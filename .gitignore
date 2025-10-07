@@ -1,0 +1,16 @@
+# Node.js dependencies
+node_modules/
+
+.env
+.env.local
+
+logs
+*.log
+
+# Optional cache
+.cache/
+dist/
+
+# OS/IDE-specific
+.DS_Store
+.vscode/
