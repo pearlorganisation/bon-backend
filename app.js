@@ -1,25 +1,17 @@
 import express from "express";
-import cors from "cors";
-import cookieParser from "cookie-parser";
+import corsConfig from "./src/config/corsConfig.js"
 import morgan from "morgan";
 import routes from "./src/routes/index.js";
-
+import notFound from "./src/middleware/notFound.js";
+import errorHandler from "./src/middleware/errorHandler.js";
 const app = express();
 
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+app.use(corsConfig);
 app.use(morgan("dev"));
 
-app.use(
-  cors({
-    origin: [process.env.FRONTEND_URL],
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], // Specify allowed HTTP methods
-    allowedHeaders: ["Content-Type", "Authorization"], // Specify allowed headers
-    credentials: true,
-  })
-);
 
 app.use("/api/v1", routes);
 
@@ -29,6 +21,8 @@ app.get("/", (req, res) => {
 });
 
 
+app.use(notFound);
+app.use(errorHandler)
 
 
 export default app;
