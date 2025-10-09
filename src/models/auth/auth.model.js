@@ -22,8 +22,8 @@ const auth_schema = new mongoose.Schema(
     // ✅ Phone number - unique
     phoneNumber: {
       type: String,
-      unique: true,
       trim: true,
+      required: true,
     },
 
     // ✅ For email verification
