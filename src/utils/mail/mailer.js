@@ -22,7 +22,7 @@ const transporter = nodemailer.createTransport({
 export const sendEmail = async (to, subject, html) => {
   try {
     const info = await transporter.sendMail({
-      from: `"Bonfire" <${process.env.NODEMAILER_EMAIL_USER}>`,
+      from: `"Bornfire" <${process.env.NODEMAILER_EMAIL_USER}>`,
       to,
       subject,
       html,
@@ -31,11 +31,10 @@ export const sendEmail = async (to, subject, html) => {
     console.log("📧 Email sent:", info.messageId);
     return info;
   } catch (error) {
-    console.error("❌ Error sending email:", error);
+    console.error("❌ Email sending failed:", error);
     throw new CustomError("Failed to send email", 500);
   }
 };
-
 /**
  * Send OTP Email
  * @param {string} name - Recipient name
