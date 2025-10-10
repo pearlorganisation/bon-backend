@@ -18,11 +18,12 @@ export const protect = asyncHandler(async (req, res, next) => {
   try {
     // 2️⃣ Verify token
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const decoded_refresh = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
     const user = await Auth.findById(decoded._id).select(
       "-password -refreshToken"
     );
     if (!user) {
-      return next(new ApiError("Invalid access token!", 401));
+      return next(new CustomError("Invalid access token!", 401));
     }
     req.user = user;
     next();
