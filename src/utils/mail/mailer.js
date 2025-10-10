@@ -1,12 +1,15 @@
 // src/utils/mailer.js
 import nodemailer from "nodemailer";
-import CustomError from "../error/customError";
+import CustomError from "../error/customError.js";
+import { configDotenv } from "dotenv";
 
+configDotenv(); 
 /**
  * Configure Nodemailer Transporter
  */
+
 const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
   auth: {
     user: process.env.NODEMAILER_EMAIL_USER,
     pass: process.env.NODEMAILER_EMAIL_PASS,

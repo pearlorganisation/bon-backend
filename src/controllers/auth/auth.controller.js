@@ -6,6 +6,7 @@ import { OTP } from "../../models/otp/otp.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import { generateOTP } from "../../utils/otpUtils.js";
 import { sendOtpEmail } from "../../utils/mail/mailer.js";
+import jwt from "jsonwebtoken";
 export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password } = req?.body;
 
@@ -20,6 +21,7 @@ export const register = asyncHandler(async (req, res, next) => {
 
   const existingUser = await Auth.findOne({ email });
   const otp = generateOTP();
+  console.log("generated otp", otp);
   try {
     if (existingUser) {
       if (existingUser.isVerified) {
@@ -49,7 +51,7 @@ export const register = asyncHandler(async (req, res, next) => {
       email,
       type: "REGISTER",
     });
-    await User.create({ ...req?.body, isVerified: false }); // thsi will through error if user creation fails
+    await Auth.create({ ...req?.body, isVerified: false }); // this will through error if user creation fails
 
     return successResponse(
       res,
@@ -58,7 +60,7 @@ export const register = asyncHandler(async (req, res, next) => {
     );
   } catch (error) {
     console.error("Error Sending OTP:", error);
-    return next(new ApiError(`Failed to send OTP: ${error.message}`, 400));
+    return next(new CustomError(`Failed to send OTP: ${error.message}`, 400));
   }
 });
 
@@ -125,7 +127,7 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
   }
 
   // 2️⃣ Check if OTP exists and matches
-  const otpRecord = await OTP.findOne({ email, type: "REGISTER" });
+  const otpRecord = await OTP.findOne({ email });
 
   if (!otpRecord) {
     return next(new CustomError("OTP expired or not found", 400));
@@ -172,6 +174,32 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
   });
 });
 
+export const resendOtp = asyncHandler(async (req, res,next) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return next(new CustomError("Email and OTP are required", 400));
+  }
+
+  const user = await Auth.findOne({ email });
+
+
+  if (!user) return next(new CustomError("User not found", 404));
+
+  const otp = generateOTP();
+  console.log("regenerated otp", otp);
+
+  await OTP.findOneAndReplace(
+    { email, type: "REGISTER" },
+    { email, otp, type: "REGISTER" },
+    { upsert: true, new: true }
+  );
+
+  await sendOtpEmail(user.name, email, otp, "REGISTER");
+
+  return successResponse(res, 200, "OTP resent successfully");
+});
+
 export const logout = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id; // assuming you have auth middleware that sets req.user
 
@@ -189,13 +217,12 @@ export const logout = asyncHandler(async (req, res, next) => {
 
 export const refreshToken = asyncHandler(async (req, res, next) => {
   const token = req.cookies?.refreshToken;
-
+  console.log(token);
   if (!token) return next(new CustomError("Refresh token missing", 401));
 
-  try {
     // 1️⃣ Verify refresh token
     const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
-
+     console.log(decoded);
     // 2️⃣ Find user and match refresh token in DB
     const user = await Auth.findById(decoded._id);
     if (!user || user.refresh_token !== token) {
@@ -216,12 +243,9 @@ export const refreshToken = asyncHandler(async (req, res, next) => {
     return successResponse(res, 200, "Tokens refreshed successfully", {
       accessToken: newAccessToken,
     });
-  } catch (error) {
-    return next(new CustomError("Refresh token expired", 401));
-  }
 });
 
-setAuthCookies = (res, accessToken, refreshToken) => {
+const setAuthCookies = (res, accessToken, refreshToken) => {
   const base = {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
