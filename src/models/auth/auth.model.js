@@ -33,8 +33,8 @@ const auth_schema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["USER", "ADMIN", "HOTEL"],
-      default: "USER",
+      enum: ["CUSTOMER", "ADMIN", "HOTEL"],
+      default: "CUSTOMER",
     },
 
     refresh_token: { type: String },
