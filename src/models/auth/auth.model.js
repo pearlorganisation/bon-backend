@@ -33,7 +33,7 @@ const auth_schema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["CUSTOMER", "ADMIN", "HOTEL"],
+      enum: ["CUSTOMER", "ADMIN", "PARTNER"],
       default: "CUSTOMER",
     },
 
