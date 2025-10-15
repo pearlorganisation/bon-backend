@@ -33,10 +33,17 @@ const auth_schema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["CUSTOMER", "ADMIN", "HOTEL"],
+      enum: ["CUSTOMER", "ADMIN", "PARTNER"],
       default: "CUSTOMER",
     },
-
+    dateOfBirth: Date,
+    gender: { type: String, enum: ["MALE", "FEMALE", "OTHER"] },
+    address: String,
+    city: String,
+    state: String,
+    country: String,
+    pincode: String,
+    profileImageUrl: String,
     refresh_token: { type: String },
   },
   { timestamps: true }
