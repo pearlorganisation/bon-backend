@@ -19,12 +19,8 @@ const partnerSchema = new mongoose.Schema(
       ifscCode: String,
       bankName: String,
     },
-    listings: [
-      {
-        listingId: { type: mongoose.Schema.Types.ObjectId, ref: "Listing" },
-      },
-    ],
-    isApproved: { type: Boolean, default: false },
+    
+    isVerified: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

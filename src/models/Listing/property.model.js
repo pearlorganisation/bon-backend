@@ -34,6 +34,7 @@ const propertySchema = new mongoose.Schema(
     Images: [{ url: String, public_id: String }],
     Videos: [{ url: String, public_id: String }],
     status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE" },
+    verified: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING" },
     //     commissionPercentage: { type: Number, default: 10 },
     //     externalIds: {
     //       makeMyTrip: { type: String },
@@ -45,5 +46,21 @@ const propertySchema = new mongoose.Schema(
 
 // ✅ 2dsphere index for geospatial queries
 propertySchema.index({ geoLocation: "2dsphere" });
+
+propertySchema.virtual("rooms", {
+  ref: "Room",
+  localField: "_id",
+  foreignField:"propertyId",
+});
+
+propertySchema.virtual("Bookings", {
+  ref: "Booking",
+  localField: "_id",
+  foreignField: "propertyId",
+});
+
+// To include virtuals in JSON output
+propertySchema.set('toJSON', { virtuals: true });
+propertySchema.set('toObject', { virtuals: true });
 
 export default mongoose.model("Property", propertySchema);
