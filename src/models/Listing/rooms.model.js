@@ -40,4 +40,15 @@ const roomSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+roomSchema.virtual("Bookings", {
+  ref: "Booking",
+  localField: "_id",
+  foreignField: "roomId",
+});
+
+
+// To include virtuals in JSON output
+roomSchema.set("toObject", { virtuals: true });
+roomSchema.set("toJSON", { virtuals: true });
+
 export default mongoose.model("Room", roomSchema);
