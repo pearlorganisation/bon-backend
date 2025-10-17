@@ -9,11 +9,10 @@ const getAllowedOrigins = () => {
     return [
       "http://localhost:3000",
       "http://localhost:5173",
+      "https://bon-frontend.vercel.app",
     ];
   } else {
-    return [
-      "http://localhost:5173",
-    ];
+    return ["https://bon-frontend.vercel.app"];
   }
 };
 
