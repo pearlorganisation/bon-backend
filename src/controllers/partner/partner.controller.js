@@ -1,7 +1,7 @@
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
-import { uploadFileToCloudinary } from "../../utils/cloudinary.js";
+import { deleteFileFromCloudinary, uploadFileToCloudinary } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
 
 // ✅ Create a new property
@@ -74,7 +74,6 @@ export const createProperty = asyncHandler(async (req, res, next) => {
 
 
 
-
 // ✅ Update property
 export const updateProperty = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
@@ -110,23 +109,46 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     property.geoLocation = req.body.geoLocation; // { type: "Point", coordinates: [lng, lat] }
   }
 
-  // 4️⃣ Handle Images
-  if (req.files?.images) {
-    // Optional: delete old images from Cloudinary
-    for (let img of property.Images) {
-      await deleteFileFromCloudinary(img.public_id, "image");
-    }
-    property.Images = await uploadFileToCloudinary(req.files.images, "properties/images");
+  if (req.body.imagesToDelete) {
+    req.body.imagesToDelete.forEach(async (image) => {
+      const result = property.Images.filter(
+        (img) => img.public_id != image.public_id
+      );
+      property.Images = result;
+      await deleteFileFromCloudinary(image.public_id, "properties/images");
+    });
   }
 
-  // 5️⃣ Handle Videos
-  if (req.files?.videos) {
-    // Optional: delete old videos from Cloudinary
-    for (let vid of property.Videos) {
-      await deleteFileFromCloudinary(vid.public_id, "video");
-    }
-    property.Videos = await uploadFileToCloudinary(req.files.videos, "properties/videos");
+  if (req.body.videosToDelete) {
+    req.body.videosToDelete.forEach(async (Video) => {
+      const result = property.Videos.filter(
+        (video) => video.public_id != Video.public_id
+      );
+      property.Videos = result;
+      await deleteFileFromCloudinary(Video.public_id, "properties/videos");
+    });
   }
+
+  // ✅ Upload images and videos if provided
+  let Images = [];
+  let Videos = [];
+
+  if (req.files?.images) {
+    Images = await uploadFileToCloudinary(
+      req.files.images,
+      "properties/images"
+    );
+  }
+
+  if (req.files?.videos) {
+    Videos = await uploadFileToCloudinary(
+      req.files.videos,
+      "properties/videos"
+    );
+  }
+
+  property.Images.push(...Images);
+  property.Videos.push(...Videos);
 
   // 6️⃣ Save property
   await property.save();
@@ -137,3 +159,12 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     data: property,
   });
 });
+
+
+
+export const getPartnerProperties = asyncHandler(async (req, res, next) => {
+   
+});
+
+
+//export deleteParnterProperty = asyncHandler
