@@ -10,10 +10,6 @@ const OtpSchema = new mongoose.Schema({
     default: "REGISTER",
     enum: ["REGISTER", "FORGOT_PASSWORD"],
   },
-  role: {
-    type: String,
-    enum: ["CUSTOMER", "PARTNER", "ADMIN"],
-  },
   email: {
     type: String,
     trim: true,

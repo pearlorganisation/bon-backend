@@ -1,7 +1,7 @@
 import jwt from "jsonwebtoken";
-import asyncHandler from "./asyncHandler.js";
-import CustomError from "../utils/error/customError.js";
-import Auth from "../models/auth/auth.model.js";
+import asyncHandler from "../asyncHandler.js";
+import CustomError from "../../utils/error/customError.js";
+import Auth from "../../models/auth/auth.model.js";
 
 export const protect = asyncHandler(async (req, res, next) => {
   let token;
@@ -33,3 +33,25 @@ export const protect = asyncHandler(async (req, res, next) => {
     );
   }
 });
+
+// Middleware factory to check allowed roles
+export const authorizeRoles = (...allowedRoles) => {
+  return (req, res, next) => {
+    const userRole = req.user?.role;
+
+    if (!userRole) {
+      return next(new CustomError("User role not found", 401));
+    }
+
+    if (!allowedRoles.includes(userRole)) {
+      return next(
+        new CustomError(
+          `Role (${req.user.role}) is not allowed to access this resource`,
+          403
+        )
+      );
+    }
+
+    next(); // role is allowed, proceed
+  };
+};

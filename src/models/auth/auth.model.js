@@ -11,6 +11,7 @@ const auth_schema = new mongoose.Schema(
       type: String,
       required: true,
       lowercase: true,
+      unique: true,
       trim: true,
       match: [
         /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
@@ -20,11 +21,16 @@ const auth_schema = new mongoose.Schema(
 
     // ✅ Phone number - unique
     phoneNumber: {
-      type: String,
-      trim: true,
-      required: true,
-      
-    },
+    type: String,
+    required: true,
+    validate: {
+      validator: function (value) {
+        // Indian phone number format (10 digits, starts with 6-9)
+        return /^[6-9]\d{9}$/.test(value);
+      },
+      message: "Invalid phone number format. Must be a 10-digit valid Indian number."
+    }
+  },
 
     // ✅ For email verification
     isVerified: { type: Boolean, default: false },
@@ -36,18 +42,34 @@ const auth_schema = new mongoose.Schema(
       enum: ["CUSTOMER", "ADMIN", "PARTNER"],
       default: "CUSTOMER",
     },
-    dateOfBirth: Date,
-    gender: { type: String, enum: ["MALE", "FEMALE", "OTHER"] },
+    dateOfBirth: {
+      type: Date,
+      required: true,
+      validate: {
+        validator: function (value) {
+          // Check if date is valid and not in future
+          const today = new Date();
+          return value <= today;
+        },
+        message: "Date of birth cannot be in the future!"
+      }
+    },
+    gender: { type: String, enum: ["male", "female", "other"] },
     address: String,
     city: String,
     state: String,
     country: String,
     pincode: String,
-    profileImageUrl: String,
+    // Cloudinary profile image
+    profileImageUrl: {
+      secure_url: { type: String},
+      public_id: { type: String},
+    },
     refresh_token: { type: String },
   },
   { timestamps: true }
 );
+
 
 //
 // ✅ Password hashing before saving
