@@ -20,21 +20,20 @@ const propertySchema = new mongoose.Schema(
         type: String,
         enum: ["Point"],
         default: "Point",
-        required: true,
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        required: true,
+        
       },
     },
     rating: { type: Number, default: 0 },
     amenities: [String],
-    checkIn: { type: Date, required: true },
-    checkOut: { type: Date, required: true },
-    Images: [{ url: String, public_id: String }],
-    Videos: [{ url: String, public_id: String }],
-    status: { type: String, enum: ["ACTIVE", "INACTIVE"], default: "ACTIVE" },
-    verified: { type: String, enum: ["PENDING", "APPROVED", "REJECTED"], default: "PENDING" },
+    checkIn: { type: Date },
+    checkOut: { type: Date },
+    Images: [{ secure_url: String, public_id: String }],
+    Videos: [{ secure_url: String, public_id: String }],
+    status: { type: String, enum: ["active", "inactive"], default: "active" },
+    verified: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
     //     commissionPercentage: { type: Number, default: 10 },
     //     externalIds: {
     //       makeMyTrip: { type: String },
@@ -47,7 +46,7 @@ const propertySchema = new mongoose.Schema(
 // ✅ 2dsphere index for geospatial queries
 propertySchema.index({ geoLocation: "2dsphere" });
 
-propertySchema.virtual("rooms", {
+propertySchema.virtual("Rooms", {
   ref: "Room",
   localField: "_id",
   foreignField:"propertyId",

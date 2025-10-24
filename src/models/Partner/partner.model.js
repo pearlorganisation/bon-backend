@@ -11,7 +11,6 @@ const partnerSchema = new mongoose.Schema(
       unique: true,
     },
   
-
     businessLicense: String,
     address: String,
     bankDetails: {
