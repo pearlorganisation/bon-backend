@@ -7,16 +7,24 @@ const roomSchema = new mongoose.Schema(
       ref: "Property",
       required: true,
     },
-    name: { type: String, required: true }, // e.g., "Deluxe Room"
-    description: String,
+    name: { type: String }, // e.g., "Deluxe Room"
     capacity: { type: Number, default: 2 },
     pricePerNight: { type: Number, required: true },
     type: {
       type: String,
-      enum: ["SINGLE", "DOUBLE", "DELUXE", "SUITE"],
-      default: "SINGLE",
+      enum: ["single", "double", "deluxe", "suite", "triple", "family"],
+      default: "single",
+      required:true
     },
     amenities: [String],
+    bedType: {
+      type: String,
+      enum: ["single", "double", "queen", "king", "twin", "sofa-bed"],
+      required: true,
+      default: "single"
+    },
+    bedCount: { type: Number, default: 1 },
+
     images: [{ url: String, public_id: String }],
     videos: [{ url: String, public_id: String }],
 
@@ -45,7 +53,6 @@ roomSchema.virtual("Bookings", {
   localField: "_id",
   foreignField: "roomId",
 });
-
 
 // To include virtuals in JSON output
 roomSchema.set("toObject", { virtuals: true });
