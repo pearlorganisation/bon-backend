@@ -6,10 +6,11 @@ import {
   uploadFileToCloudinary,
 } from "../../utils/cloudinary.js";
 import Room from "../../models/Listing/room.model.js";
+import Property from "../../models/Listing/property.model.js";
 
 export const createRooms = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
-
+  const partnerId = req.user._id; // from auth middleware
   let {
     numberOfRooms,
     name,
@@ -21,6 +22,16 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bedCount,
     blockedDates,
   } = req.body;
+
+  const property = await Property.findOne({ _id: propertyId, partnerId });
+  if (!property) {
+    return next(
+      new CustomError(
+        "You are not authorized to create  rooms for this property",
+        403
+      )
+    );
+  }
 
   // ✅ Validate required fields
   if (!numberOfRooms || numberOfRooms < 1) {
@@ -123,7 +134,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
   // ✅ Apply updates if provided
   if (name) room.name = name.trim().toLowerCase();
-  if (description) room.description = description.trim().toLowerCase();
   if (capacity) room.capacity = capacity;
   if (pricePerNight) room.pricePerNight = pricePerNight;
   if (type) room.type = type.toLowerCase();
@@ -164,52 +174,245 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 });
 
 export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
-  const propertyId = req.params.propertId;
-  let { types, pricePerNight, blockedDate, amenities, capacity } = req.body;
+  const propertyId = req.params.propertyId;
+  const partnerId = req.user._id;
+  let {
+    types,
+    pricePerNight,
+    blockedDatesAdd,
+    blockedDatesRemove,
+    amenitiesAdd,
+    amenitiesRemove,
+    capacity,
+    bedCount,
+    bedType,
+  } = req.body;
 
-  if (!types || types.length === 0) {
-    return next(new CustomError("Room types are required", 400));
+
+    const property = await Property.findOne({ _id: propertyId, partnerId });
+    if (!property) {
+      return next(
+        new CustomError(
+          "You are not authorized to update rooms for this property",
+          403
+        )
+      );
+    }
+
+  // ✅ Validate room types
+  if (!types || !Array.isArray(types) || types.length === 0) {
+    return next(
+      new CustomError("Room types are required and must be an array", 400)
+    );
   }
 
-  // ✅ Validate blockedDate
-  if (blockedDate && isNaN(Date.parse(blockedDate))) {
-    return next(new CustomError("Invalid blocked date format", 400));
+  // ✅ Normalize types
+  types = types.map((t) => t.toLowerCase().trim());
+
+  // ✅ Validate blockedDatesAdd format
+  if (blockedDatesAdd && !Array.isArray(blockedDatesAdd)) {
+    return next(
+      new CustomError("blockedDatesAdd must be an array of objects", 400)
+    );
   }
 
-  // ✅ Find all rooms of this partner matching the types
+  if (blockedDatesRemove && !Array.isArray(blockedDatesRemove)) {
+    return next(
+      new CustomError("blockedDatesRemove must be an array of objects", 400)
+    );
+  }
+
+  // ✅ Find rooms to update
   const rooms = await Room.find({
     propertyId,
-    type: { $in: types.map((t) => t.toLowerCase()) },
+    type: { $in: types },
   });
-          
 
   if (!rooms.length) {
-    return next(new CustomError("No rooms found for provided types", 404));
+    return next(
+      new CustomError("No rooms found for the provided property and types", 404)
+    );
   }
 
-  // ✅ Perform bulk update
+  // ✅ Static fields update
   const updateFields = {};
-  if (pricePerNight) updateFields.pricePerNight = pricePerNight;
-  if (amenities) updateFields.amenities = amenities.map((a) => a.toLowerCase());
-  if (capacity) updateFields.capacity = capacity;
+  if (pricePerNight !== undefined) updateFields.pricePerNight = pricePerNight;
+  if (capacity !== undefined) updateFields.capacity = capacity;
+  if (bedCount !== undefined) updateFields.bedCount = bedCount;
+  if (bedType) updateFields.bedType = bedType.trim().toLowerCase();
 
-  // ✅ Update static fields (same for all rooms)
-  await Room.updateMany(
-    { _id: { $in: filteredRooms.map((r) => r._id) } },
-    { $set: updateFields }
-  );
+  const roomIds = rooms.map((room) => room._id);
 
-  // ✅ Add blocked date to all rooms
-  if (blockedDate) {
+  // ✅ Apply static field updates
+  if (Object.keys(updateFields).length > 0) {
+    await Room.updateMany({ _id: { $in: roomIds } }, { $set: updateFields });
+  }
+
+  // ✅ Add amenities using $addToSet
+  if (amenitiesAdd && Array.isArray(amenitiesAdd)) {
     await Room.updateMany(
-      { _id: { $in: filteredRooms.map((r) => r._id) } },
-      { $push: { blockedDates: blockedDate } }
+      { _id: { $in: roomIds } },
+      {
+        $addToSet: {
+          amenities: { $each: amenitiesAdd.map((a) => a.trim().toLowerCase()) },
+        },
+      }
+    );
+  }
+
+  // ✅ Remove amenities using $pull
+  if (amenitiesRemove && Array.isArray(amenitiesRemove)) {
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $pull: {
+          amenities: {
+            $in: amenitiesRemove.map((a) => a.trim().toLowerCase()),
+          },
+        },
+      }
+    );
+  }
+
+  // ✅ Add blocked dates
+  if (blockedDatesAdd && blockedDatesAdd.length > 0) {
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      { $addToSet: { blockedDates: { $each: blockedDatesAdd } } }
+    );
+  }
+
+  // ✅ Remove blocked dates (match by startDate & endDate)
+  if (blockedDatesRemove && blockedDatesRemove.length > 0) {
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $pull: {
+          blockedDates: {
+            $or: blockedDatesRemove.map((d) => ({
+              startDate: d.startDate,
+              endDate: d.endDate,
+            })),
+          },
+        },
+      }
     );
   }
 
   return successResponse(res, 200, "Bulk update successful", {
-    updatedRooms: filteredRooms.length,
-    updatedFields: Object.keys(updateFields),
-    blockedDateAdded: blockedDate || null,
+    updatedRooms: rooms.length,
+    updatedFields: updateFields,
+    blockedDatesAdded: blockedDatesAdd || null,
+    blockedDatesRemoved: blockedDatesRemove || null,
+    amenitiesAdded: amenitiesAdd || null,
+    amenitiesRemoved: amenitiesRemove || null,
   });
+});
+
+//get types of rooms in  property
+export const getTypesOfRoomsInProperty = asyncHandler(
+  async (req, res, next) => {
+    const propertyId = req.params.propertyId;
+    const partnerId = req.user._id; //authenticated partner
+
+    const property = await Property.findOne({ _id: propertyId, partnerId });
+    if (!property) {
+      return next(
+        new CustomError(
+          "You are not authorized to get Types rooms for this property",
+          403
+        )
+      );
+    }
+
+    const rooms = await Room.distinct("type", { propertyId: propertyId });
+
+    return successResponse(res, 200, "Room types fetched successfully", rooms);
+  }
+);
+
+//delete Rooms based on Types
+
+export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
+  const propertyId = req.params.propertyId;
+  const partnerId = req.user._id; // Authenticating partner
+
+  let { types } = req.body;
+
+  // ✅ Validate types
+  if (!types || !Array.isArray(types) || types.length === 0) {
+    return next(
+      new CustomError("Room types are required and must be an array", 400)
+    );
+  }
+
+  // 🔷 Normalize room types
+  types = types.map((t) => t.toLowerCase().trim());
+
+  //  Step 1: Verify property belongs to the logged-in partner
+  const property = await Property.findOne({ _id: propertyId, partnerId });
+  if (!property) {
+    return next(
+      new CustomError(
+        "You are not authorized to delete rooms for this property",
+        403
+      )
+    );
+  }
+
+  //  Step 2: Delete rooms only owned by that partner in this property
+  const deleteResult = await Room.deleteMany({
+    propertyId,
+    type: { $in: types },
+  });
+
+  if (deleteResult.deletedCount === 0) {
+    return next(
+      new CustomError(
+        "No rooms found with specified types for this property",
+        404
+      )
+    );
+  }
+
+  return successResponse(res, 200, "Rooms deleted successfully", {
+    deletedRooms: deleteResult.deletedCount,
+  });
+});
+
+//get rooms by property id,
+
+export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
+  const propertyId = req.params.propertyId;
+
+  const partnerId = req.user._id; // from auth middleware
+
+  //  Step 1: Verify property belongs to the logged-in partner
+  const property = await Property.findOne({ _id: propertyId, partnerId });
+  if (!property) {
+    return next(
+      new CustomError(
+        "You are not authorized to get rooms for this property",
+        403
+      )
+    );
+  }
+
+  const rooms = await Room.find({ propertyId }).populate("Bookings");
+
+  if (!rooms || rooms.length === 0) {
+    return next(new CustomError("No rooms found for this property", 400));
+   }
+
+  const typesOfRooms = {};
+    
+  for (let room of rooms) {
+    if (!typesOfRooms[room.type]) {
+      typesOfRooms[room.type] = [];
+    }
+    typesOfRooms[room.type].push(room);
+  }
+  
+    
+  return successResponse(res, 200, "Rooms fetched Successfully ", typesOfRooms);
 });

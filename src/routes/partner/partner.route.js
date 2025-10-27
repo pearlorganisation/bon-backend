@@ -4,7 +4,10 @@ import { updateProperty, createProperty, getPartnerProperties, getPartnerPropert
 import {
   createRooms,
   updateRoomById,
-  updateRoomsInBulk
+  updateRoomsInBulk,
+  getRoomsByPropertyId,
+  getTypesOfRoomsInProperty,
+  deleteRoomsByTypes
 } from "../../controllers/partner/room.controller.js";
 import { protect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
@@ -15,10 +18,11 @@ const storage = multer.memoryStorage();
 const upload = multer({ storage });
 
 const uploadFields = upload.fields([
-  { name: "images", maxCount: 5 },
-  { name: "videos", maxCount: 2 },
+  { name: "images", maxCount: 10 },
+  { name: "videos", maxCount: 5 },
 ]);
 
+//---------- property routes ----------------
 
 router.post("/create-property", protect, uploadFields, createProperty);
 router.put("/update-property/:propertyId", protect, uploadFields, updateProperty);
@@ -28,9 +32,11 @@ router.get("/get-partner-property/:propertyId", protect, getPartnerPropertyByID)
 //---------- Rooms routes ----------------
 
 
-router.post("/create-room/:propertyId", protect,createRooms);
+router.post("/create-rooms/:propertyId", protect,createRooms);
 router.post("/update-single-room/:roomId", protect,updateRoomById);
-router.put("/update-rooms-bulk/:propertyId", protect,updateRoomsInBulk);
+router.put("/update-rooms-bulk/:propertyId", protect, updateRoomsInBulk);
+router.get("/get-types-of-rooms/:propertyId", protect, getTypesOfRoomsInProperty);
+router.get("/get-rooms-for-property/:propertyId", protect, getRoomsByPropertyId);
 
 
 export default router;
