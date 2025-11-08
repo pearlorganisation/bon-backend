@@ -24,9 +24,29 @@ const roomSchema = new mongoose.Schema(
       default: "single"
     },
     bedCount: { type: Number, default: 1 },
-
-    images: [{ url: String, public_id: String }],
-    videos: [{ url: String, public_id: String }],
+    
+ // ✅ Add dimensions object here
+ dimensions: {
+   length: {
+     type: Number,
+     default: 0
+   }, // in feet or meters
+   width: {
+     type: Number,
+     default: 0
+   },
+   height: {
+     type: Number,
+     default: 0
+   },
+   unit: {
+     type: String,
+     enum: ["ft", "m"],
+     default: "ft"
+   }, // optional
+ },
+    images: [{ secure_url: String, public_id: String }],
+    videos: [{ secure_url: String, public_id: String }],
 
     // ✅ Partner-defined availability periods
     availability: [
