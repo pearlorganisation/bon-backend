@@ -380,6 +380,30 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
   });
 });
 
+export const deleteRoom = asyncHandler(async (req, res, next) => {
+  const roomId = req.params.roomId;
+  const partnerId = req.user._id; // Authenticating partner
+
+  const room = await Room.findById(roomId).populate("propertyId");
+
+  if (!room) {
+    return next(new CustomError("Room not found", 404));
+  }
+
+  // ✅ Allow only the partner who owns the property to update
+  if (room.propertyId.partnerId.toString() !== partnerId.toString()) {
+    return next(
+      new CustomError("You are not authorized to update this room", 403)
+    );
+  }
+
+
+  const deleteRoom = await Room.findByIdAndDelete(roomId);
+
+  return successResponse(res, 200, "Room delete  successfully", deleteRoom);
+
+});
+
 //get rooms by property id,
 
 export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
@@ -416,3 +440,36 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
     
   return successResponse(res, 200, "Rooms fetched Successfully ", typesOfRooms);
 });
+
+
+export const setRoomsImagesandVideos = asyncHandler(async (req, res, next) => {
+     
+  const propertyId = req.params.propertyId;
+  const partnerId = req.user._id; // Authenticating partner
+
+  let { types } = req.body;
+
+  // ✅ Validate types
+  if (!types || !Array.isArray(types) || types.length === 0) {
+    return next(
+      new CustomError("Room types are required and must be an array", 400)
+    );
+  }
+
+  // 🔷 Normalize room types
+  types = types.map((t) => t.toLowerCase().trim());
+
+  //  Step 1: Verify property belongs to the logged-in partner
+  const property = await Property.findOne({ _id: propertyId, partnerId });
+  if (!property) {
+    return next(
+      new CustomError(
+        "You are not authorized to delete rooms for this property",
+        403
+      )
+    );
+  }
+
+ 
+      
+}) 
