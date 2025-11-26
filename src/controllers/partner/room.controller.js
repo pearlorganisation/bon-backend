@@ -11,7 +11,8 @@ import Property from "../../models/Listing/property.model.js";
 
 export const createRooms = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
-  const partnerId = req.user._id; // from auth middleware
+  const partnerId = req.user._id;
+
   let {
     numberOfRooms,
     name,
@@ -34,14 +35,18 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     _id: propertyId,
     partnerId,
   });
+
   if (!property) {
     return next(
       new CustomError(
-        "You are not authorized to create  rooms for this property",
+        "You are not authorized to create rooms for this property",
         403
       )
     );
   }
+
+  // ✅ 1. Define Valid Units (Fixes the crash)
+  const validUnits = ["ft", "m"];
 
   // ✅ Validate required fields
   if (!numberOfRooms || numberOfRooms < 1) {
@@ -58,68 +63,48 @@ export const createRooms = asyncHandler(async (req, res, next) => {
   ) {
     return next(
       new CustomError(
-        "Name, pricePerNight, type, dimensions bedType,bathroomType are required",
+        "Name, pricePerNight, type, dimensions, bedType, and bathroomType are required",
         400
       )
     );
   }
 
-  // ✅ Convert fields to correct format
-  numberOfRooms = parseInt(numberOfRooms);
+  // ✅ Validate Dimensions Structure
+  if (
+    dimensions &&
+    (typeof dimensions !== "object" ||
+      dimensions === null ||
+      typeof dimensions.length !== "number" ||
+      typeof dimensions.width !== "number" ||
+      typeof dimensions.height !== "number" ||
+      !dimensions.unit ||
+      !validUnits.includes(dimensions.unit))
+  ) {
+    return next(
+      new CustomError(
+        "Invalid dimensions object. Must include numeric length, width, height, and a valid unit ('ft' or 'm').",
+        400
+      )
+    );
+  }
 
-  const baseRoomData = {
-    propertyId,
-    name: name.trim().toLowerCase(),
-    capacity: capacity || 2,
-    pricePerNight,
-    type: type.toLowerCase(),
-    amenities: amenities ? amenities.map((item) => item.toLowerCase()) : [],
-    bedType: bedType.toLowerCase(),
-    bedCount: bedCount || 1,
-    blockedDates: blockedDates || [],
-    dimensions,
-    bathroomType: bathroomType.toLowerCase(),
-    bathroomCount: bathroomCount || 1,
-    bathroomAmenities: bathroomAmenities
-      ? bathroomAmenities.map((item) => item.toLowerCase())
-      : [],
-  };
-
-if (
-  dimensions &&
-  (typeof dimensions !== "object" ||
-    dimensions === null ||
-    typeof dimensions.length !== "number" ||
-    typeof dimensions.width !== "number" ||
-    typeof dimensions.height !== "number" ||
-    !dimensions.unit ||
-    !validUnits.includes(dimensions.unit))
-) {
-  return next(
-    new CustomError(
-      "Invalid dimensions object. Must include numeric length, width, height, and a valid unit ('ft' or 'm').",
-      400
-    )
-  );
-}
-
- 
-if (
-  !distanceToBathroom ||
-  typeof distanceToBathroom !== "object" ||
-  distanceToBathroom.value == null ||
-  typeof distanceToBathroom.value !== "number" ||
-  !distanceToBathroom.unit ||
-  !validUnits.includes(distanceToBathroom.unit)
-) {
-  return next(
-    new CustomError(
-      "Invalid distanceToBathroom object. Must include numeric value and unit ('ft' or 'm').",
-      400
-    )
-  );
-}
-
+  // ✅ Validate Distance To Bathroom Structure
+  // Note: We check this before adding it to baseRoomData
+  if (
+    distanceToBathroom && // Only validate if it exists (or remove this check if required)
+    (typeof distanceToBathroom !== "object" ||
+      distanceToBathroom.value == null ||
+      typeof distanceToBathroom.value !== "number" ||
+      !distanceToBathroom.unit ||
+      !validUnits.includes(distanceToBathroom.unit))
+  ) {
+    return next(
+      new CustomError(
+        "Invalid distanceToBathroom object. Must include numeric value and unit ('ft' or 'm').",
+        400
+      )
+    );
+  }
 
   // ✅ Validate ENUM fields
   const validTypes = [
@@ -133,7 +118,7 @@ if (
   const validBeds = ["single", "double", "queen", "king", "twin", "sofa-bed"];
   const validBathroom = ["private", "shared", "ensuite", "external"];
 
-  if (!validTypes.includes(baseRoomData.type)) {
+  if (!validTypes.includes(type.toLowerCase())) {
     return next(
       new CustomError(
         `Invalid room type. Allowed: ${validTypes.join(", ")}`,
@@ -141,19 +126,42 @@ if (
       )
     );
   }
-  if (!validBeds.includes(baseRoomData.bedType)) {
+  if (!validBeds.includes(bedType.toLowerCase())) {
     return next(
       new CustomError(`Invalid bed type. Allowed: ${validBeds.join(", ")}`, 400)
     );
   }
-  if (!validBathroom.includes(baseRoomData.bathroomType)) {
+  if (!validBathroom.includes(bathroomType.toLowerCase())) {
     return next(
       new CustomError(
-        `Invalid bethroom type. Allowed: ${validBathroom.join(", ")}`,
+        `Invalid bathroom type. Allowed: ${validBathroom.join(", ")}`,
         400
       )
     );
   }
+
+  // ✅ Convert fields and Prepare Data
+  numberOfRooms = parseInt(numberOfRooms);
+
+  const baseRoomData = {
+    propertyId,
+    name: name.trim(), // Don't lowerCase name usually, looks better in UI as typed
+    capacity: capacity || 2,
+    pricePerNight,
+    type: type.toLowerCase(),
+    amenities: amenities ? amenities.map((item) => item.trim()) : [],
+    bedType: bedType.toLowerCase(),
+    bedCount: bedCount || 1,
+    blockedDates: blockedDates || [],
+    dimensions, // Already validated
+    distanceToBathroom, // ✅ Added this (was missing in your original code)
+    discount: discount || 0, // ✅ Added discount (was missing in your original code)
+    bathroomType: bathroomType.toLowerCase(),
+    bathroomCount: bathroomCount || 1,
+    bathroomAmenities: bathroomAmenities
+      ? bathroomAmenities.map((item) => item.trim())
+      : [],
+  };
 
   // ✅ Create multiple rooms
   const roomsToCreate = [];
@@ -304,7 +312,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   return successResponse(res, 200, "Room updated successfully", room);
 });
 
-
 export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
   const partnerId = req.user._id;
@@ -349,7 +356,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   // ✅ Normalize types
   types = types.map((t) => t.toLowerCase().trim());
 
-
   // ✅ Find target rooms
   const rooms = await Room.find({
     propertyId,
@@ -384,7 +390,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
       )
     );
   }
-
 
   // ✅ Validate dimensions
   if (
@@ -538,8 +543,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   });
 });
 
-
-
 //get types of rooms in  property
 export const getTypesOfRoomsInProperty = asyncHandler(
   async (req, res, next) => {
@@ -670,7 +673,7 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   // .populate("Bookings");
 
   if (!rooms || rooms.length === 0) {
-    return next(new CustomError("No rooms found for this property", 400));
+    return successResponse(res, 200, "No rooms yet for this property", {});
   }
 
   const typesOfRooms = {};
