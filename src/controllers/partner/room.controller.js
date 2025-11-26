@@ -29,6 +29,24 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bathroomCount,
     distanceToBathroom,
     bathroomAmenities,
+    // ✅ Extract New Fields
+    servicesAndExtras,
+    accessibility,
+    safetyAndSecurity,
+    activitiesAndSports,
+    barAndEntertainment,
+    transportation,
+    poolAndSpa,
+    cleaningServices,
+    frontDeskServices,
+    commonAreas,
+    kidsAndFamily,
+    buildingInfo,
+    selfCheckIn,
+    beddingAndComfort,
+    bathroomFeatures,
+    roomFacilities,
+    mediaAndTechnology,
   } = req.body;
 
   const property = await Property.findOne({
@@ -89,9 +107,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
   }
 
   // ✅ Validate Distance To Bathroom Structure
-  // Note: We check this before adding it to baseRoomData
   if (
-    distanceToBathroom && // Only validate if it exists (or remove this check if required)
+    distanceToBathroom &&
     (typeof distanceToBathroom !== "object" ||
       distanceToBathroom.value == null ||
       typeof distanceToBathroom.value !== "number" ||
@@ -145,7 +162,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
 
   const baseRoomData = {
     propertyId,
-    name: name.trim(), // Don't lowerCase name usually, looks better in UI as typed
+    name: name.trim(),
     capacity: capacity || 2,
     pricePerNight,
     type: type.toLowerCase(),
@@ -153,14 +170,32 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bedType: bedType.toLowerCase(),
     bedCount: bedCount || 1,
     blockedDates: blockedDates || [],
-    dimensions, // Already validated
-    distanceToBathroom, // ✅ Added this (was missing in your original code)
-    discount: discount || 0, // ✅ Added discount (was missing in your original code)
+    dimensions,
+    distanceToBathroom,
+    discount: discount || 0,
     bathroomType: bathroomType.toLowerCase(),
     bathroomCount: bathroomCount || 1,
     bathroomAmenities: bathroomAmenities
       ? bathroomAmenities.map((item) => item.trim())
       : [],
+    // ✅ Add New Fields to Base Data
+    servicesAndExtras,
+    accessibility,
+    safetyAndSecurity,
+    activitiesAndSports,
+    barAndEntertainment,
+    transportation,
+    poolAndSpa,
+    cleaningServices,
+    frontDeskServices,
+    commonAreas,
+    kidsAndFamily,
+    buildingInfo,
+    selfCheckIn,
+    beddingAndComfort,
+    bathroomFeatures,
+    roomFacilities,
+    mediaAndTechnology,
   };
 
   // ✅ Create multiple rooms
@@ -211,6 +246,24 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     bathroomCount,
     distanceToBathroom,
     bathroomAmenities,
+    // ✅ Extract New Fields
+    servicesAndExtras,
+    accessibility,
+    safetyAndSecurity,
+    activitiesAndSports,
+    barAndEntertainment,
+    transportation,
+    poolAndSpa,
+    cleaningServices,
+    frontDeskServices,
+    commonAreas,
+    kidsAndFamily,
+    buildingInfo,
+    selfCheckIn,
+    beddingAndComfort,
+    bathroomFeatures,
+    roomFacilities,
+    mediaAndTechnology,
   } = req.body;
 
   // ✅ Validate ENUMs before assignment
@@ -306,6 +359,25 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (bathroomAmenities)
     room.bathroomAmenities = bathroomAmenities.map((a) => a.toLowerCase());
 
+  // ✅ Apply New Fields Updates
+  if (servicesAndExtras) room.servicesAndExtras = servicesAndExtras;
+  if (accessibility) room.accessibility = accessibility;
+  if (safetyAndSecurity) room.safetyAndSecurity = safetyAndSecurity;
+  if (activitiesAndSports) room.activitiesAndSports = activitiesAndSports;
+  if (barAndEntertainment) room.barAndEntertainment = barAndEntertainment;
+  if (transportation) room.transportation = transportation;
+  if (poolAndSpa) room.poolAndSpa = poolAndSpa;
+  if (cleaningServices) room.cleaningServices = cleaningServices;
+  if (frontDeskServices) room.frontDeskServices = frontDeskServices;
+  if (commonAreas) room.commonAreas = commonAreas;
+  if (kidsAndFamily) room.kidsAndFamily = kidsAndFamily;
+  if (buildingInfo) room.buildingInfo = buildingInfo;
+  if (selfCheckIn) room.selfCheckIn = selfCheckIn;
+  if (beddingAndComfort) room.beddingAndComfort = beddingAndComfort;
+  if (bathroomFeatures) room.bathroomFeatures = bathroomFeatures;
+  if (roomFacilities) room.roomFacilities = roomFacilities;
+  if (mediaAndTechnology) room.mediaAndTechnology = mediaAndTechnology;
+
   // ✅ Save in DB
   await room.save();
 
@@ -333,6 +405,24 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     bathroomAmenitiesAdd,
     bathroomAmenitiesRemove,
     distanceToBathroom,
+    // ✅ Extract New Fields for Bulk Update
+    servicesAndExtras,
+    accessibility,
+    safetyAndSecurity,
+    activitiesAndSports,
+    barAndEntertainment,
+    transportation,
+    poolAndSpa,
+    cleaningServices,
+    frontDeskServices,
+    commonAreas,
+    kidsAndFamily,
+    buildingInfo,
+    selfCheckIn,
+    beddingAndComfort,
+    bathroomFeatures,
+    roomFacilities,
+    mediaAndTechnology,
   } = req.body;
 
   // ✅ Verify property ownership
@@ -439,6 +529,27 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   if (bathroomCount !== undefined) updateFields.bathroomCount = bathroomCount;
   if (dimensions) updateFields.dimensions = dimensions;
   if (distanceToBathroom) updateFields.distanceToBathroom = distanceToBathroom;
+
+  // ✅ Add New Fields to Bulk Update Object
+  if (servicesAndExtras) updateFields.servicesAndExtras = servicesAndExtras;
+  if (accessibility) updateFields.accessibility = accessibility;
+  if (safetyAndSecurity) updateFields.safetyAndSecurity = safetyAndSecurity;
+  if (activitiesAndSports)
+    updateFields.activitiesAndSports = activitiesAndSports;
+  if (barAndEntertainment)
+    updateFields.barAndEntertainment = barAndEntertainment;
+  if (transportation) updateFields.transportation = transportation;
+  if (poolAndSpa) updateFields.poolAndSpa = poolAndSpa;
+  if (cleaningServices) updateFields.cleaningServices = cleaningServices;
+  if (frontDeskServices) updateFields.frontDeskServices = frontDeskServices;
+  if (commonAreas) updateFields.commonAreas = commonAreas;
+  if (kidsAndFamily) updateFields.kidsAndFamily = kidsAndFamily;
+  if (buildingInfo) updateFields.buildingInfo = buildingInfo;
+  if (selfCheckIn) updateFields.selfCheckIn = selfCheckIn;
+  if (beddingAndComfort) updateFields.beddingAndComfort = beddingAndComfort;
+  if (bathroomFeatures) updateFields.bathroomFeatures = bathroomFeatures;
+  if (roomFacilities) updateFields.roomFacilities = roomFacilities;
+  if (mediaAndTechnology) updateFields.mediaAndTechnology = mediaAndTechnology;
 
   const roomIds = rooms.map((r) => r._id);
 
