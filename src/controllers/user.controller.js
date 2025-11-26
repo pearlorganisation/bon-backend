@@ -28,7 +28,7 @@ export const updateUserProfile = asyncHandler(async (req, res, next) => {
 
   updatableFields.forEach((field) => {
     if (req.body!== undefined  &&  req.body?.[field] !== undefined) {
-      user[field] = req.body[field].trim().toLowerCase();
+      user[field] = JSON.parse(req.body[field]).trim().toLowerCase();
     }
   });
   
