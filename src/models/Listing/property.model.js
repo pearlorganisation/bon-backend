@@ -23,7 +23,6 @@ const propertySchema = new mongoose.Schema(
       },
       coordinates: {
         type: [Number], // [longitude, latitude]
-        
       },
     },
     rating: { type: Number, default: 0 },
@@ -33,12 +32,15 @@ const propertySchema = new mongoose.Schema(
     Images: [{ secure_url: String, public_id: String }],
     Videos: [{ secure_url: String, public_id: String }],
     status: { type: String, enum: ["active", "inactive"], default: "active" },
-    verified: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
+    verified: {
+      type: String,
+      enum: ["pending", "under_review", "approved", "rejected"],
+      default: "pending",
+    },
+    GSTIN: {type: String},
+    CIN: {type: String}
     //     commissionPercentage: { type: Number, default: 10 },
-    //     externalIds: {
-    //       makeMyTrip: { type: String },
-    //       booking: { type: String },
-    //     },
+    
   },
   { timestamps: true }
 );
