@@ -27,11 +27,10 @@ export const updateUserProfile = asyncHandler(async (req, res, next) => {
   ];
 
   updatableFields.forEach((field) => {
-    if (req.body!== undefined  &&  req.body?.[field] !== undefined) {
-      user[field] = JSON.parse(req.body[field]).trim().toLowerCase();
+    if (req.body !== undefined && req.body?.[field] !== undefined) {
+      user[field] = req.body[field].trim().toLowerCase();
     }
   });
-  
 
   if (req.files) {
     const image = await uploadFileToCloudinary(req.files, "Users/images");
@@ -58,4 +57,18 @@ export const getUserProfile = asyncHandler(async (req, res, next) => {
   }
 
   successResponse(res, 200, "User profile fetched successfully", user);
+});
+
+export const getAllUsers = asyncHandler(async (req, res, next) => {
+  if (req.user.role !== "ADMIN") {
+    return next(new CustomError("Not authorized to access this route", 403));
+  }
+
+  const users = await Auth.find().select("-password -refresh_token");
+
+  if (!users || users.length === 0) {
+    return next(new CustomError("No users found", 404));
+  }
+
+  successResponse(res, 200, "All users fetched successfully", users);
 });
