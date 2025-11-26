@@ -159,11 +159,27 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     return next(new CustomError("NO properties found", 200));
   }
 
+   result = {
+     "properties":properties,
+     "pending": [],
+     "under_review": [],
+     "approved": [],
+     "rejected": [],
+     "active":[],
+     "inactive": [],
+     numberOfProperties:properties.length
+   };
+
+      for( prop of properties){
+           result[prop.status].push(prop);
+           result[prop.verified].push(prop);
+      }
+
   successResponse(
     res,
     200,
     "successfully fetch partner properties",
-    properties
+    result,
   );
 });
 

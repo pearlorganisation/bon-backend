@@ -1,6 +1,7 @@
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
+import { validateFileSize } from "../../utils/validateFileSize.js";
 import {
   deleteFileFromCloudinary,
   uploadFileToCloudinary,
@@ -21,12 +22,17 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bedType,
     bedCount,
     blockedDates,
-    dimensions
+    dimensions,
+    discount,
+    bathroomType,
+    bathroomCount,
+    distanceToBathroom,
+    bathroomAmenities,
   } = req.body;
 
   const property = await Property.findOne({
     _id: propertyId,
-    partnerId
+    partnerId,
   });
   if (!property) {
     return next(
@@ -42,10 +48,17 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     return next(new CustomError("numberOfRooms must be at least 1", 400));
   }
 
-  if (!name || !pricePerNight || !type || !bedType || !dimensions) {
+  if (
+    !name ||
+    !pricePerNight ||
+    !type ||
+    !bedType ||
+    !dimensions ||
+    !bathroomType
+  ) {
     return next(
       new CustomError(
-        "Name, pricePerNight, type, dimensions and bedType are required",
+        "Name, pricePerNight, type, dimensions bedType,bathroomType are required",
         400
       )
     );
@@ -53,7 +66,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
 
   // ✅ Convert fields to correct format
   numberOfRooms = parseInt(numberOfRooms);
-
 
   const baseRoomData = {
     propertyId,
@@ -65,21 +77,50 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bedType: bedType.toLowerCase(),
     bedCount: bedCount || 1,
     blockedDates: blockedDates || [],
-    dimensions 
+    dimensions,
+    bathroomType: bathroomType.toLowerCase(),
+    bathroomCount: bathroomCount || 1,
+    bathroomAmenities: bathroomAmenities
+      ? bathroomAmenities.map((item) => item.toLowerCase())
+      : [],
   };
 
-    // Validate dimensions
-    const validUnits = ["ft", "m"];
-    const validDimensions =
-      dimensions &&
-      typeof dimensions === "object" &&
-      (!dimensions.unit || validUnits.includes(dimensions.unit));
+if (
+  dimensions &&
+  (typeof dimensions !== "object" ||
+    dimensions === null ||
+    typeof dimensions.length !== "number" ||
+    typeof dimensions.width !== "number" ||
+    typeof dimensions.height !== "number" ||
+    !dimensions.unit ||
+    !validUnits.includes(dimensions.unit))
+) {
+  return next(
+    new CustomError(
+      "Invalid dimensions object. Must include numeric length, width, height, and a valid unit ('ft' or 'm').",
+      400
+    )
+  );
+}
 
-    if (dimensions && !validDimensions) {
-      return next(
-        new CustomError("Invalid dimensions object or unit. Use ft or m.", 400)
-      );
-    }
+ 
+if (
+  !distanceToBathroom ||
+  typeof distanceToBathroom !== "object" ||
+  distanceToBathroom.value == null ||
+  typeof distanceToBathroom.value !== "number" ||
+  !distanceToBathroom.unit ||
+  !validUnits.includes(distanceToBathroom.unit)
+) {
+  return next(
+    new CustomError(
+      "Invalid distanceToBathroom object. Must include numeric value and unit ('ft' or 'm').",
+      400
+    )
+  );
+}
+
+
   // ✅ Validate ENUM fields
   const validTypes = [
     "single",
@@ -90,6 +131,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     "family",
   ];
   const validBeds = ["single", "double", "queen", "king", "twin", "sofa-bed"];
+  const validBathroom = ["private", "shared", "ensuite", "external"];
 
   if (!validTypes.includes(baseRoomData.type)) {
     return next(
@@ -104,12 +146,20 @@ export const createRooms = asyncHandler(async (req, res, next) => {
       new CustomError(`Invalid bed type. Allowed: ${validBeds.join(", ")}`, 400)
     );
   }
+  if (!validBathroom.includes(baseRoomData.bathroomType)) {
+    return next(
+      new CustomError(
+        `Invalid bethroom type. Allowed: ${validBathroom.join(", ")}`,
+        400
+      )
+    );
+  }
 
   // ✅ Create multiple rooms
   const roomsToCreate = [];
   for (let i = 0; i < numberOfRooms; i++) {
     roomsToCreate.push({
-      ...baseRoomData
+      ...baseRoomData,
     });
   }
 
@@ -124,61 +174,38 @@ export const createRooms = asyncHandler(async (req, res, next) => {
 });
 
 export const updateRoomById = asyncHandler(async (req, res, next) => {
-  const partnerId = req.user._id; // from auth middleware
+  const partnerId = req.user._id;
   const roomId = req.params.roomId;
 
-  // ✅ Find Room First (and ensure it belongs to the partner's property)
+  // ✅ Find the room and check ownership
   const room = await Room.findById(roomId).populate("propertyId");
+  if (!room) return next(new CustomError("Room not found", 404));
 
-  if (!room) {
-    return next(new CustomError("Room not found", 404));
-  }
-
-  // ✅ Allow only the partner who owns the property to update
   if (room.propertyId.partnerId.toString() !== partnerId.toString()) {
     return next(
       new CustomError("You are not authorized to update this room", 403)
     );
   }
 
-  // ✅ Extract updatable fields from body
+  // ✅ Extract updatable fields
   const {
     name,
     capacity,
     pricePerNight,
+    discount,
     type,
     amenities,
     bedType,
     bedCount,
     blockedDates,
-    dimensions
+    dimensions,
+    bathroomType,
+    bathroomCount,
+    distanceToBathroom,
+    bathroomAmenities,
   } = req.body;
 
-  // ✅ Apply updates if provided
-  if (name) room.name = name.trim().toLowerCase();
-  if (capacity) room.capacity = capacity;
-  if (pricePerNight) room.pricePerNight = pricePerNight;
-  if (type) room.type = type.toLowerCase();
-  if (amenities) room.amenities = amenities.map((a) => a.toLowerCase());
-  if (bedType) room.bedType = bedType.toLowerCase();
-  if (bedCount) room.bedCount = bedCount;
-  if (blockedDates) room.blockedDates = blockedDates;
-  if(dimensions) room.dimensions= dimensions;
-
-    // Validate dimensions
-    const validUnits = ["ft", "m"];
-    const validDimensions =
-      dimensions &&
-      typeof dimensions === "object" &&
-      (!dimensions.unit || validUnits.includes(dimensions.unit));
-
-    if (dimensions && !validDimensions) {
-      return next(
-        new CustomError("Invalid dimensions object or unit. Use ft or m.", 400)
-      );
-    }
-
-  // ✅ Validate ENUM fields
+  // ✅ Validate ENUMs before assignment
   const validTypes = [
     "single",
     "double",
@@ -188,8 +215,10 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     "family",
   ];
   const validBeds = ["single", "double", "queen", "king", "twin", "sofa-bed"];
+  const validUnits = ["ft", "m"];
+  const validBathroomTypes = ["private", "shared", "ensuite", "external"];
 
-  if (type && !validTypes.includes(room.type)) {
+  if (type && !validTypes.includes(type.toLowerCase())) {
     return next(
       new CustomError(
         `Invalid room type. Allowed: ${validTypes.join(", ")}`,
@@ -197,11 +226,77 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
       )
     );
   }
-  if (bedType && !validBeds.includes(room.bedType)) {
+
+  if (bedType && !validBeds.includes(bedType.toLowerCase())) {
     return next(
       new CustomError(`Invalid bed type. Allowed: ${validBeds.join(", ")}`, 400)
     );
   }
+
+  if (
+    bathroomType &&
+    !validBathroomTypes.includes(bathroomType.toLowerCase())
+  ) {
+    return next(
+      new CustomError(
+        `Invalid bathroom type. Allowed: ${validBathroomTypes.join(", ")}`,
+        400
+      )
+    );
+  }
+
+  // ✅ Validate dimensions object
+  if (
+    dimensions &&
+    (typeof dimensions !== "object" ||
+      dimensions === null ||
+      typeof dimensions.length !== "number" ||
+      typeof dimensions.width !== "number" ||
+      typeof dimensions.height !== "number" ||
+      !dimensions.unit ||
+      !validUnits.includes(dimensions.unit))
+  ) {
+    return next(
+      new CustomError(
+        "Invalid dimensions object. Must include numeric length, width, height, and valid unit ('ft' or 'm').",
+        400
+      )
+    );
+  }
+
+  // ✅ Validate distanceToBathroom
+  if (
+    distanceToBathroom &&
+    (typeof distanceToBathroom !== "object" ||
+      distanceToBathroom === null ||
+      typeof distanceToBathroom.value !== "number" ||
+      !distanceToBathroom.unit ||
+      !validUnits.includes(distanceToBathroom.unit))
+  ) {
+    return next(
+      new CustomError(
+        "Invalid distanceToBathroom object. Must include numeric value and valid unit ('ft' or 'm').",
+        400
+      )
+    );
+  }
+
+  // ✅ Apply updates only if provided
+  if (name) room.name = name.trim().toLowerCase();
+  if (capacity) room.capacity = capacity;
+  if (pricePerNight) room.pricePerNight = pricePerNight;
+  if (discount) room.discount = discount;
+  if (type) room.type = type.toLowerCase();
+  if (amenities) room.amenities = amenities.map((a) => a.toLowerCase());
+  if (bedType) room.bedType = bedType.toLowerCase();
+  if (bedCount) room.bedCount = bedCount;
+  if (blockedDates) room.blockedDates = blockedDates;
+  if (dimensions) room.dimensions = dimensions;
+  if (bathroomType) room.bathroomType = bathroomType.toLowerCase();
+  if (bathroomCount) room.bathroomCount = bathroomCount;
+  if (distanceToBathroom) room.distanceToBathroom = distanceToBathroom;
+  if (bathroomAmenities)
+    room.bathroomAmenities = bathroomAmenities.map((a) => a.toLowerCase());
 
   // ✅ Save in DB
   await room.save();
@@ -209,12 +304,15 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   return successResponse(res, 200, "Room updated successfully", room);
 });
 
+
 export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
   const partnerId = req.user._id;
+
   let {
     types,
     pricePerNight,
+    discount,
     blockedDatesAdd,
     blockedDatesRemove,
     amenitiesAdd,
@@ -222,14 +320,16 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     capacity,
     bedCount,
     bedType,
-    dimensions
+    dimensions,
+    bathroomType,
+    bathroomCount,
+    bathroomAmenitiesAdd,
+    bathroomAmenitiesRemove,
+    distanceToBathroom,
   } = req.body;
 
-
-  const property = await Property.findOne({
-    _id: propertyId,
-    partnerId
-  });
+  // ✅ Verify property ownership
+  const property = await Property.findOne({ _id: propertyId, partnerId });
   if (!property) {
     return next(
       new CustomError(
@@ -249,129 +349,183 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   // ✅ Normalize types
   types = types.map((t) => t.toLowerCase().trim());
 
-  // ✅ Validate blockedDatesAdd format
-  if (blockedDatesAdd && !Array.isArray(blockedDatesAdd)) {
-    return next(
-      new CustomError("blockedDatesAdd must be an array of objects", 400)
-    );
-  }
 
-  if (blockedDatesRemove && !Array.isArray(blockedDatesRemove)) {
-    return next(
-      new CustomError("blockedDatesRemove must be an array of objects", 400)
-    );
-  }
-
-  // ✅ Find rooms to update
+  // ✅ Find target rooms
   const rooms = await Room.find({
     propertyId,
-    type: {
-      $in: types
-    },
+    type: { $in: types },
   });
-
   if (!rooms.length) {
     return next(
       new CustomError("No rooms found for the provided property and types", 404)
     );
   }
 
-  // ✅ Static fields update
+  // ✅ Validation constants
+  const validBeds = ["single", "double", "queen", "king", "twin", "sofa-bed"];
+  const validUnits = ["ft", "m"];
+  const validBathroomTypes = ["private", "shared", "ensuite", "external"];
+
+  // ✅ Validate ENUMs
+  if (bedType && !validBeds.includes(bedType.toLowerCase())) {
+    return next(
+      new CustomError(`Invalid bed type. Allowed: ${validBeds.join(", ")}`, 400)
+    );
+  }
+
+  if (
+    bathroomType &&
+    !validBathroomTypes.includes(bathroomType.toLowerCase())
+  ) {
+    return next(
+      new CustomError(
+        `Invalid bathroom type. Allowed: ${validBathroomTypes.join(", ")}`,
+        400
+      )
+    );
+  }
+
+
+  // ✅ Validate dimensions
+  if (
+    dimensions &&
+    (typeof dimensions !== "object" ||
+      dimensions === null ||
+      typeof dimensions.length !== "number" ||
+      typeof dimensions.width !== "number" ||
+      typeof dimensions.height !== "number" ||
+      !dimensions.unit ||
+      !validUnits.includes(dimensions.unit))
+  ) {
+    return next(
+      new CustomError(
+        "Invalid dimensions object. Must include numeric length, width, height, and valid unit ('ft' or 'm').",
+        400
+      )
+    );
+  }
+
+  // ✅ Validate distanceToBathroom (if included)
+  if (
+    distanceToBathroom &&
+    (typeof distanceToBathroom !== "object" ||
+      distanceToBathroom === null ||
+      typeof distanceToBathroom.value !== "number" ||
+      !distanceToBathroom.unit ||
+      !validUnits.includes(distanceToBathroom.unit))
+  ) {
+    return next(
+      new CustomError(
+        "Invalid distanceToBathroom object. Must include numeric value and valid unit ('ft' or 'm').",
+        400
+      )
+    );
+  }
+
+  // ✅ Prepare static fields update
   const updateFields = {};
   if (pricePerNight !== undefined) updateFields.pricePerNight = pricePerNight;
+  if (discount !== undefined) updateFields.discount = discount;
   if (capacity !== undefined) updateFields.capacity = capacity;
   if (bedCount !== undefined) updateFields.bedCount = bedCount;
-  if (bedType) updateFields.bedType = bedType.trim().toLowerCase();
-  if(dimensions)updateFields.dimensions =dimensions;
-    // Validate dimensions
-    const validUnits = ["ft", "m"];
-    const validDimensions =
-      dimensions &&
-      typeof dimensions === "object" &&
-      (!dimensions.unit || validUnits.includes(dimensions.unit));
+  if (bedType) updateFields.bedType = bedType.toLowerCase().trim();
+  if (bathroomType)
+    updateFields.bathroomType = bathroomType.toLowerCase().trim();
+  if (bathroomCount !== undefined) updateFields.bathroomCount = bathroomCount;
+  if (dimensions) updateFields.dimensions = dimensions;
+  if (distanceToBathroom) updateFields.distanceToBathroom = distanceToBathroom;
 
-    if (dimensions && !validDimensions) {
-      return next(
-        new CustomError("Invalid dimensions object or unit. Use ft or m.", 400)
-      );
-    }
+  const roomIds = rooms.map((r) => r._id);
 
-  const roomIds = rooms.map((room) => room._id);
-
-  // ✅ Apply static field updates
+  // ✅ Apply static updates
   if (Object.keys(updateFields).length > 0) {
-    await Room.updateMany({
-      _id: {
-        $in: roomIds
-      }
-    }, {
-      $set: updateFields
-    });
+    await Room.updateMany({ _id: { $in: roomIds } }, { $set: updateFields });
   }
 
-  // ✅ Add amenities using $addToSet
+  // ✅ Add amenities
   if (amenitiesAdd && Array.isArray(amenitiesAdd)) {
-    await Room.updateMany({
-      _id: {
-        $in: roomIds
-      }
-    }, {
-      $addToSet: {
-        amenities: {
-          $each: amenitiesAdd.map((a) => a.trim().toLowerCase())
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $addToSet: {
+          amenities: {
+            $each: amenitiesAdd.map((a) => a.trim().toLowerCase()),
+          },
         },
-      },
-    });
+      }
+    );
   }
 
-  // ✅ Remove amenities using $pull
+  // ✅ Remove amenities
   if (amenitiesRemove && Array.isArray(amenitiesRemove)) {
-    await Room.updateMany({
-      _id: {
-        $in: roomIds
-      }
-    }, {
-      $pull: {
-        amenities: {
-          $in: amenitiesRemove.map((a) => a.trim().toLowerCase()),
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $pull: {
+          amenities: {
+            $in: amenitiesRemove.map((a) => a.trim().toLowerCase()),
+          },
         },
-      },
-    });
+      }
+    );
+  }
+
+  // ✅ Add bathroom amenities
+  if (bathroomAmenitiesAdd && Array.isArray(bathroomAmenitiesAdd)) {
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $addToSet: {
+          bathroomAmenities: {
+            $each: bathroomAmenitiesAdd.map((a) => a.trim().toLowerCase()),
+          },
+        },
+      }
+    );
+  }
+
+  // ✅ Remove bathroom amenities
+  if (bathroomAmenitiesRemove && Array.isArray(bathroomAmenitiesRemove)) {
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $pull: {
+          bathroomAmenities: {
+            $in: bathroomAmenitiesRemove.map((a) => a.trim().toLowerCase()),
+          },
+        },
+      }
+    );
   }
 
   // ✅ Add blocked dates
-  if (blockedDatesAdd && blockedDatesAdd.length > 0) {
-    await Room.updateMany({
-      _id: {
-        $in: roomIds
+  if (blockedDatesAdd && Array.isArray(blockedDatesAdd)) {
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $addToSet: { blockedDates: { $each: blockedDatesAdd } },
       }
-    }, {
-      $addToSet: {
-        blockedDates: {
-          $each: blockedDatesAdd
-        }
-      }
-    });
+    );
   }
 
-  // ✅ Remove blocked dates (match by startDate & endDate)
-  if (blockedDatesRemove && blockedDatesRemove.length > 0) {
-    await Room.updateMany({
-      _id: {
-        $in: roomIds
-      }
-    }, {
-      $pull: {
-        blockedDates: {
-          $or: blockedDatesRemove.map((d) => ({
-            startDate: d.startDate,
-            endDate: d.endDate,
-          })),
+  // ✅ Remove blocked dates
+  if (blockedDatesRemove && Array.isArray(blockedDatesRemove)) {
+    await Room.updateMany(
+      { _id: { $in: roomIds } },
+      {
+        $pull: {
+          blockedDates: {
+            $or: blockedDatesRemove.map((d) => ({
+              startDate: d.startDate,
+              endDate: d.endDate,
+            })),
+          },
         },
-      },
-    });
+      }
+    );
   }
 
+  // ✅ Success response
   return successResponse(res, 200, "Bulk update successful", {
     updatedRooms: rooms.length,
     updatedFields: updateFields,
@@ -379,8 +533,12 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     blockedDatesRemoved: blockedDatesRemove || null,
     amenitiesAdded: amenitiesAdd || null,
     amenitiesRemoved: amenitiesRemove || null,
+    bathroomAmenitiesAdded: bathroomAmenitiesAdd || null,
+    bathroomAmenitiesRemoved: bathroomAmenitiesRemove || null,
   });
 });
+
+
 
 //get types of rooms in  property
 export const getTypesOfRoomsInProperty = asyncHandler(
@@ -390,7 +548,7 @@ export const getTypesOfRoomsInProperty = asyncHandler(
 
     const property = await Property.findOne({
       _id: propertyId,
-      partnerId
+      partnerId,
     });
     if (!property) {
       return next(
@@ -402,7 +560,7 @@ export const getTypesOfRoomsInProperty = asyncHandler(
     }
 
     const rooms = await Room.distinct("type", {
-      propertyId: propertyId
+      propertyId: propertyId,
     });
 
     return successResponse(res, 200, "Room types fetched successfully", rooms);
@@ -415,9 +573,7 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
   const partnerId = req.user._id; // Authenticating partner
 
-  let {
-    types
-  } = req.body;
+  let { types } = req.body;
 
   // ✅ Validate types
   if (!types || !Array.isArray(types) || types.length === 0) {
@@ -432,7 +588,7 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
   //  Step 1: Verify property belongs to the logged-in partner
   const property = await Property.findOne({
     _id: propertyId,
-    partnerId
+    partnerId,
   });
   if (!property) {
     return next(
@@ -447,7 +603,7 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
   const deleteResult = await Room.deleteMany({
     propertyId,
     type: {
-      $in: types
+      $in: types,
     },
   });
 
@@ -482,11 +638,9 @@ export const deleteRoom = asyncHandler(async (req, res, next) => {
     );
   }
 
-
   const deleteRoom = await Room.findByIdAndDelete(roomId);
 
   return successResponse(res, 200, "Room delete  successfully", deleteRoom);
-
 });
 
 //get rooms by property id,
@@ -499,7 +653,7 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   //  Step 1: Verify property belongs to the logged-in partner
   const property = await Property.findOne({
     _id: propertyId,
-    partnerId
+    partnerId,
   });
   if (!property) {
     return next(
@@ -511,8 +665,8 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   }
 
   const rooms = await Room.find({
-    propertyId
-  })
+    propertyId,
+  });
   // .populate("Bookings");
 
   if (!rooms || rooms.length === 0) {
@@ -528,245 +682,290 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
     typesOfRooms[room.type].push(room);
   }
 
-
   return successResponse(res, 200, "Rooms fetched Successfully ", typesOfRooms);
 });
 
+export const setRoomsImagesandVideosInBulk = asyncHandler(
+  async (req, res, next) => {
+    const propertyId = req.params.propertyId;
+    const partnerId = req.user._id;
 
-export const setRoomsImagesandVideosInBulk = asyncHandler(async (req, res, next) => {
-  const propertyId = req.params.propertyId;
-  const partnerId = req.user._id;
+    let { types, imagesToDelete, videosToDelete } = req.body;
 
-  let {
-    types,
-    imagesToDelete,
-    videosToDelete
-  } = req.body;
-
-  // ✅ Validate types
-   if(!types){
-    new CustomError("Room types are required and must be an array", 400)
-   }
-   types= JSON.parse(types);
-  if ( !Array.isArray(types) || types.length === 0) {
-    return next(
-      new CustomError("Room types are required and must be an array", 400)
-    );
-  }
-
-  // 🔷 Normalize room types
-  types = types.map((t) => t.toLowerCase().trim());
-
-  // 1️⃣ Verify property belongs to partner
-  const property = await Property.findOne({
-    _id: propertyId,
-    partnerId
-  });
-  if (!property) {
-    return next(
-      new CustomError(
-        "You are not authorized to update rooms for this property",
-        403
-      )
-    );
-  }
-
-  // 2️⃣ Find rooms of these types under this property
-  const rooms = await Room.find({
-    propertyId,
-    type: {
-      $in: types
+    // ✅ Validate types
+    if (!types) {
+      new CustomError("Room types are required and must be an array", 400);
     }
-  });
-
-  if (!rooms || rooms.length === 0) {
-    return next(
-      new CustomError("No rooms found for the specified types", 404)
-    );
-  }
-
-  // 3️⃣ Handle file uploads
-  let newImages = [];
-  let newVideos = [];
-
-  if (req.files?.images) {
-    newImages = await uploadFileToCloudinary(req.files.images, "rooms/images");
-  }
-
-  if (req.files?.videos) {
-    newVideos = await uploadFileToCloudinary(req.files.videos, "rooms/videos");
-  }
-
-  // 4️⃣ Handle deletions (if any)
-  if (imagesToDelete) {
-    imagesToDelete = JSON.parse(imagesToDelete);
-    for (let img of imagesToDelete) {
-      await deleteFileFromCloudinary(img.public_id, "image");
+    types = JSON.parse(types);
+    if (!Array.isArray(types) || types.length === 0) {
+      return next(
+        new CustomError("Room types are required and must be an array", 400)
+      );
     }
 
-    // remove from all rooms’ image lists
-    await Room.updateMany({
+    // 🔷 Normalize room types
+    types = types.map((t) => t.toLowerCase().trim());
+
+    // 1️⃣ Verify property belongs to partner
+    const property = await Property.findOne({
+      _id: propertyId,
+      partnerId,
+    });
+    if (!property) {
+      return next(
+        new CustomError(
+          "You are not authorized to update rooms for this property",
+          403
+        )
+      );
+    }
+
+    // 2️⃣ Find rooms of these types under this property
+    const rooms = await Room.find({
       propertyId,
       type: {
-        $in: types
-      }
-    }, {
-      $pull: {
-        images: {
-          public_id: {
-            $in: imagesToDelete.map((i) => i.public_id)
-          }
-        },
+        $in: types,
       },
     });
-  }
 
-  if (videosToDelete) {
-    videosToDelete = JSON.parse(videosToDelete);
-    for (let vid of videosToDelete) {
-      await deleteFileFromCloudinary(vid.public_id, "video");
+    if (!rooms || rooms.length === 0) {
+      return next(
+        new CustomError("No rooms found for the specified types", 404)
+      );
     }
 
-    await Room.updateMany({
+    // 3️⃣ Handle file uploads
+    let newImages = [];
+    let newVideos = [];
+
+    if (req.files?.images) {
+      const errMsg = validateFileSize(req.files.images, "image");
+      if (errMsg) {
+        return next(new CustomError(errMsg, 400));
+      }
+      newImages = await uploadFileToCloudinary(
+        req.files.images,
+        "rooms/images"
+      );
+    }
+
+    if (req.files?.videos) {
+      const errMsg = validateFileSize(req.files.videos, "video");
+      if (errMsg) {
+        return next(new CustomError(errMsg, 400));
+      }
+      newVideos = await uploadFileToCloudinary(
+        req.files.videos,
+        "rooms/videos"
+      );
+    }
+
+    // 4️⃣ Handle deletions (if any)
+    if (imagesToDelete) {
+      imagesToDelete = JSON.parse(imagesToDelete);
+      for (let img of imagesToDelete) {
+        await deleteFileFromCloudinary(img.public_id, "image");
+      }
+
+      // remove from all rooms’ image lists
+      await Room.updateMany(
+        {
+          propertyId,
+          type: {
+            $in: types,
+          },
+        },
+        {
+          $pull: {
+            images: {
+              public_id: {
+                $in: imagesToDelete.map((i) => i.public_id),
+              },
+            },
+          },
+        }
+      );
+    }
+
+    if (videosToDelete) {
+      videosToDelete = JSON.parse(videosToDelete);
+      for (let vid of videosToDelete) {
+        await deleteFileFromCloudinary(vid.public_id, "video");
+      }
+
+      await Room.updateMany(
+        {
+          propertyId,
+          type: {
+            $in: types,
+          },
+        },
+        {
+          $pull: {
+            videos: {
+              public_id: {
+                $in: videosToDelete.map((v) => v.public_id),
+              },
+            },
+          },
+        }
+      );
+    }
+
+    // 5️⃣ Add newly uploaded files to all rooms
+    console.log(newImages, newVideos);
+    if (newImages.length > 0 || newVideos.length > 0) {
+      await Room.updateMany(
+        {
+          propertyId,
+          type: {
+            $in: types,
+          },
+        },
+        {
+          $push: {
+            images: {
+              $each: newImages,
+            },
+            videos: {
+              $each: newVideos,
+            },
+          },
+        }
+      );
+    }
+
+    // 6️⃣ Fetch updated rooms
+    const updatedRooms = await Room.find({
       propertyId,
       type: {
-        $in: types
+        $in: types,
+      },
+    });
+
+    return successResponse(
+      res,
+      200,
+      "Room images/videos updated successfully",
+      {
+        updatedRooms,
+        addedImages: newImages,
+        addedVideos: newVideos,
+        deletedImages: imagesToDelete || [],
+        deletedVideos: videosToDelete || [],
       }
-    }, {
-      $pull: {
-        videos: {
-          public_id: {
-            $in: videosToDelete.map((v) => v.public_id)
-          }
-        },
-      },
-    });
+    );
   }
+);
 
-  // 5️⃣ Add newly uploaded files to all rooms
-  console.log(newImages,newVideos);
-  if (newImages.length > 0 || newVideos.length > 0) {
-    await Room.updateMany({
-      propertyId,
-      type: {
-        $in: types
+export const setRoomImagesAndVideosById = asyncHandler(
+  async (req, res, next) => {
+    const { roomId } = req.params;
+    const partnerId = req.user._id; // from auth middleware
+
+    // ✅ 1️⃣ Find the room and verify ownership
+    const room = await Room.findById(roomId).populate("propertyId");
+    if (!room) {
+      return next(new CustomError("Room not found", 404));
+    }
+
+    if (room.propertyId.partnerId.toString() !== partnerId.toString()) {
+      return next(
+        new CustomError("You are not authorized to modify this room", 403)
+      );
+    }
+
+    // ✅ 2️⃣ Handle deletions first
+    if (req.body.imagesToDelete) {
+      const imagesToDelete = JSON.parse(req.body.imagesToDelete);
+      await Room.updateOne(
+        {
+          _id: roomId,
+        },
+        {
+          $pull: {
+            images: {
+              public_id: {
+                $in: imagesToDelete.map((img) => img.public_id),
+              },
+            },
+          },
+        }
+      );
+
+      for (const img of imagesToDelete) {
+        await deleteFileFromCloudinary(img.public_id, "image");
       }
-    }, {
-      $push: {
-        images: {
-          $each: newImages
-        },
-        videos: {
-          $each: newVideos
-        },
-      },
-    });
-  }
-
-  // 6️⃣ Fetch updated rooms
-  const updatedRooms = await Room.find({
-    propertyId,
-    type: {
-      $in: types
     }
-  });
 
-  return successResponse(res, 200, "Room images/videos updated successfully", {
-    updatedRooms,
-    addedImages: newImages,
-    addedVideos: newVideos,
-    deletedImages: imagesToDelete || [],
-    deletedVideos: videosToDelete || [],
-  });
-});
-
-export const setRoomImagesAndVideosById = asyncHandler(async (req, res, next) => {
-  const {
-    roomId
-  } = req.params;
-  const partnerId = req.user._id; // from auth middleware
-
-  // ✅ 1️⃣ Find the room and verify ownership
-  const room = await Room.findById(roomId).populate("propertyId");
-  if (!room) {
-    return next(new CustomError("Room not found", 404));
-  }
-
-  if (room.propertyId.partnerId.toString() !== partnerId.toString()) {
-    return next(new CustomError("You are not authorized to modify this room", 403));
-  }
- 
-  // ✅ 2️⃣ Handle deletions first
-  if (req.body.imagesToDelete) {
-    const imagesToDelete = JSON.parse(req.body.imagesToDelete);
-    await Room.updateOne({
-      _id: roomId
-    }, {
-      $pull: {
-        images: {
-          public_id: {
-            $in: imagesToDelete.map((img) => img.public_id)
-          }
+    if (req.body.videosToDelete) {
+      const videosToDelete = JSON.parse(req.body.videosToDelete);
+      await Room.updateOne(
+        {
+          _id: roomId,
         },
-      },
-    });
+        {
+          $pull: {
+            videos: {
+              public_id: {
+                $in: videosToDelete.map((vid) => vid.public_id),
+              },
+            },
+          },
+        }
+      );
 
-    for (const img of imagesToDelete) {
-      await deleteFileFromCloudinary(img.public_id, "image");
+      for (const vid of videosToDelete) {
+        await deleteFileFromCloudinary(vid.public_id, "video");
+      }
     }
-  }
 
-  if (req.body.videosToDelete) {
-    const videosToDelete = JSON.parse(req.body.videosToDelete);
-    await Room.updateOne({
-      _id: roomId
-    }, {
-      $pull: {
-        videos: {
-          public_id: {
-            $in: videosToDelete.map((vid) => vid.public_id)
-          }
-        },
-      },
-    });
+    // ✅ 3️⃣ Upload new files if provided
+    let uploadedImages = [];
+    let uploadedVideos = [];
 
-    for (const vid of videosToDelete) {
-      await deleteFileFromCloudinary(vid.public_id, "video");
+    if (req.files?.images) {
+      uploadedImages = await uploadFileToCloudinary(
+        req.files.images,
+        "rooms/images"
+      );
     }
-  }
 
-  // ✅ 3️⃣ Upload new files if provided
-  let uploadedImages = [];
-  let uploadedVideos = [];
+    if (req.files?.videos) {
+      uploadedVideos = await uploadFileToCloudinary(
+        req.files.videos,
+        "rooms/videos"
+      );
+    }
 
-  if (req.files?.images) {
-    uploadedImages = await uploadFileToCloudinary(req.files.images, "rooms/images");
-  
-  }
-
-  if (req.files?.videos) {
-    uploadedVideos = await uploadFileToCloudinary(req.files.videos, "rooms/videos");
-  }
-
-   console.log(uploadedImages,uploadedVideos);
-  // ✅ 4️⃣ Push new uploads into room
-  if (uploadedImages.length > 0 || uploadedVideos.length > 0) {
-    await Room.updateOne({
-      _id: roomId
-    }, {
-      $push: {
-        images: {
-          $each: uploadedImages
+    console.log(uploadedImages, uploadedVideos);
+    // ✅ 4️⃣ Push new uploads into room
+    if (uploadedImages.length > 0 || uploadedVideos.length > 0) {
+      await Room.updateOne(
+        {
+          _id: roomId,
         },
-        videos: {
-          $each: uploadedVideos
-        },
-      },
-    });
+        {
+          $push: {
+            images: {
+              $each: uploadedImages,
+            },
+            videos: {
+              $each: uploadedVideos,
+            },
+          },
+        }
+      );
+    }
+
+    // ✅ 5️⃣ Return updated room
+    const updatedRoom = await Room.findById(roomId);
+
+    return successResponse(
+      res,
+      200,
+      "Room media updated successfully",
+      updatedRoom
+    );
   }
-
-  // ✅ 5️⃣ Return updated room
-  const updatedRoom = await Room.findById(roomId);
-
-  return successResponse(res, 200, "Room media updated successfully", updatedRoom);
-});
+);
