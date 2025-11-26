@@ -7,7 +7,10 @@ import {
   updateRoomsInBulk,
   getRoomsByPropertyId,
   getTypesOfRoomsInProperty,
-  deleteRoomsByTypes
+  deleteRoomsByTypes,
+  deleteRoom,
+  setRoomImagesAndVideosById,
+  setRoomsImagesandVideosInBulk
 } from "../../controllers/partner/room.controller.js";
 import { protect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
@@ -33,10 +36,13 @@ router.get("/get-partner-property/:propertyId", protect, getPartnerPropertyByID)
 
 
 router.post("/create-rooms/:propertyId", protect,createRooms);
-router.post("/update-single-room/:roomId", protect,updateRoomById);
+router.put("/update-single-room/:roomId", protect,updateRoomById);
 router.put("/update-rooms-bulk/:propertyId", protect, updateRoomsInBulk);
 router.get("/get-types-of-rooms/:propertyId", protect, getTypesOfRoomsInProperty);
 router.get("/get-rooms-for-property/:propertyId", protect, getRoomsByPropertyId);
-
+router.delete("/delete-rooms",protect,deleteRoomsByTypes);
+router.delete("/delete-single-room/:roomId", protect, deleteRoom);
+router.post("/set-rooms-img-vid-inbulk/:propertyId", protect, uploadFields, setRoomsImagesandVideosInBulk);
+router.post("/set-room-img-vid/:roomId", protect, uploadFields, setRoomImagesAndVideosById);
 
 export default router;
