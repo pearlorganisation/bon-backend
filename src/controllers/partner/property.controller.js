@@ -159,12 +159,23 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     return next(new CustomError("NO properties found", 200));
   }
 
-  successResponse(
-    res,
-    200,
-    "successfully fetch partner properties",
-    properties
-  );
+  const result = {
+    properties: properties,
+    pending: [],
+    under_review: [],
+    approved: [],
+    rejected: [],
+    active: [],
+    inactive: [],
+    numberOfProperties: properties.length,
+  };
+
+  for (const prop of properties) {
+    result[prop.status].push(prop);
+    result[prop.verified].push(prop);
+  }
+
+  successResponse(res, 200, "successfully fetch partner properties", result);
 });
 
 //get Property by ID
@@ -172,9 +183,9 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
   const propertyId = req.params.propertyId;
   console.log(propertyId);
-  const property = await Property.findOne({ _id: propertyId, partnerId})
-    // .populate("Rooms")
-    // .populate("Bookings");
+  const property = await Property.findOne({ _id: propertyId, partnerId });
+  // .populate("Rooms")
+  // .populate("Bookings");
 
   if (!property) {
     return next(
