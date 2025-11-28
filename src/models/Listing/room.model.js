@@ -64,14 +64,6 @@ const roomSchema = new mongoose.Schema(
     },
     bathroomAmenities: [String],
 
-    // ✅ Partner-defined availability periods
-    availability: [
-      {
-        startDate: { type: Date, required: true },
-        endDate: { type: Date, required: true },
-      },
-    ],
-
     // Optional: blocked dates (maintenance, holidays)
     blockedDates: [
       {
