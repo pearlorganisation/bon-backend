@@ -1,18 +1,25 @@
-
 import express from "express";
-import { updateProperty, createProperty, getPartnerProperties, getPartnerPropertyByID } from "../../controllers/partner/property.controller.js"
+import {
+  updateProperty,
+  createProperty,
+  getPartnerProperties,
+  getPartnerPropertyByID,
+} from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
   updateRoomById,
   updateRoomsInBulk,
   getRoomsByPropertyId,
   getTypesOfRoomsInProperty,
-  deleteRoomsByTypes
+  deleteRoomsByTypes,
+  deleteRoom,
+  setRoomImagesAndVideosById,
+  setRoomsImagesandVideosInBulk,
 } from "../../controllers/partner/room.controller.js";
 import { protect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
 
-const  router = express.Router();
+const router = express.Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -25,18 +32,47 @@ const uploadFields = upload.fields([
 //---------- property routes ----------------
 
 router.post("/create-property", protect, uploadFields, createProperty);
-router.put("/update-property/:propertyId", protect, uploadFields, updateProperty);
+router.put(
+  "/update-property/:propertyId",
+  protect,
+  uploadFields,
+  updateProperty
+);
 router.get("/get-partner-properties", protect, getPartnerProperties);
-router.get("/get-partner-property/:propertyId", protect, getPartnerPropertyByID);
+router.get(
+  "/get-partner-property/:propertyId",
+  protect,
+  getPartnerPropertyByID
+);
 
 //---------- Rooms routes ----------------
 
-
-router.post("/create-rooms/:propertyId", protect,createRooms);
-router.post("/update-single-room/:roomId", protect,updateRoomById);
+router.post("/create-rooms/:propertyId", protect, createRooms);
+router.put("/update-single-room/:roomId", protect, updateRoomById);
 router.put("/update-rooms-bulk/:propertyId", protect, updateRoomsInBulk);
-router.get("/get-types-of-rooms/:propertyId", protect, getTypesOfRoomsInProperty);
-router.get("/get-rooms-for-property/:propertyId", protect, getRoomsByPropertyId);
-
+router.get(
+  "/get-types-of-rooms/:propertyId",
+  protect,
+  getTypesOfRoomsInProperty
+);
+router.get(
+  "/get-rooms-for-property/:propertyId",
+  protect,
+  getRoomsByPropertyId
+);
+router.delete("/delete-rooms", protect, deleteRoomsByTypes);
+router.delete("/delete-single-room/:roomId", protect, deleteRoom);
+router.post(
+  "/set-rooms-img-vid-inbulk/:propertyId",
+  protect,
+  uploadFields,
+  setRoomsImagesandVideosInBulk
+);
+router.post(
+  "/set-room-img-vid/:roomId",
+  protect,
+  uploadFields,
+  setRoomImagesAndVideosById
+);
 
 export default router;
