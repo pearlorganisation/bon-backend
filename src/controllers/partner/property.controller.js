@@ -7,7 +7,7 @@ import {
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
 
-// ✅ Create a new property
+// ✅ Create a new propertyw
 export const createProperty = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id; // partner from auth middleware
 
