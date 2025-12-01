@@ -21,16 +21,17 @@ const auth_schema = new mongoose.Schema(
 
     // ✅ Phone number - unique
     phoneNumber: {
-    type: String,
-    required: true,
-    validate: {
-      validator: function (value) {
-        // Indian phone number format (10 digits, starts with 6-9)
-        return /^[6-9]\d{9}$/.test(value);
+      type: String,
+      required: true,
+      validate: {
+        validator: function (value) {
+          // Indian phone number format (10 digits, starts with 6-9)
+          return /^[6-9]\d{9}$/.test(value);
+        },
+        message:
+          "Invalid phone number format. Must be a 10-digit valid Indian number.",
       },
-      message: "Invalid phone number format. Must be a 10-digit valid Indian number."
-    }
-  },
+    },
 
     // ✅ For email verification
     isVerified: { type: Boolean, default: false },
@@ -44,15 +45,15 @@ const auth_schema = new mongoose.Schema(
     },
     dateOfBirth: {
       type: Date,
-      required: true,
+      required: false,
       validate: {
         validator: function (value) {
           // Check if date is valid and not in future
           const today = new Date();
           return value <= today;
         },
-        message: "Date of birth cannot be in the future!"
-      }
+        message: "Date of birth cannot be in the future!",
+      },
     },
     gender: { type: String, enum: ["male", "female", "other"] },
     address: String,
@@ -62,14 +63,13 @@ const auth_schema = new mongoose.Schema(
     pincode: String,
     // Cloudinary profile image
     profileImageUrl: {
-      secure_url: { type: String},
-      public_id: { type: String},
+      secure_url: { type: String },
+      public_id: { type: String },
     },
     refresh_token: { type: String },
   },
   { timestamps: true }
 );
-
 
 //
 // ✅ Password hashing before saving
