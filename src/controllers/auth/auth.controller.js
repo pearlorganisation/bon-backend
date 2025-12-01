@@ -10,7 +10,6 @@ import jwt from "jsonwebtoken";
 
 export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password, role } = req?.body;
-
   const Roles = ["CUSTOMER", "PARTNER"];
 
   if (
@@ -23,7 +22,7 @@ export const register = asyncHandler(async (req, res, next) => {
   ) {
     return next(
       new CustomError(
-        "All fields (name, email, phoneNumber, password, role ) are required",
+        "All fields (name, email, phoneNumber, password, role) are required",
         400
       )
     );
@@ -32,91 +31,103 @@ export const register = asyncHandler(async (req, res, next) => {
   const existingUser = await Auth.findOne({ email });
   const otp = generateOTP();
   console.log("generated otp", otp);
-  try {
-    if (existingUser) {
-      if (existingUser.isVerified) {
-        return next(new CustomError("User already exists!", 400));
-      }
 
-      // 5️⃣ Send OTP via email
-      await sendOtpEmail(name, email, otp, "REGISTER");
+  // 2. Handle Existing User
+  if (existingUser) {
+    // If user is already verified, block registration
+    if (existingUser.isVerified) {
+      return next(new CustomError("User already exists!", 400));
+    }
 
+    // If user exists but NOT verified, resend OTP
+    try {
       await OTP.findOneAndReplace(
         { email, type: "REGISTER" },
         { otp, email, type: "REGISTER" },
-        { upsert: true, new: true } // upsert: Creates a new document if no match is found., new: returns updated doc
+        { upsert: true, new: true }
       );
-
+      await sendOtpEmail(name, email, otp, "REGISTER");
       return res.status(200).json({
         success: true,
-        message: "OTP resent successfully. Please verify your email.",
+        message: "Account pending verification. OTP resent successfully.",
       });
+    } catch (error) {
+      console.error("Error resending OTP:", error);
+      return next(
+        new CustomError(`Failed to send email: ${error.message}`, 500)
+      );
     }
+  }
 
-    // Create new user and send OTP
-    // 5️⃣ Send OTP via email
-
+  // 3. Handle New User Registration with ROLLBACK
+  let newUser = null;
+  try {
+    // A. Create OTP Record first
     await OTP.create({
       otp,
       email,
       type: "REGISTER",
     });
-    await Auth.create({ ...req?.body, isVerified: false }); // this will through error if user creation fails
 
-    await sendOtpEmail(name, email, otp, "REGISTER");
+    // B. Create User (Force isVerified: false)
+    newUser = await Auth.create({
+      ...req.body,
+      isVerified: false,
+    });
+
+    // C. Send OTP via email
+    // await sendOtpEmail(name, email, otp, "REGISTER");
 
     return successResponse(
       res,
       201,
-      "OTP sent successfully. Please verify your email."
+      "User registered successfully. Please verify your email.",
+      {
+        email: newUser.email,
+        message:
+          "OTP sent to your email. Please verify to complete registration.",
+      }
     );
   } catch (error) {
-    console.error("Error Sending OTP:", error);
-    return next(new CustomError(`Failed to send OTP: ${error.message}`, 400));
+    console.error("Error during registration:", error);
+    // ROLLBACK: If email failed or OTP creation failed, delete the user
+    if (newUser && newUser._id) {
+      await Auth.findByIdAndDelete(newUser._id);
+      await OTP.deleteOne({ email, type: "REGISTER" });
+      console.log("Rolled back user creation due to email failure.");
+    }
+    return next(new CustomError(`Registration failed: ${error.message}`, 400));
   }
 });
-
-/**
- * @desc Login user
- */
 
 export const login = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
 
-  // 1️⃣ Validate input
   if (!email || !password) {
-    throw new CustomError("Email  password and  role are required", 400);
+    throw new CustomError("Email and password are required", 400);
   }
 
-  // 2️⃣ Check if user exists
   const user = await Auth.findOne({ email });
   if (!user) {
     throw new CustomError("User not found", 404);
   }
 
-  // 3️⃣ Ensure user is verified
   if (!user.isVerified) {
     throw new CustomError("Please verify your email before logging in", 403);
   }
 
-  // 4️⃣ Check password
   const isPasswordValid = await user.isPasswordCorrect(password);
   if (!isPasswordValid) {
     throw new CustomError("Invalid credentials", 401);
   }
 
-  // 5️⃣ Generate tokens
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
-
-  // Save refresh token in DB
 
   user.refresh_token = refreshToken;
   await user.save({ validateBeforeSave: false });
 
   setAuthCookies(res, accessToken, refreshToken);
-
-  // 6️⃣ Return response
 
   return successResponse(res, 200, "Login successful", {
     accessToken,
@@ -130,16 +141,13 @@ export const login = asyncHandler(async (req, res, next) => {
   });
 });
 
-// ✅ Verify Email OTP
 export const verifyOtp = asyncHandler(async (req, res, next) => {
   const { email, otp, type } = req.body;
 
-  // 1️⃣ Basic validation
   if (!email || !otp || !type) {
-    return next(new CustomError("Email OTP type and roles are required", 400));
+    return next(new CustomError("Email, OTP and type are required", 400));
   }
 
-  // 2️⃣ Check if OTP exists and matches
   const otpRecord = await OTP.findOne({ email, type });
 
   if (!otpRecord) {
@@ -150,15 +158,14 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Invalid OTP", 400));
   }
 
-  // 3️⃣ Find user and verify
   const user = await Auth.findOne({ email });
+
   if (!user) {
     return next(new CustomError("User not found", 404));
   }
 
   if (otpRecord.type === "FORGOT_PASSWORD") {
     await OTP.deleteOne({ email, type: "FORGOT_PASSWORD" });
-
     return successResponse(
       res,
       200,
@@ -167,26 +174,20 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
   }
 
   if (user.isVerified) {
+    // If somehow verified but OTP existed, just clean up
+    await OTP.deleteOne({ email, type: "REGISTER" });
     return next(new CustomError("User already verified", 400));
   }
 
   user.isVerified = true;
-
-  // 4️⃣ Generate tokens
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
-
-  // 5️⃣ Save refresh token in DB
   user.refresh_token = refreshToken;
   await user.save();
-
-  // 6️⃣ Delete OTP (used)
   await OTP.deleteOne({ email, type: "REGISTER" });
 
-  // 7️⃣ Set tokens in cookies
   setAuthCookies(res, accessToken, refreshToken);
 
-  // 8️⃣ Send success response
   return successResponse(res, 200, "Email verified successfully!", {
     user: {
       _id: user._id,
@@ -194,6 +195,8 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
       email: user.email,
       role: user.role,
     },
+    accessToken,
+    refreshToken,
   });
 });
 
@@ -201,11 +204,10 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
   const { email, type } = req.body;
 
   if (!email || !type) {
-    return next(new CustomError("Email OTP and role are required", 400));
+    return next(new CustomError("Email and type are required", 400));
   }
 
   const user = await Auth.findOne({ email });
-
   if (!user) return next(new CustomError("User not found", 404));
 
   const otp = generateOTP();
@@ -223,14 +225,12 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 });
 
 export const logout = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id; // assuming you have auth middleware that sets req.user
+  const userId = req.user?._id;
 
   if (userId) {
-    // Remove refresh token from DB
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
   }
 
-  // Clear cookies
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
 
@@ -249,7 +249,6 @@ export const refreshToken = asyncHandler(async (req, res, next) => {
       return next(new CustomError("Refresh token invalid", 401));
     }
 
-    // Generate new access token only
     const newAccessToken = user.generateAccessToken();
 
     res.cookie("accessToken", newAccessToken, {
@@ -257,7 +256,7 @@ export const refreshToken = asyncHandler(async (req, res, next) => {
       secure: process.env.NODE_ENV === "production",
       sameSite: "none",
       path: "/",
-      maxAge: 1 * 24 * 60 * 60 * 1000, // 1 day
+      maxAge: 1 * 24 * 60 * 60 * 1000,
     });
 
     return successResponse(res, 200, "Tokens refreshed successfully", {
@@ -276,7 +275,7 @@ export const refreshToken = asyncHandler(async (req, res, next) => {
 export const forgotPassword = asyncHandler(async (req, res, next) => {
   const { email } = req.body;
 
-  if (!email) return next(new CustomError("Email and role is required", 400));
+  if (!email) return next(new CustomError("Email is required", 400));
 
   const user = await Auth.findOne({ email });
   if (!user) return next(new CustomError("User not found", 404));
@@ -285,7 +284,6 @@ export const forgotPassword = asyncHandler(async (req, res, next) => {
 
   const otp = generateOTP();
 
-  // Save OTP in DB (type: FORGOT_PASSWORD)
   await OTP.findOneAndReplace(
     { email, type: "FORGOT_PASSWORD" },
     { email, otp, type: "FORGOT_PASSWORD" },
@@ -301,18 +299,15 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
   const { email, newPassword } = req.body;
 
   if (!email || !newPassword)
-    return next(
-      new CustomError("email role and password are not provided", 400)
-    );
+    return next(new CustomError("Email and new password are required", 400));
 
   const user = await Auth.findOne({ email });
-
-  if (!user) return next(new CustomError("user not found", 400));
+  if (!user) return next(new CustomError("User not found", 400));
 
   user.password = newPassword;
   await user.save();
 
-  return successResponse(res, 200, "password reset Successfully");
+  return successResponse(res, 200, "Password reset Successfully");
 });
 
 const setAuthCookies = (res, accessToken, refreshToken) => {
@@ -322,14 +317,12 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     sameSite: "none",
     path: "/",
   };
-
   res.cookie("accessToken", accessToken, {
     ...base,
-    maxAge: 1 * 24 * 60 * 60 * 1000, // 1 day
+    maxAge: 1 * 24 * 60 * 60 * 1000,
   });
-
   res.cookie("refreshToken", refreshToken, {
     ...base,
-    maxAge: 15 * 24 * 60 * 60 * 1000, // 15 days
+    maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 };
