@@ -201,3 +201,68 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   );
 });
 //export deleteParnterProperty = asyncHandler
+
+//  ADD PROPERTY DETAILS (Policies, Documents, Payment, Approval)
+export const addPropertyDetails = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
+  const propertyId = req.params.propertyId;
+
+  // Find property
+  const property = await Property.findOne({ _id: propertyId, partnerId });
+  if (!property) {
+    return next(
+      new CustomError("Property not found or not owned by this partner", 404)
+    );
+  }
+
+  //  HOTEL POLICIES
+  if (req.body.policies) {
+    try {
+      property.policies = JSON.parse(req.body.policies);
+    } catch (error) {
+      return next(new CustomError("Invalid JSON in policies", 400));
+    }
+  }
+
+  //  DOCUMENT VERIFICATION
+  if (req.body.documentVerification) {
+    try {
+      property.documentVerification = JSON.parse(req.body.documentVerification);
+    } catch (error) {
+      return next(new CustomError("Invalid JSON in documentVerification", 400));
+    }
+  }
+
+  //  PROPERTY APPROVAL SECTION
+  if (req.body.propertyApproval) {
+    try {
+      property.propertyApproval = JSON.parse(req.body.propertyApproval);
+    } catch (error) {
+      return next(new CustomError("Invalid JSON in propertyApproval", 400));
+    }
+  }
+
+  //  PAYMENT DETAILS
+  if (req.body.paymentDetails) {
+    try {
+      property.paymentDetails = JSON.parse(req.body.paymentDetails);
+    } catch (error) {
+      return next(new CustomError("Invalid JSON in paymentDetails", 400));
+    }
+  }
+
+  //  MAP LINK (optional for location)
+  if (req.body.mapLink) {
+    property.mapLink = req.body.mapLink;
+  }
+
+  // FINAL: Save the updates
+  await property.save();
+
+  successResponse(
+    res,
+    200,
+    "Property details added/updated successfully",
+    property
+  );
+});
