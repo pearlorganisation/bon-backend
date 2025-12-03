@@ -159,6 +159,42 @@ export const getPartnerBookings = async (req, res) => {
   }
 };
 
+export const getPartnerBookingByProperty = async (req, res) => {
+  try {
+    const partnerId = req.user._id;
+    const propertyId = req.params.propertyId;
+
+    const property = await Property.findOne({
+      _id: propertyId,
+      partnerId: partnerId,
+    });
+
+    if (!property) {
+      return res.status(404).json({
+        success: false,
+        message: "Property not found or not assigned to this partner",
+      });
+    }
+
+    const bookings = await Booking.find({ propertyId })
+      .populate("userId", "name email phone")
+      .populate("roomId", "name type images")
+      .populate("propertyId", "name city address")
+      .sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      success: true,
+      count: bookings.length,
+      bookings,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
 // ==========================================
 // 4. Cancel Booking
 // ==========================================

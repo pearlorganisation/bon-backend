@@ -5,6 +5,7 @@ import {
   getPartnerBookings,
   cancelBooking,
   getAllBookingsAdmin,
+  getPartnerBookingByProperty,
 } from "../controllers/Booking/booking.controller.js";
 
 // Middleware to check authentication and roles (Placeholder names)
@@ -16,6 +17,8 @@ const router = express.Router();
 router.post("/book", protect, createBooking);
 router.get("/me", protect, getMyBookings);
 router.put("/cancel/:bookingId", protect, cancelBooking);
+
+router.get("/property/:propertyId", protect, getPartnerBookingByProperty);
 
 // Partner Routes
 router.get(
