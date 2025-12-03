@@ -25,8 +25,111 @@ const propertySchema = new mongoose.Schema(
         type: [Number], // [longitude, latitude]
       },
     },
+    mapLink: String,
     rating: { type: Number, default: 0 },
     amenities: [String],
+
+    policies: {
+      checkInTime: String,
+      checkOutTime: String,
+      cancellationPolicy: String,
+      petPolicy: String,
+      otherPolicies: String,
+    },
+
+    documentVerification: {
+      gst: {
+        number: String,
+        status: {
+          type: String,
+          enum: ["pending", "verified"],
+          default: "pending",
+        },
+      },
+      pan: {
+        number: String,
+        status: {
+          type: String,
+          enum: ["pending", "verified"],
+          default: "pending",
+        },
+      },
+      aadhaar: {
+        number: String,
+        status: {
+          type: String,
+          enum: ["pending", "verified"],
+          default: "pending",
+        },
+      },
+      passport: {
+        number: String,
+        status: {
+          type: String,
+          enum: ["pending", "verified"],
+          default: "pending",
+        },
+      },
+      license: {
+        number: String,
+        status: {
+          type: String,
+          enum: ["pending", "verified"],
+          default: "pending",
+        },
+      },
+      hotelAgreement: {
+        documentUrl: String,
+        status: {
+          type: String,
+          enum: ["pending", "verified"],
+          default: "pending",
+        },
+      },
+      kycDocuments: {
+        documentUrl: String,
+        status: {
+          type: String,
+          enum: ["pending", "verified"],
+          default: "pending",
+        },
+      },
+      email: {
+        emailAddress: String,
+        status: {
+          type: String,
+          enum: ["pending", "verified"],
+          default: "pending",
+        },
+      },
+    },
+
+    propertyApproval: {
+      status: {
+        type: String,
+        enum: ["pending", "approved", "rejected"],
+        default: "pending",
+      },
+      termsAndConditions: {
+        type: String,
+        enum: ["pending", "accepted"],
+        default: "pending",
+      },
+      invoiceStatus: {
+        type: String,
+        enum: ["unpaid", "paid"],
+        default: "unpaid",
+      },
+    },
+
+    paymentDetails: {
+      bankName: String,
+      accountNumber: String,
+      ifscCode: String,
+      accountHolderName: String,
+      branchName: String,
+    },
+
     checkIn: { type: Date },
     checkOut: { type: Date },
     Images: [{ secure_url: String, public_id: String }],
@@ -37,10 +140,9 @@ const propertySchema = new mongoose.Schema(
       enum: ["pending", "under_review", "approved", "rejected"],
       default: "pending",
     },
-    GSTIN: {type: String},
-    CIN: {type: String}
+    GSTIN: { type: String },
+    CIN: { type: String },
     //     commissionPercentage: { type: Number, default: 10 },
-    
   },
   { timestamps: true }
 );
@@ -51,7 +153,7 @@ propertySchema.index({ geoLocation: "2dsphere" });
 propertySchema.virtual("Rooms", {
   ref: "Room",
   localField: "_id",
-  foreignField:"propertyId",
+  foreignField: "propertyId",
 });
 
 propertySchema.virtual("Bookings", {
@@ -61,7 +163,7 @@ propertySchema.virtual("Bookings", {
 });
 
 // To include virtuals in JSON output
-propertySchema.set('toJSON', { virtuals: true });
-propertySchema.set('toObject', { virtuals: true });
+propertySchema.set("toJSON", { virtuals: true });
+propertySchema.set("toObject", { virtuals: true });
 
 export default mongoose.model("Property", propertySchema);
