@@ -9,6 +9,13 @@ import {
 import Room from "../../models/Listing/room.model.js";
 import Property from "../../models/Listing/property.model.js";
 
+// Helper function to handle FormData arrays (which might come as string if single item)
+const parseArrayField = (field) => {
+  if (!field) return [];
+  if (Array.isArray(field)) return field;
+  return [field];
+};
+
 export const createRooms = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
   const partnerId = req.user._id;
@@ -29,7 +36,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bathroomCount,
     distanceToBathroom,
     bathroomAmenities,
-    // ✅ Extract New Fields
     servicesAndExtras,
     accessibility,
     safetyAndSecurity,
@@ -63,10 +69,42 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ 1. Define Valid Units (Fixes the crash)
+  // =================================================================
+  // ✅ FIX: Parse FormData Strings to Numbers/Objects
+  // =================================================================
+
+  // 1. Fix Dimensions (Convert strings "12" to numbers 12)
+  if (dimensions && typeof dimensions === "object") {
+    dimensions.length = Number(dimensions.length || 0);
+    dimensions.width = Number(dimensions.width || 0);
+    dimensions.height = Number(dimensions.height || 0);
+  }
+
+  // 2. Fix DistanceToBathroom
+  if (distanceToBathroom && typeof distanceToBathroom === "object") {
+    distanceToBathroom.value = Number(distanceToBathroom.value || 0);
+  }
+
+  // 3. Fix Numeric Fields (FormData sends these as strings)
+  if (numberOfRooms) numberOfRooms = Number(numberOfRooms);
+  if (capacity) capacity = Number(capacity);
+  if (pricePerNight) pricePerNight = Number(pricePerNight);
+  if (bedCount) bedCount = Number(bedCount);
+  if (bathroomCount) bathroomCount = Number(bathroomCount);
+  if (discount) discount = Number(discount);
+
+  // 4. Fix Building Info Numbers
+  if (buildingInfo && typeof buildingInfo === "object") {
+    if (buildingInfo.totalFloors)
+      buildingInfo.totalFloors = Number(buildingInfo.totalFloors);
+    if (buildingInfo.constructionYear)
+      buildingInfo.constructionYear = Number(buildingInfo.constructionYear);
+  }
+
+  // =================================================================
+
   const validUnits = ["ft", "m"];
 
-  // ✅ Validate required fields
   if (!numberOfRooms || numberOfRooms < 1) {
     return next(new CustomError("numberOfRooms must be at least 1", 400));
   }
@@ -87,7 +125,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Validate Dimensions Structure
+  // ✅ Validate Dimensions Structure (Now works because we parsed them to Numbers above)
   if (
     dimensions &&
     (typeof dimensions !== "object" ||
@@ -123,7 +161,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Validate ENUM fields
   const validTypes = [
     "single",
     "double",
@@ -157,8 +194,28 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Convert fields and Prepare Data
-  numberOfRooms = parseInt(numberOfRooms);
+  let uploadedImages = [];
+  let uploadedVideos = [];
+
+  if (req.files?.images) {
+    const errMsg = validateFileSize(req.files.images, "image");
+    if (errMsg) return next(new CustomError(errMsg, 400));
+
+    uploadedImages = await uploadFileToCloudinary(
+      req.files.images,
+      "rooms/images"
+    );
+  }
+
+  if (req.files?.videos) {
+    const errMsg = validateFileSize(req.files.videos, "video");
+    if (errMsg) return next(new CustomError(errMsg, 400));
+
+    uploadedVideos = await uploadFileToCloudinary(
+      req.files.videos,
+      "rooms/videos"
+    );
+  }
 
   const baseRoomData = {
     propertyId,
@@ -166,7 +223,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     capacity: capacity || 2,
     pricePerNight,
     type: type.toLowerCase(),
-    amenities: amenities ? amenities.map((item) => item.trim()) : [],
+    // Parse arrays (handle single string vs array)
+    amenities: parseArrayField(amenities).map((item) => item.trim()),
     bedType: bedType.toLowerCase(),
     bedCount: bedCount || 1,
     blockedDates: blockedDates || [],
@@ -175,10 +233,11 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     discount: discount || 0,
     bathroomType: bathroomType.toLowerCase(),
     bathroomCount: bathroomCount || 1,
-    bathroomAmenities: bathroomAmenities
-      ? bathroomAmenities.map((item) => item.trim())
-      : [],
-    // ✅ Add New Fields to Base Data
+    bathroomAmenities: parseArrayField(bathroomAmenities).map((item) =>
+      item.trim()
+    ),
+    images: uploadedImages,
+    videos: uploadedVideos,
     servicesAndExtras,
     accessibility,
     safetyAndSecurity,
@@ -198,7 +257,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     mediaAndTechnology,
   };
 
-  // ✅ Create multiple rooms
   const roomsToCreate = [];
   for (let i = 0; i < numberOfRooms; i++) {
     roomsToCreate.push({
@@ -220,7 +278,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
   const roomId = req.params.roomId;
 
-  // ✅ Find the room and check ownership
   const room = await Room.findById(roomId).populate("propertyId");
   if (!room) return next(new CustomError("Room not found", 404));
 
@@ -230,8 +287,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Extract updatable fields
-  const {
+  let {
     name,
     capacity,
     pricePerNight,
@@ -246,7 +302,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     bathroomCount,
     distanceToBathroom,
     bathroomAmenities,
-    // ✅ Extract New Fields
     servicesAndExtras,
     accessibility,
     safetyAndSecurity,
@@ -266,7 +321,34 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     mediaAndTechnology,
   } = req.body;
 
-  // ✅ Validate ENUMs before assignment
+  // =================================================================
+  // ✅ FIX: Parse FormData Strings to Numbers/Objects (Update Route)
+  // =================================================================
+
+  if (dimensions && typeof dimensions === "object") {
+    dimensions.length = Number(dimensions.length || 0);
+    dimensions.width = Number(dimensions.width || 0);
+    dimensions.height = Number(dimensions.height || 0);
+  }
+
+  if (distanceToBathroom && typeof distanceToBathroom === "object") {
+    distanceToBathroom.value = Number(distanceToBathroom.value || 0);
+  }
+
+  if (capacity) capacity = Number(capacity);
+  if (pricePerNight) pricePerNight = Number(pricePerNight);
+  if (discount) discount = Number(discount);
+  if (bedCount) bedCount = Number(bedCount);
+  if (bathroomCount) bathroomCount = Number(bathroomCount);
+
+  if (buildingInfo && typeof buildingInfo === "object") {
+    if (buildingInfo.totalFloors)
+      buildingInfo.totalFloors = Number(buildingInfo.totalFloors);
+    if (buildingInfo.constructionYear)
+      buildingInfo.constructionYear = Number(buildingInfo.constructionYear);
+  }
+  // =================================================================
+
   const validTypes = [
     "single",
     "double",
@@ -306,7 +388,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Validate dimensions object
   if (
     dimensions &&
     (typeof dimensions !== "object" ||
@@ -325,7 +406,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Validate distanceToBathroom
   if (
     distanceToBathroom &&
     (typeof distanceToBathroom !== "object" ||
@@ -342,13 +422,35 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Apply updates only if provided
+  if (req.files?.images) {
+    const errMsg = validateFileSize(req.files.images, "image");
+    if (errMsg) return next(new CustomError(errMsg, 400));
+
+    const newImages = await uploadFileToCloudinary(
+      req.files.images,
+      "rooms/images"
+    );
+    room.images.push(...newImages);
+  }
+
+  if (req.files?.videos) {
+    const errMsg = validateFileSize(req.files.videos, "video");
+    if (errMsg) return next(new CustomError(errMsg, 400));
+
+    const newVideos = await uploadFileToCloudinary(
+      req.files.videos,
+      "rooms/videos"
+    );
+    room.videos.push(...newVideos);
+  }
+
   if (name) room.name = name.trim().toLowerCase();
   if (capacity) room.capacity = capacity;
   if (pricePerNight) room.pricePerNight = pricePerNight;
   if (discount) room.discount = discount;
   if (type) room.type = type.toLowerCase();
-  if (amenities) room.amenities = amenities.map((a) => a.toLowerCase());
+  if (amenities)
+    room.amenities = parseArrayField(amenities).map((a) => a.toLowerCase());
   if (bedType) room.bedType = bedType.toLowerCase();
   if (bedCount) room.bedCount = bedCount;
   if (blockedDates) room.blockedDates = blockedDates;
@@ -357,9 +459,10 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (bathroomCount) room.bathroomCount = bathroomCount;
   if (distanceToBathroom) room.distanceToBathroom = distanceToBathroom;
   if (bathroomAmenities)
-    room.bathroomAmenities = bathroomAmenities.map((a) => a.toLowerCase());
+    room.bathroomAmenities = parseArrayField(bathroomAmenities).map((a) =>
+      a.toLowerCase()
+    );
 
-  // ✅ Apply New Fields Updates
   if (servicesAndExtras) room.servicesAndExtras = servicesAndExtras;
   if (accessibility) room.accessibility = accessibility;
   if (safetyAndSecurity) room.safetyAndSecurity = safetyAndSecurity;
@@ -378,13 +481,22 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (roomFacilities) room.roomFacilities = roomFacilities;
   if (mediaAndTechnology) room.mediaAndTechnology = mediaAndTechnology;
 
-  // ✅ Save in DB
   await room.save();
 
   return successResponse(res, 200, "Room updated successfully", room);
 });
 
+// ... (rest of the file remains unchanged: updateRoomsInBulk, getTypesOfRoomsInProperty, etc.)
 export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
+  // Note: If you use bulk update with formData, you will need to apply similar
+  // Number() parsing logic here too, though bulk updates usually use raw JSON.
+  // ... leave existing logic ...
+
+  // (Existing code for updateRoomsInBulk goes here)
+  // To keep the answer clean, I am assuming the rest of your file is unchanged.
+  // However, if you are sending FormData to updateRoomsInBulk, you must add the parsing logic there too.
+
+  // Standard implementation follows...
   const propertyId = req.params.propertyId;
   const partnerId = req.user._id;
 
@@ -405,7 +517,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     bathroomAmenitiesAdd,
     bathroomAmenitiesRemove,
     distanceToBathroom,
-    // ✅ Extract New Fields for Bulk Update
     servicesAndExtras,
     accessibility,
     safetyAndSecurity,
@@ -425,7 +536,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     mediaAndTechnology,
   } = req.body;
 
-  // ✅ Verify property ownership
   const property = await Property.findOne({ _id: propertyId, partnerId });
   if (!property) {
     return next(
@@ -436,17 +546,14 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Validate room types
   if (!types || !Array.isArray(types) || types.length === 0) {
     return next(
       new CustomError("Room types are required and must be an array", 400)
     );
   }
 
-  // ✅ Normalize types
   types = types.map((t) => t.toLowerCase().trim());
 
-  // ✅ Find target rooms
   const rooms = await Room.find({
     propertyId,
     type: { $in: types },
@@ -457,12 +564,10 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Validation constants
   const validBeds = ["single", "double", "queen", "king", "twin", "sofa-bed"];
   const validUnits = ["ft", "m"];
   const validBathroomTypes = ["private", "shared", "ensuite", "external"];
 
-  // ✅ Validate ENUMs
   if (bedType && !validBeds.includes(bedType.toLowerCase())) {
     return next(
       new CustomError(`Invalid bed type. Allowed: ${validBeds.join(", ")}`, 400)
@@ -481,7 +586,16 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Validate dimensions
+  // FIX FOR BULK UPDATE TOO
+  if (dimensions && typeof dimensions === "object") {
+    dimensions.length = Number(dimensions.length);
+    dimensions.width = Number(dimensions.width);
+    dimensions.height = Number(dimensions.height);
+  }
+  if (distanceToBathroom && typeof distanceToBathroom === "object") {
+    distanceToBathroom.value = Number(distanceToBathroom.value);
+  }
+
   if (
     dimensions &&
     (typeof dimensions !== "object" ||
@@ -500,7 +614,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Validate distanceToBathroom (if included)
   if (
     distanceToBathroom &&
     (typeof distanceToBathroom !== "object" ||
@@ -517,20 +630,20 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Prepare static fields update
   const updateFields = {};
-  if (pricePerNight !== undefined) updateFields.pricePerNight = pricePerNight;
-  if (discount !== undefined) updateFields.discount = discount;
-  if (capacity !== undefined) updateFields.capacity = capacity;
-  if (bedCount !== undefined) updateFields.bedCount = bedCount;
+  if (pricePerNight !== undefined)
+    updateFields.pricePerNight = Number(pricePerNight);
+  if (discount !== undefined) updateFields.discount = Number(discount);
+  if (capacity !== undefined) updateFields.capacity = Number(capacity);
+  if (bedCount !== undefined) updateFields.bedCount = Number(bedCount);
   if (bedType) updateFields.bedType = bedType.toLowerCase().trim();
   if (bathroomType)
     updateFields.bathroomType = bathroomType.toLowerCase().trim();
-  if (bathroomCount !== undefined) updateFields.bathroomCount = bathroomCount;
+  if (bathroomCount !== undefined)
+    updateFields.bathroomCount = Number(bathroomCount);
   if (dimensions) updateFields.dimensions = dimensions;
   if (distanceToBathroom) updateFields.distanceToBathroom = distanceToBathroom;
 
-  // ✅ Add New Fields to Bulk Update Object
   if (servicesAndExtras) updateFields.servicesAndExtras = servicesAndExtras;
   if (accessibility) updateFields.accessibility = accessibility;
   if (safetyAndSecurity) updateFields.safetyAndSecurity = safetyAndSecurity;
@@ -553,12 +666,10 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
 
   const roomIds = rooms.map((r) => r._id);
 
-  // ✅ Apply static updates
   if (Object.keys(updateFields).length > 0) {
     await Room.updateMany({ _id: { $in: roomIds } }, { $set: updateFields });
   }
 
-  // ✅ Add amenities
   if (amenitiesAdd && Array.isArray(amenitiesAdd)) {
     await Room.updateMany(
       { _id: { $in: roomIds } },
@@ -572,7 +683,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Remove amenities
   if (amenitiesRemove && Array.isArray(amenitiesRemove)) {
     await Room.updateMany(
       { _id: { $in: roomIds } },
@@ -586,7 +696,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Add bathroom amenities
   if (bathroomAmenitiesAdd && Array.isArray(bathroomAmenitiesAdd)) {
     await Room.updateMany(
       { _id: { $in: roomIds } },
@@ -600,7 +709,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Remove bathroom amenities
   if (bathroomAmenitiesRemove && Array.isArray(bathroomAmenitiesRemove)) {
     await Room.updateMany(
       { _id: { $in: roomIds } },
@@ -614,7 +722,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Add blocked dates
   if (blockedDatesAdd && Array.isArray(blockedDatesAdd)) {
     await Room.updateMany(
       { _id: { $in: roomIds } },
@@ -624,7 +731,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Remove blocked dates
   if (blockedDatesRemove && Array.isArray(blockedDatesRemove)) {
     await Room.updateMany(
       { _id: { $in: roomIds } },
@@ -641,7 +747,6 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Success response
   return successResponse(res, 200, "Bulk update successful", {
     updatedRooms: rooms.length,
     updatedFields: updateFields,
@@ -654,11 +759,10 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   });
 });
 
-//get types of rooms in  property
 export const getTypesOfRoomsInProperty = asyncHandler(
   async (req, res, next) => {
     const propertyId = req.params.propertyId;
-    const partnerId = req.user._id; //authenticated partner
+    const partnerId = req.user._id;
 
     const property = await Property.findOne({
       _id: propertyId,
@@ -681,25 +785,20 @@ export const getTypesOfRoomsInProperty = asyncHandler(
   }
 );
 
-//delete Rooms based on Types
-
 export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
-  const partnerId = req.user._id; // Authenticating partner
+  const partnerId = req.user._id;
 
   let { types } = req.body;
 
-  // ✅ Validate types
   if (!types || !Array.isArray(types) || types.length === 0) {
     return next(
       new CustomError("Room types are required and must be an array", 400)
     );
   }
 
-  // 🔷 Normalize room types
   types = types.map((t) => t.toLowerCase().trim());
 
-  //  Step 1: Verify property belongs to the logged-in partner
   const property = await Property.findOne({
     _id: propertyId,
     partnerId,
@@ -713,7 +812,6 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
     );
   }
 
-  //  Step 2: Delete rooms only owned by that partner in this property
   const deleteResult = await Room.deleteMany({
     propertyId,
     type: {
@@ -737,7 +835,7 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
 
 export const deleteRoom = asyncHandler(async (req, res, next) => {
   const roomId = req.params.roomId;
-  const partnerId = req.user._id; // Authenticating partner
+  const partnerId = req.user._id;
 
   const room = await Room.findById(roomId).populate("propertyId");
 
@@ -745,7 +843,6 @@ export const deleteRoom = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Room not found", 404));
   }
 
-  // ✅ Allow only the partner who owns the property to update
   if (room.propertyId.partnerId.toString() !== partnerId.toString()) {
     return next(
       new CustomError("You are not authorized to update this room", 403)
@@ -757,14 +854,10 @@ export const deleteRoom = asyncHandler(async (req, res, next) => {
   return successResponse(res, 200, "Room delete  successfully", deleteRoom);
 });
 
-//get rooms by property id,
-
 export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
+  const partnerId = req.user._id;
 
-  const partnerId = req.user._id; // from auth middleware
-
-  //  Step 1: Verify property belongs to the logged-in partner
   const property = await Property.findOne({
     _id: propertyId,
     partnerId,
@@ -781,7 +874,6 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   const rooms = await Room.find({
     propertyId,
   });
-  // .populate("Bookings");
 
   if (!rooms || rooms.length === 0) {
     return successResponse(res, 200, "No rooms yet for this property", {});
@@ -806,7 +898,6 @@ export const setRoomsImagesandVideosInBulk = asyncHandler(
 
     let { types, imagesToDelete, videosToDelete } = req.body;
 
-    // ✅ Validate types
     if (!types) {
       new CustomError("Room types are required and must be an array", 400);
     }
@@ -817,10 +908,8 @@ export const setRoomsImagesandVideosInBulk = asyncHandler(
       );
     }
 
-    // 🔷 Normalize room types
     types = types.map((t) => t.toLowerCase().trim());
 
-    // 1️⃣ Verify property belongs to partner
     const property = await Property.findOne({
       _id: propertyId,
       partnerId,
@@ -834,7 +923,6 @@ export const setRoomsImagesandVideosInBulk = asyncHandler(
       );
     }
 
-    // 2️⃣ Find rooms of these types under this property
     const rooms = await Room.find({
       propertyId,
       type: {
@@ -848,7 +936,6 @@ export const setRoomsImagesandVideosInBulk = asyncHandler(
       );
     }
 
-    // 3️⃣ Handle file uploads
     let newImages = [];
     let newVideos = [];
 
@@ -874,14 +961,12 @@ export const setRoomsImagesandVideosInBulk = asyncHandler(
       );
     }
 
-    // 4️⃣ Handle deletions (if any)
     if (imagesToDelete) {
       imagesToDelete = JSON.parse(imagesToDelete);
       for (let img of imagesToDelete) {
         await deleteFileFromCloudinary(img.public_id, "image");
       }
 
-      // remove from all rooms’ image lists
       await Room.updateMany(
         {
           propertyId,
@@ -926,7 +1011,6 @@ export const setRoomsImagesandVideosInBulk = asyncHandler(
       );
     }
 
-    // 5️⃣ Add newly uploaded files to all rooms
     console.log(newImages, newVideos);
     if (newImages.length > 0 || newVideos.length > 0) {
       await Room.updateMany(
@@ -949,7 +1033,6 @@ export const setRoomsImagesandVideosInBulk = asyncHandler(
       );
     }
 
-    // 6️⃣ Fetch updated rooms
     const updatedRooms = await Room.find({
       propertyId,
       type: {
@@ -975,9 +1058,8 @@ export const setRoomsImagesandVideosInBulk = asyncHandler(
 export const setRoomImagesAndVideosById = asyncHandler(
   async (req, res, next) => {
     const { roomId } = req.params;
-    const partnerId = req.user._id; // from auth middleware
+    const partnerId = req.user._id;
 
-    // ✅ 1️⃣ Find the room and verify ownership
     const room = await Room.findById(roomId).populate("propertyId");
     if (!room) {
       return next(new CustomError("Room not found", 404));
@@ -989,7 +1071,6 @@ export const setRoomImagesAndVideosById = asyncHandler(
       );
     }
 
-    // ✅ 2️⃣ Handle deletions first
     if (req.body.imagesToDelete) {
       const imagesToDelete = JSON.parse(req.body.imagesToDelete);
       await Room.updateOne(
@@ -1034,7 +1115,6 @@ export const setRoomImagesAndVideosById = asyncHandler(
       }
     }
 
-    // ✅ 3️⃣ Upload new files if provided
     let uploadedImages = [];
     let uploadedVideos = [];
 
@@ -1053,7 +1133,6 @@ export const setRoomImagesAndVideosById = asyncHandler(
     }
 
     console.log(uploadedImages, uploadedVideos);
-    // ✅ 4️⃣ Push new uploads into room
     if (uploadedImages.length > 0 || uploadedVideos.length > 0) {
       await Room.updateOne(
         {
@@ -1072,7 +1151,6 @@ export const setRoomImagesAndVideosById = asyncHandler(
       );
     }
 
-    // ✅ 5️⃣ Return updated room
     const updatedRoom = await Room.findById(roomId);
 
     return successResponse(
