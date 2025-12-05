@@ -5,6 +5,7 @@ import {
   getPartnerProperties,
   getPartnerPropertyByID,
   addPropertyDetails,
+  getAllProperties
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
@@ -45,6 +46,7 @@ router.get(
   protect,
   getPartnerPropertyByID
 );
+router.get("/get-all-properties",getAllProperties);
 
 router.put(
   "/add-property-details/:propertyId",
