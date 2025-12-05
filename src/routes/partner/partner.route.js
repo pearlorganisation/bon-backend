@@ -55,8 +55,13 @@ router.put(
 
 //---------- Rooms routes ----------------
 
-router.post("/create-rooms/:propertyId", protect, createRooms);
-router.put("/update-single-room/:roomId", protect, updateRoomById);
+router.post("/create-rooms/:propertyId", protect, uploadFields, createRooms);
+router.put(
+  "/update-single-room/:roomId",
+  protect,
+  uploadFields,
+  updateRoomById
+);
 router.put("/update-rooms-bulk/:propertyId", protect, updateRoomsInBulk);
 router.get(
   "/get-types-of-rooms/:propertyId",
