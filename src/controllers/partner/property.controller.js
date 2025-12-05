@@ -266,3 +266,26 @@ export const addPropertyDetails = asyncHandler(async (req, res, next) => {
     property
   );
 });
+
+
+
+export const getAllProperties = async (req, res) => {
+  
+  try {
+    const properties = await Property.find();
+
+    return successResponse(
+      res,
+      200,
+      "Properties fetched successfully",
+      properties
+    );
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: error.message,
+    });
+  }
+};
