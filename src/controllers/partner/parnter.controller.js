@@ -20,3 +20,24 @@ const verifyProperyKYB = asyncHandler(async (req, res, next) => {
 
 
 });
+
+
+export const getAllPartners = async (req, res) => {
+       try {
+         const partners = await Partner.find();
+     
+         return successResponse(
+           res,
+           200,
+           "Partners fetched successfully",
+           partners
+         );
+     
+       } catch (error) {
+         return res.status(500).json({
+           success: false,
+           statusCode: 500,
+           message: error.message,
+         });
+       }
+     };
