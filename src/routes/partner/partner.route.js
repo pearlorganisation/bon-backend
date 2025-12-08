@@ -5,7 +5,7 @@ import {
   getPartnerProperties,
   getPartnerPropertyByID,
   addPropertyDetails,
-  getAllProperties
+  getAllProperties,
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
@@ -46,7 +46,7 @@ router.get(
   protect,
   getPartnerPropertyByID
 );
-router.get("/get-all-properties",getAllProperties);
+router.get("/get-all-properties", getAllProperties);
 
 router.put(
   "/add-property-details/:propertyId",
@@ -72,7 +72,7 @@ router.get(
 );
 router.get(
   "/get-rooms-for-property/:propertyId",
-  protect,
+
   getRoomsByPropertyId
 );
 router.delete("/delete-rooms", protect, deleteRoomsByTypes);
