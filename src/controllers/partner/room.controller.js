@@ -856,19 +856,11 @@ export const deleteRoom = asyncHandler(async (req, res, next) => {
 
 export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
-  const partnerId = req.user._id;
+  // const partnerId = req.user._id;
 
-  const property = await Property.findOne({
-    _id: propertyId,
-    partnerId,
-  });
+  const property = await Property.findById(propertyId);
   if (!property) {
-    return next(
-      new CustomError(
-        "You are not authorized to get rooms for this property",
-        403
-      )
-    );
+    return next(new CustomError("Property not found", 404));
   }
 
   const rooms = await Room.find({
