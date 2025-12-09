@@ -7,6 +7,7 @@ import {
   grantDocumentAccess,
   requestDocumentAccess,
   getMyPropertyDocuments,
+  getAdminDocuments, // Import the new controller
 } from "../controllers/DocumentRequest/documentRequest.controller.js";
 import { protect, authorizeRoles } from "../middleware/auth/auth.middleware.js";
 
@@ -27,6 +28,14 @@ router.post(
   authorizeRoles("ADMIN"),
   uploadSingle,
   createMasterDocument
+);
+
+// New: Get docs with filters (state/country) for the admin to select from
+router.get(
+  "/admin/documents",
+  protect,
+  authorizeRoles("ADMIN"),
+  getAdminDocuments
 );
 
 router.get(
