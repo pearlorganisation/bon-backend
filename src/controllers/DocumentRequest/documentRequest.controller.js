@@ -9,7 +9,9 @@ import CustomError from "../../utils/error/customError.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
 import { uploadFileToCloudinary } from "../../utils/cloudinary.js";
 
+// ==========================================
 // ADMIN CONTROLLERS
+// ==========================================
 
 // 1. Admin creates a master document
 export const createMasterDocument = asyncHandler(async (req, res, next) => {
@@ -36,7 +38,7 @@ export const createMasterDocument = asyncHandler(async (req, res, next) => {
     country: country.toLowerCase(),
     state: state.toLowerCase(),
     city: city ? city.toLowerCase() : null,
-    documentType, // Save the type
+    documentType,
     documentUrl,
     public_id,
   });
@@ -48,37 +50,62 @@ export const createMasterDocument = asyncHandler(async (req, res, next) => {
 export const getPendingDocRequests = asyncHandler(async (req, res, next) => {
   const requests = await PropertyDocumentAccess.find({ status: "pending" })
     .populate("partnerId", "name email")
-    .populate("propertyId", "name address city state");
+    .populate("propertyId", "name address city state country");
 
   successResponse(res, 200, "Pending requests fetched", requests);
 });
 
-// 3. Admin Assigns Documents & Sets Time Window
+// 3. [NEW] Get Admin Documents (Filter by State/Country/City)
+// This helps the frontend populate the list for the Admin to choose from
+export const getAdminDocuments = asyncHandler(async (req, res, next) => {
+  const { country, state, city, documentType } = req.query;
+
+  const filter = { isActive: true };
+
+  // Case-insensitive regex matching
+  if (country) filter.country = { $regex: new RegExp(`^${country}$`, "i") };
+  if (state) filter.state = { $regex: new RegExp(`^${state}$`, "i") };
+  if (city) filter.city = { $regex: new RegExp(`^${city}$`, "i") };
+
+  // Exact match for type
+  if (documentType) filter.documentType = documentType;
+
+  const documents = await AdminDocument.find(filter).sort({ createdAt: -1 });
+
+  successResponse(res, 200, "Admin documents fetched successfully", documents);
+});
+
+// 4. [UPDATED] Admin Assigns Documents Manually
 export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
   const { requestId } = req.params;
-  const { accessDurationDays, adminNote } = req.body;
 
-  const request = await PropertyDocumentAccess.findById(requestId).populate(
-    "propertyId"
-  );
+  // Now accepting selectedDocumentIds from frontend
+  const { accessDurationDays, adminNote, selectedDocumentIds } = req.body;
+
+  const request = await PropertyDocumentAccess.findById(requestId);
   if (!request) return next(new CustomError("Request not found", 404));
 
-  const propertyState = request.propertyId.state.toLowerCase();
-  const propertyCountry = request.propertyId.country.toLowerCase();
+  // Validate that admin sent documents
+  if (
+    !selectedDocumentIds ||
+    !Array.isArray(selectedDocumentIds) ||
+    selectedDocumentIds.length === 0
+  ) {
+    return next(
+      new CustomError("Please select at least one document to assign.", 400)
+    );
+  }
 
-  const requestedTypes = request.requestedDocumentTypes;
-
-  const matchingDocs = await AdminDocument.find({
-    state: { $regex: new RegExp(`^${propertyState}$`, "i") },
-    country: { $regex: new RegExp(`^${propertyCountry}$`, "i") },
+  // Fetch the actual documents to ensure they exist
+  const docsToAssign = await AdminDocument.find({
+    _id: { $in: selectedDocumentIds },
     isActive: true,
-    documentType: { $in: requestedTypes },
   });
 
-  if (matchingDocs.length === 0) {
+  if (docsToAssign.length === 0) {
     return next(
       new CustomError(
-        `No master documents found for state: ${propertyState} matching the requested types.`,
+        "The selected documents could not be found or are inactive.",
         404
       )
     );
@@ -89,33 +116,33 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
   const endDate = new Date();
   endDate.setDate(startDate.getDate() + parseInt(accessDurationDays || 7));
 
-  // Update Request
-  request.assignedDocuments = matchingDocs.map((doc) => ({
+  // Update Request with MANUAL selection
+  request.assignedDocuments = docsToAssign.map((doc) => ({
     documentId: doc._id,
   }));
+
   request.accessStartDate = startDate;
   request.accessEndDate = endDate;
   request.status = "approved";
-  request.adminNote =
-    adminNote ||
-    "Access granted based on property location and requested types.";
+  request.adminNote = adminNote || "Access granted manually by Admin.";
 
   await request.save();
 
   successResponse(
     res,
     200,
-    "Access granted and specific documents assigned",
+    "Access granted and selected documents assigned successfully",
     request
   );
 });
 
+// ==========================================
 // PARTNER CONTROLLERS
+// ==========================================
 
 // 1. Partner Requests Access for a Property
 export const requestDocumentAccess = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
-
   const { propertyId, documentTypes } = req.body;
 
   if (
@@ -150,7 +177,7 @@ export const requestDocumentAccess = asyncHandler(async (req, res, next) => {
   const newRequest = await PropertyDocumentAccess.create({
     partnerId,
     propertyId,
-    requestedDocumentTypes: documentTypes, // Store the requested types
+    requestedDocumentTypes: documentTypes,
     status: "pending",
   });
 
@@ -169,7 +196,7 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
   })
     .populate({
       path: "assignedDocuments.documentId",
-      select: "title description documentUrl documentType", // Added documentType to selection
+      select: "title description documentUrl documentType",
     })
     .sort({ createdAt: -1 });
 
