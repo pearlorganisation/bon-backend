@@ -48,7 +48,7 @@ const auth_schema = new mongoose.Schema(
       required: false,
       validate: {
         validator: function (value) {
-          // Check if date is valid and not in future
+          // Check if date is valid and not in futures
           const today = new Date();
           return value <= today;
         },
