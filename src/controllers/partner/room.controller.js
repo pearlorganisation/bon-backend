@@ -1153,3 +1153,40 @@ export const setRoomImagesAndVideosById = asyncHandler(
     );
   }
 );
+
+// GET room details by Room ID
+export const getRoomDetailsById = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+
+    console.log("room id ", roomId);
+
+
+    // Find room and optionally populate property info
+    const room = await Room.findById(roomId)
+      .populate("propertyId") // optional: populate property details
+      .lean();
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        statusCode: 404,
+        message: "Room not found",
+        data: {},
+      });
+    }
+
+    console.log("room  detials ", room);
+
+    // Use successResponse helper
+    return successResponse(res, 200, "Room details fetched successfully", room);
+  } catch (error) {
+    console.error("Error fetching room details:", error);
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: "Server error while fetching room details",
+      data: { error: error.message },
+    });
+  }
+};
