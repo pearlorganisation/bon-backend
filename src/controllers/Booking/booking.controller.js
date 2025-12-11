@@ -139,6 +139,36 @@ export const getMyBookings = async (req, res) => {
   }
 };
 
+export const getBookingDetail = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const bookingDetail = await Booking.findOne({
+      userId: req.user._id,
+      bookingId,
+    })
+      .populate({
+        path: "propertyId",
+        select: "name city images address",
+      })
+      .populate({
+        path: "roomId",
+        select: "name type images",
+      });
+
+    if (!bookingDetail) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    res.status(200).json({ success: true, bookingDetail });
+
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+
+
 export const getPartnerBookings = async (req, res) => {
   try {
     const partnerId = req.user._id;
