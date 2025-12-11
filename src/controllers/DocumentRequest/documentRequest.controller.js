@@ -11,9 +11,8 @@ import { uploadFileToCloudinary } from "../../utils/cloudinary.js";
 
 // ==========================================
 // ADMIN CONTROLLERS
-// ==========================================
+// ==========================================s
 
-// 1. Admin creates a master document
 export const createMasterDocument = asyncHandler(async (req, res, next) => {
   const { title, description, country, state, city, documentType } = req.body;
 
@@ -46,17 +45,15 @@ export const createMasterDocument = asyncHandler(async (req, res, next) => {
   successResponse(res, 201, "Master Document Created Successfully", newDoc);
 });
 
-// 2. Admin views pending requests from Partners
 export const getPendingDocRequests = asyncHandler(async (req, res, next) => {
   const requests = await PropertyDocumentAccess.find({ status: "pending" })
     .populate("partnerId", "name email")
-    .populate("propertyId", "name address city state country");
+    .populate("propertyId", "name address city state country")
+    .sort({ createdAt: -1 });
 
   successResponse(res, 200, "Pending requests fetched", requests);
 });
 
-// 3. [NEW] Get Admin Documents (Filter by State/Country/City)
-// This helps the frontend populate the list for the Admin to choose from
 export const getAdminDocuments = asyncHandler(async (req, res, next) => {
   const { country, state, city, documentType } = req.query;
 
@@ -67,7 +64,6 @@ export const getAdminDocuments = asyncHandler(async (req, res, next) => {
   if (state) filter.state = { $regex: new RegExp(`^${state}$`, "i") };
   if (city) filter.city = { $regex: new RegExp(`^${city}$`, "i") };
 
-  // Exact match for type
   if (documentType) filter.documentType = documentType;
 
   const documents = await AdminDocument.find(filter).sort({ createdAt: -1 });
@@ -75,17 +71,13 @@ export const getAdminDocuments = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "Admin documents fetched successfully", documents);
 });
 
-// 4. [UPDATED] Admin Assigns Documents Manually
 export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
   const { requestId } = req.params;
-
-  // Now accepting selectedDocumentIds from frontend
   const { accessDurationDays, adminNote, selectedDocumentIds } = req.body;
 
   const request = await PropertyDocumentAccess.findById(requestId);
   if (!request) return next(new CustomError("Request not found", 404));
 
-  // Validate that admin sent documents
   if (
     !selectedDocumentIds ||
     !Array.isArray(selectedDocumentIds) ||
@@ -96,7 +88,6 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // Fetch the actual documents to ensure they exist
   const docsToAssign = await AdminDocument.find({
     _id: { $in: selectedDocumentIds },
     isActive: true,
@@ -111,14 +102,13 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // Calculate Dates
   const startDate = new Date();
   const endDate = new Date();
   endDate.setDate(startDate.getDate() + parseInt(accessDurationDays || 7));
 
-  // Update Request with MANUAL selection
   request.assignedDocuments = docsToAssign.map((doc) => ({
     documentId: doc._id,
+    assignedAt: new Date(),
   }));
 
   request.accessStartDate = startDate;
@@ -140,7 +130,7 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
 // PARTNER CONTROLLERS
 // ==========================================
 
-// 1. Partner Requests Access for a Property
+// FIX: Allow overlapping requests only if types are different
 export const requestDocumentAccess = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
   const { propertyId, documentTypes } = req.body;
@@ -159,21 +149,46 @@ export const requestDocumentAccess = asyncHandler(async (req, res, next) => {
   if (!property)
     return next(new CustomError("Property not found or unauthorized", 403));
 
-  const existingRequest = await PropertyDocumentAccess.findOne({
+  // 1. Find all active or pending requests for this property
+  const existingRequests = await PropertyDocumentAccess.find({
     propertyId,
     status: { $in: ["pending", "approved"] },
   });
 
-  if (existingRequest && existingRequest.status === "approved") {
-    if (new Date() < new Date(existingRequest.accessEndDate)) {
-      return next(
-        new CustomError("You already have active access to documents", 400)
-      );
+  const now = new Date();
+  const conflictTypes = [];
+
+  // 2. Check each requested type against existing records
+  for (const reqType of documentTypes) {
+    for (const record of existingRequests) {
+      // Check if this specific type was requested in this record
+      if (record.requestedDocumentTypes.includes(reqType)) {
+        // If it's pending, it's a conflict
+        if (record.status === "pending") {
+          conflictTypes.push(`${reqType} (Pending)`);
+        }
+        // If it's approved, check if expired
+        else if (record.status === "approved") {
+          if (record.accessEndDate > now) {
+            conflictTypes.push(`${reqType} (Already Active)`);
+          }
+        }
+      }
     }
-  } else if (existingRequest && existingRequest.status === "pending") {
-    return next(new CustomError("A request is already pending", 400));
   }
 
+  if (conflictTypes.length > 0) {
+    return next(
+      new CustomError(
+        `Requests exist for: ${conflictTypes.join(
+          ", "
+        )}. Please wait or check your documents.`,
+        400
+      )
+    );
+  }
+
+  // 3. Create new request for the clean types
   const newRequest = await PropertyDocumentAccess.create({
     partnerId,
     propertyId,
@@ -184,41 +199,50 @@ export const requestDocumentAccess = asyncHandler(async (req, res, next) => {
   successResponse(res, 201, "Request sent to Admin successfully", newRequest);
 });
 
-// 2. Partner Views Assigned Documents (Time-Restricted)
+// FIX: Return merged documents from all active requests
 export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
   const { propertyId } = req.params;
+  const now = new Date();
 
-  const accessRecord = await PropertyDocumentAccess.findOne({
+  // Find ALL approved requests that haven't expired
+  const accessRecords = await PropertyDocumentAccess.find({
     propertyId,
     partnerId,
     status: "approved",
-  })
-    .populate({
-      path: "assignedDocuments.documentId",
-      select: "title description documentUrl documentType",
-    })
-    .sort({ createdAt: -1 });
+    accessEndDate: { $gt: now }, // Only valid dates
+  }).populate({
+    path: "assignedDocuments.documentId",
+    select: "title description documentUrl documentType public_id",
+  });
 
-  if (!accessRecord) {
-    return next(
-      new CustomError("No active document access found for this property", 404)
-    );
-  }
+  // Find pending requests to show status on frontend
+  const pendingRecords = await PropertyDocumentAccess.find({
+    propertyId,
+    partnerId,
+    status: "pending",
+  });
 
-  const now = new Date();
-  const isExpired = now > new Date(accessRecord.accessEndDate);
+  // Collect pending types
+  let pendingTypes = [];
+  pendingRecords.forEach((rec) => {
+    pendingTypes = [...pendingTypes, ...rec.requestedDocumentTypes];
+  });
 
-  if (isExpired) {
-    accessRecord.status = "expired";
-    await accessRecord.save();
-    return next(
-      new CustomError("Document access has expired. Please request again.", 403)
-    );
-  }
+  // Merge all assigned documents into a single array
+  let allDocuments = [];
+  accessRecords.forEach((record) => {
+    if (record.assignedDocuments) {
+      const docsWithValidity = record.assignedDocuments.map((doc) => ({
+        ...doc.toObject(),
+        validUntil: record.accessEndDate,
+      }));
+      allDocuments = [...allDocuments, ...docsWithValidity];
+    }
+  });
 
   successResponse(res, 200, "Documents fetched successfully", {
-    validUntil: accessRecord.accessEndDate,
-    documents: accessRecord.assignedDocuments,
+    documents: allDocuments,
+    pendingTypes: [...new Set(pendingTypes)], // Unique pending types
   });
 });

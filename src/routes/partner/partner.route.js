@@ -19,6 +19,7 @@ import {
   deleteRoom,
   setRoomImagesAndVideosById,
   setRoomsImagesandVideosInBulk,
+  getRoomDetailsById,
 } from "../../controllers/partner/room.controller.js";
 import { protect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
@@ -96,5 +97,11 @@ router.post(
   uploadFields,
   setRoomImagesAndVideosById
 );
+
+router.get("/RoomDetails/:roomId",getRoomDetailsById)
+
+
+
+
 
 export default router;
