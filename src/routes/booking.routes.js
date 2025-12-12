@@ -18,14 +18,17 @@ const router = express.Router();
 router.post("/book", protect, createBooking);
 router.get("/me", protect, getMyBookings);
 router.put("/cancel/:bookingId", protect, cancelBooking);
-router.get("/:bookingId",protect,getBookingDetail)
+router.get("/bookingDetail/:bookingId",protect,getBookingDetail)
+
+
+
 
 router.get("/property/:propertyId", protect, getPartnerBookingByProperty);
 
 // Partner Routes
 router.get( 
   "/partner/all",
-  protect,
+  protect,  
   authorizeRoles("PARTNER", "ADMIN"),
   getPartnerBookings
 );
