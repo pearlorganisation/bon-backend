@@ -139,6 +139,96 @@ export const getMyBookings = async (req, res) => {
   }
 };
 
+
+export const getBookingDetail = async (req, res) => {
+
+  try {
+    const { bookingId } = req.params;
+
+    const bookingDetail = await Booking.findOne({
+      _id: bookingId,
+      userId: req.user._id,
+    })
+      .populate({
+        path: "userId",
+        select: "name email phoneNumber createdAt profileImageUrl", // ✅ FIXED
+      })
+      .populate({
+        path: "propertyId",
+        select: "name city images address",
+      })
+      .populate({
+        path: "roomId",
+        select: "name type images pricePerNight", // ❌ profileImageUrl removed (room doesn't have it)
+      });
+
+    if (!bookingDetail) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Booking timeline
+    const bookingTimeline = [
+      { title: "Booking created", date: bookingDetail.createdAt },
+      { title: "Payment completed", date: bookingDetail.paymentCompletedAt || null },
+      { title: "Hotel confirmed", date: bookingDetail.hotelConfirmedAt || null },
+      { title: "User check-in", date: bookingDetail.checkIn },
+      { title: "User check-out", date: bookingDetail.checkOut },
+    ];
+
+    // Final formatted response
+    const formattedBooking = {
+      bookingId: bookingDetail._id,
+      checkIn: bookingDetail.checkIn,
+      checkOut: bookingDetail.checkOut,
+      guestDetails: bookingDetail.guestDetails || {},
+      totalAmount: bookingDetail.totalAmount,
+      tax: bookingDetail.tax || 0,
+      status: bookingDetail.status,
+
+      property: {
+        name: bookingDetail.propertyId?.name || "N/A",
+        city: bookingDetail.propertyId?.city || "N/A",
+        address: bookingDetail.propertyId?.address || "N/A",
+        images: bookingDetail.propertyId?.images || [],
+      },
+
+      room: {
+        name: bookingDetail.roomId?.name || "N/A",
+        type: bookingDetail.roomId?.type || "N/A",
+        images: bookingDetail.roomId?.images || [],
+        pricePerNight: bookingDetail.roomId?.pricePerNight || 0,
+      },
+
+      user: {
+        name: bookingDetail.userId?.name || "Unknown",
+        email: bookingDetail.userId?.email || "N/A",
+        phone: bookingDetail.userId?.phoneNumber || "N/A", // ✅ FIXED
+        registered: bookingDetail.userId?.createdAt || null,
+        profileImageUrl: bookingDetail.userId?.profileImageUrl || null, // ✅ FIXED
+      },
+
+      paymentDetails: {
+        amount: bookingDetail.amount || 0,
+        tax: bookingDetail.tax || 0,
+        total: bookingDetail.totalAmount || 0,
+      },
+
+      bookingTimeline,
+    };
+
+    res.status(200).json({ success: true, bookingDetail: formattedBooking });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error });
+  }
+};
+
+
+
+
+
+
+
 export const getPartnerBookings = async (req, res) => {
   try {
     const partnerId = req.user._id;
