@@ -5,6 +5,7 @@ import {
   updateUserProfile,
   getUserProfile,
   getAllUsers,
+  getUserProfileById,
 } from "../controllers/user.controller.js";
 
 const storage = multer.memoryStorage(); // or diskStorage
@@ -17,5 +18,7 @@ router.post("/profile", protect, upload.array("images", 1), updateUserProfile);
 
 router.get("/profile", protect, getUserProfile);
 router.get("/all", protect, getAllUsers);
+
+router.get("/profile/:userId", protect, getUserProfileById);
 
 export default router;
