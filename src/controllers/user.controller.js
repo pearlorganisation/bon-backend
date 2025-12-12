@@ -72,3 +72,5 @@ export const getAllUsers = asyncHandler(async (req, res, next) => {
 
   successResponse(res, 200, "All users fetched successfully", users);
 });
+
+
