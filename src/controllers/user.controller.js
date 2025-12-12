@@ -73,4 +73,22 @@ export const getAllUsers = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "All users fetched successfully", users);
 });
 
+export const getUserProfileById = asyncHandler(async (req, res, next) => {
+  const adminRole = req.user.role;
+
+  if (adminRole !== "ADMIN") {
+    return next(new CustomError("Not authorized to access this route", 403));
+  }
+
+  const userId = req.params.userId;
+
+  const user = await Auth.findById(userId).select("-password -refresh_token");
+
+  if (!user) {
+    return next(new CustomError("User not found", 404));
+  }
+
+  successResponse(res, 200, "User profile fetched successfully", user);
+});
+
 
