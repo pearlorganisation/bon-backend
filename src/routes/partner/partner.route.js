@@ -6,8 +6,8 @@ import {
   getPartnerPropertyByID,
   addPropertyDetails,
   getAllProperties,
-  getPublicPropertyById,
   changePropertyStatus,
+  getPublicPropertyById,
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
