@@ -267,10 +267,7 @@ export const addPropertyDetails = asyncHandler(async (req, res, next) => {
   );
 });
 
-
-
 export const getAllProperties = async (req, res) => {
-  
   try {
     const properties = await Property.find();
 
@@ -280,7 +277,6 @@ export const getAllProperties = async (req, res) => {
       "Properties fetched successfully",
       properties
     );
-
   } catch (error) {
     return res.status(500).json({
       success: false,
@@ -289,3 +285,63 @@ export const getAllProperties = async (req, res) => {
     });
   }
 };
+
+// ✅ Change Property Status (Active <--> Inactive) -- ADMIN ONLY
+export const changePropertyStatus = asyncHandler(async (req, res, next) => {
+  const adminId = req.user._id;
+  const role = req.user.role;
+
+  if (role !== "ADMIN") {
+    return next(new CustomError("Only admin can change property status", 403));
+  }
+
+  const propertyId = req.params.propertyId;
+  const { status } = req.body;
+
+  if (!["active", "inactive"].includes(status)) {
+    return next(
+      new CustomError("Status must be either 'active' or 'inactive'", 400)
+    );
+  }
+
+  const property = await Property.findById(propertyId);
+  if (!property) {
+    return next(new CustomError("Property not found", 404));
+  }
+
+  property.status = status;
+  await property.save();
+
+  successResponse(
+    res,
+    200,
+    `Property status updated to ${status} successfully`,
+    property
+  );
+});
+
+// get property by id
+export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
+  const propertyId = req.params.propertyId;
+
+  // 1️⃣ Fetch property
+  const property = await Property.findById(propertyId)
+    .populate("Rooms") // optional
+    .select(
+      "name description address city state country geoLocation mapLink rating amenities Images Videos status createdAt updatedAt"
+    );
+
+  if (!property) {
+    return next(new CustomError("Property not found", 404));
+  }
+
+  // 2️⃣ Ensure property is public/active
+  if (property.status !== "active") {
+    return next(
+      new CustomError("This property is not available for public viewing", 403)
+    );
+  }
+
+  // 3️⃣ Return only public-safe data
+  successResponse(res, 200, "Property fetched successfully", property);
+});

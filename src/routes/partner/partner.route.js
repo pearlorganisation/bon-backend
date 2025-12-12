@@ -6,6 +6,8 @@ import {
   getPartnerPropertyByID,
   addPropertyDetails,
   getAllProperties,
+  changePropertyStatus,
+  getPublicPropertyById,
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
@@ -47,6 +49,11 @@ router.get(
   protect,
   getPartnerPropertyByID
 );
+router.get(
+  "/get-property-by-id/:propertyId",
+
+  getPublicPropertyById
+);
 router.get("/get-all-properties", getAllProperties);
 
 router.put(
@@ -54,6 +61,12 @@ router.put(
   protect,
   upload.fields([]),
   addPropertyDetails
+);
+
+router.put(
+  "/change-property-status/:propertyId",
+  protect,
+  changePropertyStatus
 );
 
 //---------- Rooms routes ----------------
@@ -91,10 +104,6 @@ router.post(
   setRoomImagesAndVideosById
 );
 
-router.get("/RoomDetails/:roomId",getRoomDetailsById)
-
-
-
-
+router.get("/RoomDetails/:roomId", getRoomDetailsById);
 
 export default router;
