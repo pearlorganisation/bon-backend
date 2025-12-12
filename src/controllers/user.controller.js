@@ -92,3 +92,73 @@ export const getUserProfileById = asyncHandler(async (req, res, next) => {
 });
 
 
+
+// updating all user details for admin
+
+export const updateAllUsers = asyncHandler(async (req, res, next) => {
+  const userId = req.params.id;
+
+  let user = await Auth.findById(userId);
+
+  if (!user) {
+    return next(new CustomError("User not found", 404));
+  }
+
+  const updatableFields = [
+    "name",
+    "email",
+    "address",
+    "city",
+    "state",
+    "country",
+    "pincode",
+    "gender",
+    "dateOfBirth",
+    "phoneNumber",
+    "role",           // Admin can also update role
+    "isVerified",     // Admin can verify user
+  ];
+
+  updatableFields.forEach((field) => {
+    if (req.body && req.body[field] !== undefined) {
+      user[field] = req.body[field];
+    }
+  });
+
+  // If admin uploads profile image
+  if (req.files) {
+    const image = await uploadFileToCloudinary(req.files, "Users/images");
+
+    if (user.profileImageUrl?.public_id) {
+      await deleteFileFromCloudinary(user.profileImageUrl.public_id);
+    }
+
+    user.profileImageUrl = image[0];
+  }
+
+  await user.save();
+
+  successResponse(res, 200, "User updated successfully", user);
+});
+
+
+
+
+export const deleteAllUsers = asyncHandler(async (req, res, next) => {
+  const userId = req.params.id;
+
+  const user = await Auth.findById(userId);
+
+  if (!user) {
+    return next(new CustomError("User not found", 404));
+  }
+
+  // Delete profile image from cloudinary
+  if (user.profileImageUrl?.public_id) {
+    await deleteFileFromCloudinary(user.profileImageUrl.public_id);
+  }
+
+  await user.deleteOne();
+
+  successResponse(res, 200, "User deleted successfully");
+});

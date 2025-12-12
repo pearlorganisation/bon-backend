@@ -55,3 +55,6 @@ export const authorizeRoles = (...allowedRoles) => {
     next(); // role is allowed, proceed
   };
 };
+
+
+export const isAdmin = authorizeRoles("ADMIN");
