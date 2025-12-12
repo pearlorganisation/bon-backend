@@ -6,6 +6,7 @@ import {
   getPartnerPropertyByID,
   addPropertyDetails,
   getAllProperties,
+  getPublicPropertyById,
   changePropertyStatus,
 } from "../../controllers/partner/property.controller.js";
 import {
@@ -47,6 +48,11 @@ router.get(
   "/get-partner-property/:propertyId",
   protect,
   getPartnerPropertyByID
+);
+router.get(
+  "/get-property-by-id/:propertyId",
+
+  getPublicPropertyById
 );
 router.get("/get-all-properties", getAllProperties);
 

@@ -285,37 +285,3 @@ export const getAllProperties = async (req, res) => {
     });
   }
 };
-
-// ✅ Change Property Status (Active <--> Inactive) -- ADMIN ONLY
-export const changePropertyStatus = asyncHandler(async (req, res, next) => {
-  const adminId = req.user._id;
-  const role = req.user.role;
-
-  if (role !== "ADMIN") {
-    return next(new CustomError("Only admin can change property status", 403));
-  }
-
-  const propertyId = req.params.propertyId;
-  const { status } = req.body;
-
-  if (!["active", "inactive"].includes(status)) {
-    return next(
-      new CustomError("Status must be either 'active' or 'inactive'", 400)
-    );
-  }
-
-  const property = await Property.findById(propertyId);
-  if (!property) {
-    return next(new CustomError("Property not found", 404));
-  }
-
-  property.status = status;
-  await property.save();
-
-  successResponse(
-    res,
-    200,
-    `Property status updated to ${status} successfully`,
-    property
-  );
-});
