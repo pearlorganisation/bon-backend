@@ -104,9 +104,7 @@ auth_schema.methods.generateAccessToken = function () {
   );
 };
 
-//
-// ✅ Refresh token (long-lived, e.g., 7d)
-//
+
 auth_schema.methods.generateRefreshToken = function () {
   return jwt.sign({ _id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
     expiresIn: process.env.REFRESH_TOKEN_EXPIRY,
