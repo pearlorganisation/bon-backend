@@ -159,7 +159,7 @@ const propertySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ 2dsphere index for geospatial queries
+// 2dsphere index for geospatial queries
 propertySchema.index({ geoLocation: "2dsphere" });
 
 propertySchema.virtual("Rooms", {
