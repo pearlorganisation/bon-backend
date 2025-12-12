@@ -7,6 +7,8 @@ import {
   addPropertyDetails,
   getAllProperties,
   changePropertyStatus,
+  
+  getPublicPropertyById,
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
@@ -23,7 +25,7 @@ import {
 import { protect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
 
-const router = express.Router();
+const  router = express.Router();
 
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -48,10 +50,15 @@ router.get(
   protect,
   getPartnerPropertyByID
 );
+router.get(
+  "/get-property-by-id/:propertyId",
+  
+  getPublicPropertyById
+);
 router.get("/get-all-properties", getAllProperties);
 
-router.put(
-  "/add-property-details/:propertyId",
+router.put(                     
+  "/add-property-details/:propertyId", 
   protect,
   upload.fields([]),
   addPropertyDetails
