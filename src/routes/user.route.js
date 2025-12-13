@@ -14,7 +14,6 @@ const upload = multer({ storage });
 const router = express.Router();
 
 router.post("/profile", protect, upload.array("images", 1), updateUserProfile);
-router.post("/profile", protect, upload.array("images", 1), updateUserProfile);
 
 router.get("/profile", protect, getUserProfile);
 router.get("/all", protect, getAllUsers);
