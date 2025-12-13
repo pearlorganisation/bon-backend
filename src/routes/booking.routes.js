@@ -7,6 +7,7 @@ import {
   getAllBookingsAdmin,
   getPartnerBookingByProperty,
   getBookingDetail,
+  sendSupportEmail
 } from "../controllers/Booking/booking.controller.js";
 
 // Middleware to check authentication and roles (Placeholder names)
@@ -21,7 +22,7 @@ router.put("/cancel/:bookingId", protect, cancelBooking);
 router.get("/bookingDetail/:bookingId",protect,getBookingDetail)
 
 
-
+router.post("/email-support", sendSupportEmail);
 
 router.get("/property/:propertyId", protect, getPartnerBookingByProperty);
 
