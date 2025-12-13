@@ -16,7 +16,7 @@ export const register = asyncHandler(async (req, res, next) => {
     !email ||
     !name ||
     !phoneNumber ||
-    !password ||
+    !password ||  
     !role ||
     !Roles.includes(role)
   ) {
