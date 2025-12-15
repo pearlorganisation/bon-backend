@@ -19,8 +19,10 @@ import {
   setRoomImagesAndVideosById,
   setRoomsImagesandVideosInBulk,
   getRoomDetailsById,
+  
 } from "../../controllers/partner/room.controller.js";
-import { protect } from "../../middleware/auth/auth.middleware.js";
+import {partner_KYC,verify_property_GSTIN} from "../../controllers/partner/parnter.controller.js"
+import { authorizeRoles, protect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -32,6 +34,29 @@ const uploadFields = upload.fields([
   { name: "images", maxCount: 10 },
   { name: "videos", maxCount: 5 },
 ]);
+
+
+
+//---------- property routes ----------------
+
+router.post(
+  "/verify-pan",
+  protect,
+  authorizeRoles("PARTNER"),
+  partner_KYC
+);
+
+router.post(
+  "/verify-gstin",
+  protect,
+  authorizeRoles("PARTNER"),
+  verify_property_GSTIN
+);
+
+
+
+
+
 
 //---------- property routes ----------------
 
@@ -99,5 +124,11 @@ router.post(
 );
 
 router.get("/RoomDetails/:roomId", getRoomDetailsById);
+
+
+
+
+
+
 
 export default router;
