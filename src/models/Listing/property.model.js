@@ -15,6 +15,11 @@ const propertySchema = new mongoose.Schema(
     state: { type: String, required: true },
     country: { type: String, required: true },
     pincode: String,
+    propertyType: {
+      type: String,
+      trim: true,
+      lowercase: true, 
+    },
     geoLocation: {
       type: {
         type: String,
@@ -151,7 +156,7 @@ const propertySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// ✅ 2dsphere index for geospatial queries
+// 2dsphere index for geospatial queries
 propertySchema.index({ geoLocation: "2dsphere" });
 
 propertySchema.virtual("Rooms", {
