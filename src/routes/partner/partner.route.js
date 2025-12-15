@@ -7,6 +7,7 @@ import {
   addPropertyDetails,
   getAllProperties,
   changePropertyStatus,
+  getPublicPropertyById,
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
@@ -22,7 +23,7 @@ import {
   
 } from "../../controllers/partner/room.controller.js";
 import {partner_KYC,verify_property_GSTIN} from "../../controllers/partner/parnter.controller.js"
-import { authorizeRoles, protect } from "../../middleware/auth/auth.middleware.js";
+import { authorizeRoles, protect, optionalProtect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -72,6 +73,11 @@ router.get(
   "/get-partner-property/:propertyId",
   protect,
   getPartnerPropertyByID
+);
+router.get(
+  "/get-property-by-id/:propertyId",
+optionalProtect,
+  getPublicPropertyById
 );
 router.get("/get-all-properties", getAllProperties);
 

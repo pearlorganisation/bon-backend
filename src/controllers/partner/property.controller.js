@@ -6,6 +6,7 @@ import {
   uploadFileToCloudinary,
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
+import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
 // ✅ Create a new propertyw
 export const createProperty = asyncHandler(async (req, res, next) => {
@@ -19,6 +20,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     country,
     geoLocation, // { coordinates: [lng, lat] }
     amenities,
+     propertyType,
     status,
   } = req.body;
   console.log(req.body);
@@ -84,6 +86,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     "checkIn",
     "checkOut",
     "status",
+    "propertyType",
   ];
 
   updatableFields.forEach((field) => {
@@ -318,4 +321,32 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
     `Property status updated to ${status} successfully`,
     property
   );
+  
+});
+
+// get property by id
+
+export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
+  const propertyId = req.params.propertyId;
+
+  // 1️⃣ Fetch property
+  const property = await Property.findById(propertyId)
+    .populate("Rooms")      // optional
+    .select(
+      "name description address city state country geoLocation mapLink rating amenities Images Videos status createdAt updatedAt"
+    );
+
+  if (!property) {
+    return next(new CustomError("Property not found", 404));
+  }
+
+  // 2️⃣ Ensure property is public/active
+   if (property.status !== "active" && !isAdmin) {
+    return next(
+      new CustomError("This property is not available for public viewing", 403)
+    );
+  }
+
+  // 3️⃣ Return only public-safe data
+  successResponse(res, 200, "Property fetched successfully", property);
 });

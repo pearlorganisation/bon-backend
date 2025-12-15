@@ -1,7 +1,10 @@
 import Booking from "../../models/Listing/booking.model.js";
 import Room from "../../models/Listing/room.model.js";
 import Property from "../../models/Listing/property.model.js";
+import asyncHandler from "../../middleware/asyncHandler.js";
+import { sendEmail } from "../../utils/mail/mailer.js";
 // import asyncHandler from "../utils/asyncHandler.js";
+import CustomError from "../../utils/error/customError.js";
 import mongoose from "mongoose";
 
 const generateBookingId = () => {
@@ -136,6 +139,94 @@ export const getMyBookings = async (req, res) => {
     res.status(200).json({ success: true, count: bookings.length, bookings });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+export const getBookingDetail = async (req, res) => {
+  try {
+    const { bookingId } = req.params;
+
+    const bookingDetail = await Booking.findOne({
+      _id: bookingId,
+      userId: req.user._id,
+    })
+      .populate({
+        path: "userId",
+        select: "name email phoneNumber createdAt profileImageUrl", // ✅ FIXED
+      })
+      .populate({
+        path: "propertyId",
+        select: "name city images address",
+      })
+      .populate({
+        path: "roomId",
+        select: "name type images pricePerNight", // ❌ profileImageUrl removed (room doesn't have it)
+      });
+
+    if (!bookingDetail) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+
+    // Booking timeline
+    const bookingTimeline = [
+      { title: "Booking created", date: bookingDetail.createdAt },
+      {
+        title: "Payment completed",
+        date: bookingDetail.paymentCompletedAt || null,
+      },
+      {
+        title: "Hotel confirmed",
+        date: bookingDetail.hotelConfirmedAt || null,
+      },
+      { title: "User check-in", date: bookingDetail.checkIn },
+      { title: "User check-out", date: bookingDetail.checkOut },
+    ];
+
+    // Final formatted response
+    const formattedBooking = {
+      bookingId: bookingDetail._id,
+      checkIn: bookingDetail.checkIn,
+      checkOut: bookingDetail.checkOut,
+      guestDetails: bookingDetail.guestDetails || {},
+      totalAmount: bookingDetail.totalAmount,
+      tax: bookingDetail.tax || 0,
+      status: bookingDetail.status,
+
+      property: {
+        name: bookingDetail.propertyId?.name || "N/A",
+        city: bookingDetail.propertyId?.city || "N/A",
+        address: bookingDetail.propertyId?.address || "N/A",
+        images: bookingDetail.propertyId?.images || [],
+      },
+
+      room: {
+        name: bookingDetail.roomId?.name || "N/A",
+        type: bookingDetail.roomId?.type || "N/A",
+        images: bookingDetail.roomId?.images || [],
+        pricePerNight: bookingDetail.roomId?.pricePerNight || 0,
+      },
+
+      user: {
+        name: bookingDetail.userId?.name || "Unknown",
+        email: bookingDetail.userId?.email || "N/A",
+        phone: bookingDetail.userId?.phoneNumber || "N/A", // ✅ FIXED
+        registered: bookingDetail.userId?.createdAt || null,
+        profileImageUrl: bookingDetail.userId?.profileImageUrl || null, // ✅ FIXED
+      },
+
+      paymentDetails: {
+        amount: bookingDetail.amount || 0,
+        tax: bookingDetail.tax || 0,
+        total: bookingDetail.totalAmount || 0,
+      },
+
+      bookingTimeline,
+    };
+
+    res.status(200).json({ success: true, bookingDetail: formattedBooking });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error });
   }
 };
 
@@ -283,3 +374,45 @@ export const getAllBookingsAdmin = async (req, res) => {
     });
   }
 };
+
+export const sendSupportEmail = asyncHandler(async (req, res, next) => {
+  const { email, message } = req.body;
+
+  // 1️⃣ Validate input
+  if (!email || !message) {
+    return next(new CustomError("Email and message are required", 400));
+  }
+
+  // 2️⃣ Admin email (receiver)
+  const adminEmail = process.env.NODEMAILER_EMAIL_USER;
+
+  if (!adminEmail) {
+    return next(new CustomError("Admin email not configured", 500));
+  }
+
+  // 3️⃣ Email subject
+  const subject = "New Support Message";
+
+  // 4️⃣ Email HTML
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+      <h2>📩 New Support Message</h2>
+      <p><strong>From:</strong> ${email}</p>
+      <hr />
+      <p>${message}</p>
+      <br/>
+      <p style="font-size:12px;color:#666">
+        This message was sent from Email Support form.
+      </p>
+    </div>
+  `;
+
+  // 5️⃣ Send email
+  await sendEmail(adminEmail, subject, html);
+
+  // 6️⃣ Success response
+  res.status(200).json({
+    success: true,
+    message: "Message sent successfully. Our team will contact you soon.",
+  });
+});

@@ -25,7 +25,7 @@ const auth_schema = new mongoose.Schema(
       required: true,
       validate: {
         validator: function (value) {
-          // Indian phone number format (10 digits, starts with 6-9)
+          // Indian phone number format (10 digits, starts with 6-9)d
           return /^[6-9]\d{9}$/.test(value);
         },
         message:
@@ -104,9 +104,7 @@ auth_schema.methods.generateAccessToken = function () {
   );
 };
 
-//
-// ✅ Refresh token (long-lived, e.g., 7d)
-//
+
 auth_schema.methods.generateRefreshToken = function () {
   return jwt.sign({ _id: this._id }, process.env.REFRESH_TOKEN_SECRET, {
     expiresIn: process.env.REFRESH_TOKEN_EXPIRY,

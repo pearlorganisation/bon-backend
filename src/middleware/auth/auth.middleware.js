@@ -55,3 +55,38 @@ export const authorizeRoles = (...allowedRoles) => {
     next(); // role is allowed, proceed
   };
 };
+
+
+export const optionalProtect = asyncHandler(async (req, res, next) => {
+  let token;
+
+  // 🔹 Read token from cookies (same style as protect)
+  if (req.cookies && req.cookies.accessToken) {
+    token = req.cookies.accessToken;
+  }
+
+  // 🔓 No token → public user
+  if (!token) {
+    req.user = null;
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+
+    const user = await Auth.findById(decoded._id).select(
+      "-password -refresh_token"
+    );
+
+    req.user = user || null;
+    next();
+  } catch (error) {
+    // ❗ Invalid token → treat as public
+    req.user = null;
+    next();
+  }
+});
+
+
+
+export const isAdmin = authorizeRoles("ADMIN");
