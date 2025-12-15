@@ -7,8 +7,8 @@ dotenv.config();
 
 // configDotenv();
 
-console.log("🎀", process.env.NODEMAILER_EMAIL_USER),
-  console.log("🎀", process.env.NODEMAILER_EMAIL_PASS);
+// console.log("🎀", process.env.NODEMAILER_EMAIL_USER),
+//   console.log("🎀", process.env.NODEMAILER_EMAIL_PASS);
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",

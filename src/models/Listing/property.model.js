@@ -38,28 +38,22 @@ const propertySchema = new mongoose.Schema(
     },
 
     documentVerification: {
-      gst: {
-        number: String,
+      GSTIN: {
+        gstin: String,
+        legalName: String,
+        tradeName: String,
+        constitutionOfBusiness: String,
+        taxpayerType: String,
+        gstStatus: String, //["ACTIVE", "INACTIVE"]  cashfree approved
+        dateOfRegistration: String,
+        natureOfBusinessActivities: [String],
         status: {
           type: String,
-          enum: ["pending", "verified"],
+          enum: ["pending", "verified"], // cashfree approved
           default: "pending",
         },
-      },
-      pan: {
-        number: String,
-        status: {
+        GSTIN_message: {
           type: String,
-          enum: ["pending", "verified"],
-          default: "pending",
-        },
-      },
-      aadhaar: {
-        number: String,
-        status: {
-          type: String,
-          enum: ["pending", "verified"],
-          default: "pending",
         },
       },
       passport: {
@@ -149,11 +143,9 @@ const propertySchema = new mongoose.Schema(
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     verified: {
       type: String,
-      enum: ["pending", "under_review", "approved", "rejected"],
+      enum: ["pending", "under_review", "approved", "rejected"], //admin approved
       default: "pending",
     },
-    GSTIN: { type: String },
-    CIN: { type: String },
     //     commissionPercentage: { type: Number, default: 10 },
   },
   { timestamps: true }
