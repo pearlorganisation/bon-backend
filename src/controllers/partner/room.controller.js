@@ -1208,7 +1208,7 @@ export const getAllRooms = asyncHandler(async (req, res, next) => {
         { "address.street": searchRegex },
       ],
     }).select("_id");
-
+    //df
     const propertyIds = matchingProperties.map((p) => p._id);
 
     query.$or = [{ name: searchRegex }, { propertyId: { $in: propertyIds } }];
