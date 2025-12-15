@@ -21,7 +21,7 @@ import {
   setRoomsImagesandVideosInBulk,
   getRoomDetailsById,
 } from "../../controllers/partner/room.controller.js";
-import { protect } from "../../middleware/auth/auth.middleware.js";
+import { protect, optionalProtect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -51,7 +51,7 @@ router.get(
 );
 router.get(
   "/get-property-by-id/:propertyId",
-
+optionalProtect,
   getPublicPropertyById
 );
 router.get("/get-all-properties", getAllProperties);
