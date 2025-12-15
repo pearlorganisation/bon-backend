@@ -1,7 +1,10 @@
 import Booking from "../../models/Listing/booking.model.js";
 import Room from "../../models/Listing/room.model.js";
 import Property from "../../models/Listing/property.model.js";
+import asyncHandler from "../../middleware/asyncHandler.js";
+import { sendEmail } from "../../utils/mail/mailer.js";
 // import asyncHandler from "../utils/asyncHandler.js";
+import CustomError from "../../utils/error/customError.js";
 import mongoose from "mongoose";
 
 const generateBookingId = () => {
@@ -139,9 +142,7 @@ export const getMyBookings = async (req, res) => {
   }
 };
 
-
 export const getBookingDetail = async (req, res) => {
-
   try {
     const { bookingId } = req.params;
 
@@ -169,8 +170,14 @@ export const getBookingDetail = async (req, res) => {
     // Booking timeline
     const bookingTimeline = [
       { title: "Booking created", date: bookingDetail.createdAt },
-      { title: "Payment completed", date: bookingDetail.paymentCompletedAt || null },
-      { title: "Hotel confirmed", date: bookingDetail.hotelConfirmedAt || null },
+      {
+        title: "Payment completed",
+        date: bookingDetail.paymentCompletedAt || null,
+      },
+      {
+        title: "Hotel confirmed",
+        date: bookingDetail.hotelConfirmedAt || null,
+      },
       { title: "User check-in", date: bookingDetail.checkIn },
       { title: "User check-out", date: bookingDetail.checkOut },
     ];
@@ -222,12 +229,6 @@ export const getBookingDetail = async (req, res) => {
     res.status(500).json({ message: "Server error", error });
   }
 };
-
-
-
-
-
-
 
 export const getPartnerBookings = async (req, res) => {
   try {
@@ -373,3 +374,45 @@ export const getAllBookingsAdmin = async (req, res) => {
     });
   }
 };
+
+export const sendSupportEmail = asyncHandler(async (req, res, next) => {
+  const { email, message } = req.body;
+
+  // 1️⃣ Validate input
+  if (!email || !message) {
+    return next(new CustomError("Email and message are required", 400));
+  }
+
+  // 2️⃣ Admin email (receiver)
+  const adminEmail = process.env.NODEMAILER_EMAIL_USER;
+
+  if (!adminEmail) {
+    return next(new CustomError("Admin email not configured", 500));
+  }
+
+  // 3️⃣ Email subject
+  const subject = "New Support Message";
+
+  // 4️⃣ Email HTML
+  const html = `
+    <div style="font-family: Arial, sans-serif; padding: 20px;">
+      <h2>📩 New Support Message</h2>
+      <p><strong>From:</strong> ${email}</p>
+      <hr />
+      <p>${message}</p>
+      <br/>
+      <p style="font-size:12px;color:#666">
+        This message was sent from Email Support form.
+      </p>
+    </div>
+  `;
+
+  // 5️⃣ Send email
+  await sendEmail(adminEmail, subject, html);
+
+  // 6️⃣ Success response
+  res.status(200).json({
+    success: true,
+    message: "Message sent successfully. Our team will contact you soon.",
+  });
+});
