@@ -1161,7 +1161,6 @@ export const getRoomDetailsById = async (req, res) => {
 
     console.log("room id ", roomId);
 
-
     // Find room and optionally populate property info
     const room = await Room.findById(roomId)
       .populate("propertyId") // optional: populate property details
@@ -1190,3 +1189,66 @@ export const getRoomDetailsById = async (req, res) => {
     });
   }
 };
+
+export const getAllRooms = asyncHandler(async (req, res, next) => {
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 12;
+  const skip = (page - 1) * limit;
+
+  let query = {};
+
+  if (req.query.search) {
+    const searchRegex = new RegExp(req.query.search, "i");
+
+    const matchingProperties = await Property.find({
+      $or: [
+        { name: searchRegex },
+        { city: searchRegex },
+        { state: searchRegex },
+        { "address.street": searchRegex },
+      ],
+    }).select("_id");
+
+    const propertyIds = matchingProperties.map((p) => p._id);
+
+    query.$or = [{ name: searchRegex }, { propertyId: { $in: propertyIds } }];
+  }
+
+  if (req.query.minPrice || req.query.maxPrice) {
+    query.pricePerNight = {};
+    if (req.query.minPrice)
+      query.pricePerNight.$gte = Number(req.query.minPrice);
+    if (req.query.maxPrice)
+      query.pricePerNight.$lte = Number(req.query.maxPrice);
+  }
+
+  if (req.query.type && req.query.type !== "all") {
+    query.type = req.query.type.toLowerCase();
+  }
+
+  if (req.query.capacity) {
+    query.capacity = { $gte: Number(req.query.capacity) };
+  }
+
+  const rooms = await Room.find(query)
+    .populate({
+      path: "propertyId",
+      select: "name address city state country type rating images",
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+
+  const totalRooms = await Room.countDocuments(query);
+
+  return successResponse(res, 200, "All rooms fetched successfully", {
+    rooms,
+    pagination: {
+      totalRooms,
+      totalPages: Math.ceil(totalRooms / limit),
+      currentPage: page,
+      limit,
+    },
+  });
+});
