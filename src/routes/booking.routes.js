@@ -21,7 +21,6 @@ router.get("/me", protect, getMyBookings);
 router.put("/cancel/:bookingId", protect, cancelBooking);
 router.get("/bookingDetail/:bookingId",protect,getBookingDetail)
 
-
 router.post("/email-support", sendSupportEmail);
 
 router.get("/property/:propertyId", protect, getPartnerBookingByProperty);

@@ -1,7 +1,6 @@
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
-
 import { OTP } from "../../models/otp/otp.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import { generateOTP } from "../../utils/otpUtils.js";
@@ -150,7 +149,7 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
 
   const otpRecord = await OTP.findOne({ email, type });
 
-  if (!otpRecord) {
+  if (!otpRecord) { 
     return next(new CustomError("OTP expired or not found", 400));
   }
 
