@@ -15,6 +15,11 @@ const propertySchema = new mongoose.Schema(
     state: { type: String, required: true },
     country: { type: String, required: true },
     pincode: String,
+    propertyType: {
+      type: String,
+      trim: true,
+      lowercase: true, 
+    },
     geoLocation: {
       type: {
         type: String,
