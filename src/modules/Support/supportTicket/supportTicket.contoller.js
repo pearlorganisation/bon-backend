@@ -1,62 +1,89 @@
 import SupportTicket from "./supportTicket.model.js";
+import asyncHandler from "../../../middleware/asyncHandler.js";
+import successResponse from "../../../utils/error/successResponse.js";
 
 // ✅ Create support ticket (Customer)
-export const createSupportTicket = async (req, res) => {
-  try {
-    const { issueType, subject, description } = req.body;
+export const createSupportTicket = asyncHandler(async (req, res) => {
+  const { issueType, subject, description } = req.body;
 
-    console.log(
-      "issueType, subject, description ",
-      issueType,
-      subject,
-      description
-    );
-
-    if (!issueType || !subject || !description) {
-      return res.status(400).json({
-        success: false,
-        message: "All fields are required",
-      });
-    }
-
-    const ticket = await SupportTicket.create({
-      userId: req.user._id,
-      issueType,
-      subject,
-      description,
-    });
-
-    res.status(201).json({
-      success: true,
-      message: "Support ticket created successfully",
-      data: ticket,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
+  if (!issueType || !subject || !description) {
+    return res.status(400).json({
       success: false,
-      message: "Server error",
+      message: "All fields are required",
     });
   }
-};
 
-// ✅ Get all tickets for admin
-export const getAllSupportTickets = async (req, res) => {
-  try {
-    const tickets = await SupportTicket.find()
-      .populate("userId", "name email phoneNumber") // 👈 CUSTOMER CONTACT
-      .populate("handledBy", "name email") // 👈 ADMIN
-      .sort({ createdAt: -1 });
+  const ticket = await SupportTicket.create({
+    userId: req.user._id,
+    issueType,
+    subject,
+    description,
+  });
 
-    res.status(200).json({
-      success: true,
-      data: tickets,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
+  return successResponse(
+    res,
+    201,
+    "Support ticket created successfully",
+    ticket
+  );
+});
+
+// ✅ Get all support tickets (Admin)
+export const getAllSupportTickets = asyncHandler(async (req, res) => {
+  const tickets = await SupportTicket.find()
+    .populate("userId", "name email phoneNumber") // Customer info
+    .populate("handledBy", "name email") // Admin info
+    .sort({ createdAt: -1 });
+
+  return successResponse(
+    res,
+    200,
+    "Support tickets fetched successfully",
+    tickets
+  );
+});
+
+// ✅ Update support ticket status (Admin)
+export const updateSupportTicketStatus = asyncHandler(async (req, res) => {
+  const { ticketId } = req.params;
+  const { status } = req.body;
+
+  const validStatuses = [
+    "PENDING",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "RESOLVED",
+    "FAILED",
+  ];
+  if (!status || !validStatuses.includes(status)) {
+    return res.status(400).json({
       success: false,
-      message: "Server error",
+      message: `Invalid status. Allowed values: ${validStatuses.join(", ")}`,
     });
   }
-};
+
+  const ticket = await SupportTicket.findById(ticketId);
+  if (!ticket) {
+    return res.status(404).json({
+      success: false,
+      message: "Support ticket not found",
+    });
+  }
+
+  ticket.status = status;
+
+  ticket.resolvedAt = status === "COMPLETED" ? new Date() : null;
+
+  await ticket.save();
+
+  const updatedTicket = await SupportTicket.findById(ticketId)
+    .populate("userId", "name email phoneNumber")
+    .populate("handledBy", "name email");
+
+  return successResponse(
+    res,
+    200,
+    "Support ticket status updated successfully",
+    updatedTicket
+  );
+});

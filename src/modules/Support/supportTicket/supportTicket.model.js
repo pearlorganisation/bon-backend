@@ -29,8 +29,8 @@ const supportTicketSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"],
-      default: "OPEN",
+      enum: ["PENDING", "IN_PROGRESS","COMPLETED","RESOLVED", "FAILED"],
+      default: "PENDING",
     },
 
     // 🧑 Admin who handled ticket
