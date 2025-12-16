@@ -1,10 +1,40 @@
 import mongoose from "mongoose";
 
+
 /* --------------------------------------------
-   ADMIN DOCUMENT SCHEMA
+    DOCUMENT TYPE SCHEMA
 -------------------------------------------- */
 
-const adminDocumentSchema = new mongoose.Schema(
+const DocumentTypeSchema = new mongoose.Schema(
+  { 
+
+     name: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true
+      // example: "property listing terms"
+    },
+
+    description: String,
+
+
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Auth", // admin
+      required: true,
+    },
+  },
+  { timestamps: true }
+);
+
+
+/* --------------------------------------------
+    DOCUMENT SCHEMA
+-------------------------------------------- */
+
+const DocumentSchema = new mongoose.Schema(
   {
     title: { type: String, required: true },
     description: String,
@@ -17,27 +47,40 @@ const adminDocumentSchema = new mongoose.Schema(
     city: { type: String },
 
     // UPDATED: Added specific enums
-    documentType: {
-      type: String,
-      enum: [
-        "property_listing_terms",
-        "commission_payment_policy",
-        "terms_of_use",
-        "hotel_partner_agreement",
-      ],
+    documentTypeId:  {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DocumentType",
       required: true,
     },
+    createdBy : {
+         type: mongoose.Schema.Types.ObjectId,
+         ref: "Auth",  //sub-admins
+         required:true
+    },
 
-    isActive: { type: Boolean, default: true },
+    isActive: { type: Boolean, default: false },
+    isDeleted: {type: Boolean, default: true}
   },
   { timestamps: true }
 );
 
+DocumentSchema.index(
+  {
+    country: 1,
+    state: 1,
+    documentTypeId: 1,
+  },
+  {
+    unique: true,
+  }
+);
+
+
 /* --------------------------------------------
-   PROPERTY DOCUMENT ACCESS SCHEMA
+   PARTNER DOCUMENT ACCESS SCHEMA
 -------------------------------------------- */
 
-const propertyDocumentAccessSchema = new mongoose.Schema(
+const PartnerDocumentAccessSchema = new mongoose.Schema(
   {
     partnerId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -53,23 +96,18 @@ const propertyDocumentAccessSchema = new mongoose.Schema(
 
     // UPDATED: Store which documents were requested
     requestedDocumentTypes: [
-      {
-        type: String,
-        enum: [
-          "property_listing_terms",
-          "commission_payment_policy",
-          "terms_of_use",
-          "hotel_partner_agreement",
-        ],
-        required: true,
-      },
+         {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "DocumentType",
+      required: true,
+    },
     ],
 
     assignedDocuments: [
       {
         documentId: {
           type: mongoose.Schema.Types.ObjectId,
-          ref: "AdminDocument",
+          ref: "Document",
           required: true,
         },
         assignedAt: { type: Date, default: Date.now },
@@ -86,6 +124,7 @@ const propertyDocumentAccessSchema = new mongoose.Schema(
     accessEndDate: { type: Date },
 
     adminNote: { type: String },
+    requestedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
 );
@@ -93,13 +132,16 @@ const propertyDocumentAccessSchema = new mongoose.Schema(
 /* --------------------------------------------
    EXPORT MODELS IN A SINGLE FILE
 -------------------------------------------- */
+const DocumentType = 
+mongoose.models.DocumentType ||
+ mongoose.model("DocumentType",DocumentTypeSchema);
 
-const AdminDocument =
-  mongoose.models.AdminDocument ||
-  mongoose.model("AdminDocument", adminDocumentSchema);
+const Document =
+  mongoose.models.Document ||
+  mongoose.model("Document", DocumentSchema);
 
-const PropertyDocumentAccess =
-  mongoose.models.PropertyDocumentAccess ||
-  mongoose.model("PropertyDocumentAccess", propertyDocumentAccessSchema);
+const PartnerDocumentAccess =
+  mongoose.models.PartnerDocumentAccess ||
+  mongoose.model("PartnerDocumentAccess", PartnerDocumentAccessSchema);
 
-export { AdminDocument, PropertyDocumentAccess };
+export {DocumentType, Document, PartnerDocumentAccess };

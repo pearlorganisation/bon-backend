@@ -40,7 +40,7 @@ const auth_schema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["CUSTOMER", "ADMIN", "PARTNER"],
+      enum: ["CUSTOMER", "ADMIN", "PARTNER","SUB_ADMIN"],
       default: "CUSTOMER",
     },
     dateOfBirth: {
