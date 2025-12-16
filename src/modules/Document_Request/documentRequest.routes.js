@@ -1,10 +1,9 @@
 import express from "express";
 import multer from "multer";
 
-import {
-  // Import the new controller
-} from "../controllers/DocumentRequest/documentRequest.controller.js";
-import { protect, authorizeRoles } from "../middleware/auth/auth.middleware.js";
+import // Import the new controller
+"./documentRequest.controller.js";
+import { protect, authorizeRoles } from "../../middleware/auth/auth.middleware.js";
 
 const router = express.Router();
 

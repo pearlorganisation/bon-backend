@@ -74,6 +74,12 @@ DocumentSchema.index(
     unique: true,
   }
 );
+DocumentSchema.index({
+  country: 1,
+  state: 1,
+  documentTypeId: 1,
+  isActive: 1,
+});
 
 
 /* --------------------------------------------
@@ -124,6 +130,7 @@ const PartnerDocumentAccessSchema = new mongoose.Schema(
     accessEndDate: { type: Date },
 
     adminNote: { type: String },
+    partnerNote: {type:String},
     requestedAt: { type: Date, default: Date.now },
   },
   { timestamps: true }
