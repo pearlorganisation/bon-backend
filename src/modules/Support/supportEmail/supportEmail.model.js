@@ -22,8 +22,8 @@ const supportEmailSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"],
-      default: "OPEN",
+      enum: ["PENDING", "IN_PROGRESS","COMPLETED","RESOLVED", "FAILED"],
+      default: "PENDING",
     },
 
     handledBy: {
