@@ -3,6 +3,8 @@ import CustomError from "../../utils/error/customError.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
 import { OTP } from "../../models/otp/otp.model.js";
 import Auth from "../../models/auth/auth.model.js";
+import Customer from "../../models/Customer/customer.model.js";
+import Partner from "../../models/Partner/partner.model.js";
 import { generateOTP } from "../../utils/otpUtils.js";
 import { sendOtpEmail } from "../../utils/mail/mailer.js";
 import jwt from "jsonwebtoken";
@@ -74,8 +76,18 @@ export const register = asyncHandler(async (req, res, next) => {
       isVerified: false,
     });
 
+    if(role === "CUSTOMER"){
+             await Customer.create({
+                 userId:newUser._id
+             });
+    }else{
+            await Partner.create({
+               userId: newUser._id
+            });
+    }
+
     // C. Send OTP via email
-    // await sendOtpEmail(name, email, otp, "REGISTER");
+    await sendOtpEmail(name, email, otp, "REGISTER");
 
     return successResponse(
       res,
@@ -89,12 +101,7 @@ export const register = asyncHandler(async (req, res, next) => {
     );
   } catch (error) {
     console.error("Error during registration:", error);
-    // ROLLBACK: If email failed or OTP creation failed, delete the user
-    if (newUser && newUser._id) {
-      await Auth.findByIdAndDelete(newUser._id);
-      await OTP.deleteOne({ email, type: "REGISTER" });
-      console.log("Rolled back user creation due to email failure.");
-    }
+   
     return next(new CustomError(`Registration failed: ${error.message}`, 400));
   }
 });

@@ -40,7 +40,7 @@ const auth_schema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["CUSTOMER", "ADMIN", "PARTNER"],
+      enum: ["CUSTOMER", "ADMIN", "PARTNER", "SUB_ADMIN"],
       default: "CUSTOMER",
     },
     dateOfBirth: {
@@ -103,7 +103,6 @@ auth_schema.methods.generateAccessToken = function () {
     { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
   );
 };
-
 
 auth_schema.methods.generateRefreshToken = function () {
   return jwt.sign({ _id: this._id }, process.env.REFRESH_TOKEN_SECRET, {

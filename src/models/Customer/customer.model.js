@@ -5,13 +5,13 @@ import mongoose from 'mongoose';
 const CustomerSchema = new mongoose.Schema(
 
   {
-    userId: {
+     userId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auth",
       required: true,
+      unique:true
     },
     
-
 
     bookings: [
       {
