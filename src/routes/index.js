@@ -4,7 +4,7 @@ import AuthRouter from "./auth/auth.route.js";
 import UserRouter from "./user.route.js";
 import PartnerRouter from "./partner/partner.route.js";
 import BookingRouter from "./booking.routes.js";
-import DocRouter from "./document.routes.js";
+import DocRouter from "../modules/Document_Request/documentRequest.routes.js";
 import ReviewsRouter from "./review.routes.js";
 import RoomsRouter from "./room.route.js";
 import SuportCallRouter from "../modules/Support/supportCall/supportCall.routes.js";
