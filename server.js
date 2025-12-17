@@ -2,7 +2,7 @@
 import dotenv from "dotenv";
 import app from "./app.js";
 import connectDB from "./src/config/db.js";
-
+import  expireDocumentAccessCron from "./src/utils/cron/expireDocumentAccess.cron.js"
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
@@ -19,3 +19,5 @@ connectDB()
     console.error("❌ Database connection failed:", err);
     process.exit(1);
   });
+
+  expireDocumentAccessCron();
