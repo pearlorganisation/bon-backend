@@ -18,7 +18,7 @@ const propertySchema = new mongoose.Schema(
     propertyType: {
       type: String,
       trim: true,
-      lowercase: true, 
+      lowercase: true,
     },
     geoLocation: {
       type: {
@@ -61,22 +61,7 @@ const propertySchema = new mongoose.Schema(
           type: String,
         },
       },
-      passport: {
-        number: String,
-        status: {
-          type: String,
-          enum: ["pending", "verified"],
-          default: "pending",
-        },
-      },
-      license: {
-        number: String,
-        status: {
-          type: String,
-          enum: ["pending", "verified"],
-          default: "pending",
-        },
-      },
+
       hotelAgreement: {
         documentUrl: String,
         status: {
@@ -85,14 +70,7 @@ const propertySchema = new mongoose.Schema(
           default: "pending",
         },
       },
-      kycDocuments: {
-        documentUrl: String,
-        status: {
-          type: String,
-          enum: ["pending", "verified"],
-          default: "pending",
-        },
-      },
+
       email: {
         emailAddress: String,
         status: {
