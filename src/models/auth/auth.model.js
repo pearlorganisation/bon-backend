@@ -6,7 +6,7 @@ const auth_schema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
 
-    // ✅ Email field - unique & lowercase
+    //  Email field - unique & lowercase
     email: {
       type: String,
       required: true,
@@ -40,7 +40,7 @@ const auth_schema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["CUSTOMER", "ADMIN", "PARTNER","SUB_ADMIN"],
+      enum: ["CUSTOMER", "ADMIN", "PARTNER", "SUB_ADMIN"],
       default: "CUSTOMER",
     },
     dateOfBirth: {
