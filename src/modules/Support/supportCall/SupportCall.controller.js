@@ -53,13 +53,19 @@ export const getAllSupportCalls = async (req, res) => {
 };
 
 
-
-export const updateSupportCallStatus = asyncHandler(async (req,res) => {
+export const updateSupportCallStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
   // 1️⃣ Validate status
-  const validStatuses = ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"];
+  const validStatuses = [
+    "PENDING",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "RESOLVED",
+    "FAILED",
+  ];
+
   if (!validStatuses.includes(status)) {
     throw new CustomError("Invalid call status", 400);
   }
@@ -67,10 +73,9 @@ export const updateSupportCallStatus = asyncHandler(async (req,res) => {
   // 2️⃣ Prepare update object
   const updateData = {
     status,
-    handledBy: req.user?._id, // admin who handled the call
   };
 
-  // 3️⃣ If completed, set call time
+  // 3️⃣ Update calledAt only when COMPLETED
   if (status === "COMPLETED") {
     updateData.calledAt = new Date();
   }
