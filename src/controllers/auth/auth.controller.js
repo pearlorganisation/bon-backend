@@ -17,7 +17,7 @@ export const register = asyncHandler(async (req, res, next) => {
     !email ||
     !name ||
     !phoneNumber ||
-    !password ||  
+    !password ||
     !role ||
     !Roles.includes(role)
   ) {
@@ -142,6 +142,7 @@ export const login = asyncHandler(async (req, res, next) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      phoneNumber: user.phoneNumber,
       role: user.role,
     },
   });
@@ -156,7 +157,7 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
 
   const otpRecord = await OTP.findOne({ email, type });
 
-  if (!otpRecord) { 
+  if (!otpRecord) {
     return next(new CustomError("OTP expired or not found", 400));
   }
 
@@ -199,6 +200,7 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      phoneNumber: user.phoneNumber,
       role: user.role,
     },
     accessToken,
