@@ -22,7 +22,8 @@ const supportCallSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"],
+      enum: ["PENDING", "IN_PROGRESS","COMPLETED","RESOLVED", "FAILED"],
+
       default: "PENDING",
     },
 
