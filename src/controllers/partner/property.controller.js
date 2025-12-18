@@ -188,7 +188,7 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
   if (user.role === "ADMIN") {
     // Admin can see all properties
     properties = await Property.find();
-  } else if (user.role === "partner") {
+  } else if (user.role === "PARTNER") {
     // Partner can see only their properties
     properties = await Property.find({ partnerId: user._id });
   } else {
