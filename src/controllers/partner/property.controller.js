@@ -153,17 +153,54 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 });
 
 // get all partner properties
+// export const getPartnerProperties = asyncHandler(async (req, res, next) => {
+//   const partnerId = req.user._id;
+
+//   const properties = await Property.find({ partnerId });
+
+//   if (!properties) {
+//     return next(new CustomError("NO properties found", 200));
+//   }
+
+//   const result = {
+//     properties: properties,
+//     pending: [],
+//     under_review: [],
+//     approved: [],
+//     rejected: [],
+//     active: [],
+//     inactive: [],
+//     numberOfProperties: properties.length,
+//   };
+
+//   for (const prop of properties) {
+//     result[prop.status].push(prop);
+//     result[prop.verified].push(prop);
+//   }
+
+//   successResponse(res, 200, "successfully fetch partner properties", result);
+// });
+
 export const getPartnerProperties = asyncHandler(async (req, res, next) => {
-  const partnerId = req.user._id;
+  const user = req.user; // from auth middleware
+  let properties;
 
-  const properties = await Property.find({ partnerId });
+  if (user.role === "ADMIN") {
+    // Admin can see all properties
+    properties = await Property.find();
+  } else if (user.role === "partner") {
+    // Partner can see only their properties
+    properties = await Property.find({ partnerId: user._id });
+  } else {
+    return next(new CustomError("Unauthorized", 401));
+  }
 
-  if (!properties) {
-    return next(new CustomError("NO properties found", 200));
+  if (!properties.length) {
+    return next(new CustomError("No properties found", 200));
   }
 
   const result = {
-    properties: properties,
+    properties,
     pending: [],
     under_review: [],
     approved: [],
@@ -174,12 +211,13 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
   };
 
   for (const prop of properties) {
-    result[prop.status].push(prop);
-    result[prop.verified].push(prop);
+    if (result[prop.status]) result[prop.status].push(prop);
+    if (result[prop.verified]) result[prop.verified].push(prop);
   }
 
-  successResponse(res, 200, "successfully fetch partner properties", result);
+  successResponse(res, 200, "Successfully fetched partner properties", result);
 });
+
 
 //get Property by ID
 export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {

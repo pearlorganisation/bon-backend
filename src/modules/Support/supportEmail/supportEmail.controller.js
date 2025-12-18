@@ -4,11 +4,10 @@ import CustomError from "../../../utils/error/customError.js";
 import successResponse from "../../../utils/error/successResponse.js";
 import { sendEmail } from "../../../utils/mail/mailer.js";
 import SupportEmail from "./supportEmail.model.js";
+import { supportMailToAdmin } from "../../../utils/mail/mailer.js";
 
-/**
- * Send support email
- */
-export const sendSupportEmail = asyncHandler(async (req, res, next) => {
+
+export const sendSupportEmail = asyncHandler(async (req, res) => {
   const { email, message } = req.body;
 
   // 1️⃣ Validate input
@@ -16,58 +15,56 @@ export const sendSupportEmail = asyncHandler(async (req, res, next) => {
     throw new CustomError("Email and message are required", 400);
   }
 
-  // 2️⃣ Save to DB
+  // 2️⃣ Save in DB
   const supportEmail = await SupportEmail.create({
     userId: req.user?._id,
     email,
     message,
+    status: "PENDING",
   });
 
-  // 3️⃣ Admin email (receiver)
-  const adminEmail = process.env.NODEMAILER_EMAIL_USER;
-  if (!adminEmail) {
-    throw new CustomError("Admin email not configured", 500);
-  }
+  // 3️⃣ Send mail to ADMIN
+  await supportMailToAdmin({
+    customerEmail: email,
+    message,
+  });
 
-  // 4️⃣ Email subject & HTML
-  const subject = "New Support Message";
-  const html = `
-    <div style="font-family: Arial, sans-serif; padding: 20px;">
-      <h2>📩 New Support Message</h2>
-      <p><strong>From:</strong> ${email}</p>
-      <hr />
-      <p>${message}</p>
-      <br/>
-      <p style="font-size:12px;color:#666">
-        This message was sent from Email Support form.
-      </p>
-    </div>
-  `;
-
-  // 5️⃣ Send email
-  await sendEmail(adminEmail, subject, html);
-
-  // 6️⃣ Success response
-  return successResponse(res, 200, "Message sent successfully. Our team will contact you soon.", supportEmail);
+  // 4️⃣ Success response
+  return successResponse(
+    res,
+    200,
+    "Your message has been sent to admin successfully",
+    supportEmail
+  );
 });
 
-/**
- * Update the status of a support email
- */
-export const updateEmailStatus = asyncHandler(async (req, res, next) => {
-  const { id } = req.params;
-  const { status, handledBy } = req.body;
-
-  // Validate status
-  const validStatuses = ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"];
-  if (!validStatuses.includes(status)) {
-    throw new CustomError("Invalid status value", 400);
-  }
 
   // Update email status
+export const updateEmailStatus = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  // 1️ Validate status
+  const validStatuses = ["PENDING", "IN_PROGRESS", "COMPLETED", "RESOLVED","FAILED"];
+
+  if (!validStatuses.includes(status)) {
+    throw new CustomError("Invalid email status", 400);
+  }
+
+  // 2️⃣ Prepare update object
+  const updateData = {
+    status,
+  };
+
+  // 3️⃣ Update timestamp only when COMPLETED
+  if (status === "COMPLETED") {
+    updateData.completedAt = new Date(); // or resolvedAt (your choice)
+  }
+
+  // 4️⃣ Update DB
   const updatedEmail = await SupportEmail.findByIdAndUpdate(
     id,
-    { status, handledBy },
+    updateData,
     { new: true }
   );
 
@@ -75,8 +72,15 @@ export const updateEmailStatus = asyncHandler(async (req, res, next) => {
     throw new CustomError("Support email not found", 404);
   }
 
-  return successResponse(res, 200, "Email status updated successfully", updatedEmail);
+  // 5️⃣ Success response
+  return successResponse(
+    res,
+    200,
+    "Email status updated successfully",
+    updatedEmail
+  );
 });
+
 
 /**
  * Get all support emails
