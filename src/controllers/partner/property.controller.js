@@ -20,7 +20,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     country,
     geoLocation, // { coordinates: [lng, lat] }
     amenities,
-     propertyType,
+    propertyType,
     status,
   } = req.body;
   console.log(req.body);
@@ -218,7 +218,6 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "Successfully fetched partner properties", result);
 });
 
-
 //get Property by ID
 export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
@@ -359,7 +358,6 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
     `Property status updated to ${status} successfully`,
     property
   );
-  
 });
 
 // get property by id
@@ -369,7 +367,7 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
 
   // 1️⃣ Fetch property
   const property = await Property.findById(propertyId)
-    .populate("Rooms")      // optional
+    .populate("Rooms") // optional
     .select(
       "name description address city state country geoLocation mapLink rating amenities Images Videos status createdAt updatedAt"
     );
@@ -379,7 +377,7 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   }
 
   // 2️⃣ Ensure property is public/active
-   if (property.status !== "active" && !isAdmin) {
+  if (property.status !== "active" && !isAdmin) {
     return next(
       new CustomError("This property is not available for public viewing", 403)
     );
