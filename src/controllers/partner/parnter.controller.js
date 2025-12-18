@@ -53,6 +53,9 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
       ),
     ]);
 
+    
+
+
     const panData = panResponse.data;
     const gstinData = gstinResponse.data;
 
@@ -105,6 +108,30 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
     });
   }
 });
+
+// GET partner KYC details
+export const getPartnerKYC = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+
+  const partner = await Partner.findOne({ userId }).select(
+    "panDetails gstinList isVerified"
+  );
+
+  if (!partner) {
+    return next(new CustomError("Partner not found", 404));
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: "Partner KYC fetched successfully",
+    data: {
+      panDetails: partner.panDetails || null,
+      gstinList: partner.gstinList || [],
+      isVerified: partner.isVerified,
+    },
+  });
+});
+
 
 export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
