@@ -2,11 +2,10 @@
 import dotenv from "dotenv";
 import app from "./app.js";
 import connectDB from "./src/config/db.js";
-import  expireDocumentAccessCron from "./src/utils/cron/expireDocumentAccess.cron.js"
+import expireDocumentAccessCron from "./src/utils/cron/expireDocumentAccess.cron.js";
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
-
 
 // Connect DB and start server
 connectDB()
@@ -20,4 +19,6 @@ connectDB()
     process.exit(1);
   });
 
+if (process.env.ENABLE_CRON === "true") {
   expireDocumentAccessCron();
+}
