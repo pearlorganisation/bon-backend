@@ -19,7 +19,7 @@ const DocumentTypeSchema = new mongoose.Schema(
 
     description: String,
 
-
+    isActive: {type:String, default:true},
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auth", // admin
@@ -59,7 +59,7 @@ const DocumentSchema = new mongoose.Schema(
     },
 
     isActive: { type: Boolean, default: false },
-    isDeleted: {type: Boolean, default: true}
+    isDeleted: {type: Boolean, default: false}
   },
   { timestamps: true }
 );
