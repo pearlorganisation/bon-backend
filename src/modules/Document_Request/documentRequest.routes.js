@@ -105,7 +105,7 @@ router.get(
   getAllDocRequestsForAdmin
 );
 
-// Grant document access
+// Grant document accesss
 router.post(
   "/admin/document-requests/:requestId/grant",
   protect,
@@ -170,6 +170,11 @@ router.patch(
 );
 
 // Get all document types
-router.get("/document-types", protect, authorizeRoles("ADMIN","SUB_ADMIN","PARTNER"), getAllDocumentTypes);
+router.get(
+  "/document-types",
+  protect,
+  authorizeRoles("ADMIN", "SUB_ADMIN", "PARTNER"),
+  getAllDocumentTypes
+);
 
 export default router;
