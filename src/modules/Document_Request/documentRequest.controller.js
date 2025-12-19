@@ -30,7 +30,7 @@ export const createDocument = asyncHandler(async (req, res, next) => {
   if (!documentTypeId) {
     return next(new CustomError("Please specify the document type", 400));
   }
-
+ console.log(req.files.document,"a a ");
   const uploadResult = await uploadFileToCloudinary(
     req.files.document,
     "admin/documents"
@@ -95,7 +95,7 @@ export const updateDocument = asyncHandler(async (req, res, next) => {
   }
 
   //if new file uploaded
-  if (req.files.document) {
+  if (req.files?.document) {
     const uploadResult = await uploadFileToCloudinary(
       req.files.document,
       "admin/documents"
@@ -114,7 +114,7 @@ export const updateDocument = asyncHandler(async (req, res, next) => {
   if (city !== undefined) document.city = city.trim().toLowerCase();
   if (documentTypeId !== undefined) document.documentTypeId = documentTypeId;
 
-  if (req.user.role === "Admin") {
+  if (req.user.role === "ADMIN") {
     //only admin can change  document status
     if (isActive !== undefined) document.isActive = isActive;
   }
@@ -146,19 +146,19 @@ export const updateDocument = asyncHandler(async (req, res, next) => {
 export const softDeleteDocument = asyncHandler(async (req, res, next) => {
   const { id } = req.params; // documentId
   const { isDeleted } = req.body;
-  // 1️⃣ Find document
+  // 1️ Find document
   const document = await Document.findById(id);
 
   if (!document) {
     return next(new CustomError("Document not found", 404));
   }
 
-  // 3️⃣ If already deleted
-  if (!isDeleted) {
+  // 3️ If already deleted
+  if (isDeleted==undefined) {
     return next(new CustomError("delete value  required", 400));
   }
 
-  // 4️⃣ Soft delete
+  // 4️ Soft delete
   document.isDeleted = isDeleted;
   await document.save();
 
@@ -191,11 +191,11 @@ export const getDocuments = asyncHandler(async (req, res, next) => {
 
   for (let doc of documents) {
     if (doc.isDeleted) {
-      response[isDeleted].push(doc);
+      response["isDeleted"].push(doc);
     } else if (doc.isActive) {
-      response[isActive].push(doc);
+      response["isActive"].push(doc);
     } else {
-      response[isInctive].push(doc);
+      response["isInctive"].push(doc);
     }
   }
 
@@ -342,7 +342,7 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
     .populate("requestedDocumentTypes", "_id");
 
   if (!request) {
-    return next(new CustomError("Request not found", 404));
+    return next(new CustomError("Document-Request not found", 404));
   }
 
   if (request.status !== "pending") {
@@ -397,8 +397,14 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
       doc.country !== request.propertyId.country ||
       doc.state !== request.propertyId.state
     ) {
+         console.log("doc",doc.country,doc.state);
+           console.log(
+             "property",
+             request.propertyId.country,
+             request.propertyId.state
+           );
       throw new CustomError(
-        "One or more documents do not match property location",
+        "One or more documents do not match property (country",
         400
       );
     }
@@ -430,6 +436,45 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
     request
   );
 });
+// ADMIN ONLY [ pending  ,rejected ]
+export const toggleDocumentRequestStatus = asyncHandler(async (req, res, next) => {
+  const { requestId } = req.params;
+  const { adminNote } = req.body;
+
+  const request = await PartnerDocumentAccess.findById(requestId);
+
+  if (!request) {
+    return next(new CustomError("Request not found", 404));
+  }
+
+  // Allowed transitions only
+  if (request.status === "pending") {
+    request.status = "rejected";
+  } else if (request.status === "rejected") {
+    request.status = "pending";
+  } else {
+    return next(
+      new CustomError(
+        "Only pending or rejected requests can be updated",
+        400
+      )
+    );
+  }
+
+  // Update admin note (optional)
+  if (adminNote !== undefined) {
+    request.adminNote = adminNote;
+  }
+
+  await request.save();
+
+  successResponse(res, 200, "Request status updated successfully", {
+    _id: request._id,
+    status: request.status,
+    adminNote: request.adminNote,
+  });
+});
+
 
 // ==========================================
 // PARTNER DOCUMENT ACCESS CONTROLLERS
@@ -510,7 +555,7 @@ export const requestDocumentAccess = asyncHandler(async (req, res, next) => {
     requestedDocumentTypes: documentTypeIds,
     status: "pending",
     PartnerNote: partnerNote || "",
-    requestedAt: new Date.now(),
+    requestedAt:  Date.now(),
   });
 
   successResponse(res, 201, "Request sent to admin successfully", newRequest);
@@ -552,7 +597,7 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
   })
     .populate({
       path: "assignedDocuments.documentId",
-      select: "title description documentTypeId country state city", // ❌ no url
+      select: "title description documentTypeId country state city",
       populate: {
         path: "documentTypeId",
         select: "name description",
@@ -561,12 +606,12 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
     .lean();
 
   /* --------------------------------------------
-     3️ PENDING REQUESTS
+     3️ PENDING & REJECTED REQUESTS
   -------------------------------------------- */
-  const pendingRecords = await PartnerDocumentAccess.find({
+  const pendingAndRejectedRecords = await PartnerDocumentAccess.find({
     propertyId,
     partnerId,
-    status: "pending",
+    status: { $in: ["pending", "rejected"] },
   })
     .populate({
       path: "requestedDocumentTypes",
@@ -595,6 +640,7 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
           city: doc.documentId.city,
         },
 
+        adminNote: record.adminNote,
         assignedAt: doc.assignedAt,
         validUntil: record.accessEndDate,
         status: "active",
@@ -603,7 +649,7 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
   });
 
   /* --------------------------------------------
-     5️⃣ FORMAT EXPIRED DOCUMENTS (NO URL)
+     5️ FORMAT EXPIRED DOCUMENTS (NO URL)
   -------------------------------------------- */
   const expiredDocuments = [];
 
@@ -629,27 +675,43 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
   });
 
   /* --------------------------------------------
-     6️⃣ FORMAT PENDING TYPES (UNIQUE)
+     6️ FORMAT PENDING & REJECTED TYPES
   -------------------------------------------- */
-  const pendingTypeMap = new Map();
+  const pendingTypes = [];
+  const rejectedTypes = [];
 
-  pendingRecords.forEach((record) => {
+  pendingAndRejectedRecords.forEach((record) => {
     record.requestedDocumentTypes.forEach((type) => {
-      pendingTypeMap.set(type._id.toString(), type);
+      const base = {
+        _id: type._id,
+        name: type.name,
+        description: type.description,
+        requestedAt: record.createdAt,
+      };
+
+      if (record.status === "pending") {
+        pendingTypes.push(base);
+      }
+
+      if (record.status === "rejected") {
+        rejectedTypes.push({
+          ...base,
+          adminNote: record.adminNote || "",
+          rejectedAt: record.updatedAt,
+        });
+      }
     });
   });
 
-  const pendingTypes = Array.from(pendingTypeMap.values());
-
-  /* --------------------------------------------
-     7️⃣ RESPONSE
-  -------------------------------------------- */
+  
   successResponse(res, 200, "Documents fetched successfully", {
     activeDocuments,
     expiredDocuments,
     pendingTypes,
+    rejectedTypes,
   });
 });
+
 
 // ==========================================
 //  Document Type
@@ -666,7 +728,7 @@ export const createDocumentType = asyncHandler(async (req, res, next) => {
 
   name = name.trim().toLowerCase();
 
-  let alreadyExist = await DocumentType.findOne({ label });
+  let alreadyExist = await DocumentType.findOne({ name });
 
   if (alreadyExist) {
     return next(new CustomError("Document Type Allready exist"));
@@ -685,7 +747,7 @@ export const createDocumentType = asyncHandler(async (req, res, next) => {
 export const updateDocumentType = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
   let { name, description } = req.body;
-
+    console.log(id);
   const docType = await DocumentType.findById(id);
 
   if (!docType) {
@@ -719,17 +781,19 @@ export const updateDocumentType = asyncHandler(async (req, res, next) => {
 export const deleteDocumentType = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
 
-  const docType = await DocumentType.findByIdAndDelete(id);
+  const docType = await DocumentType.findById(id);
 
   if (!docType) {
     return next(new CustomError("Document type not found", 404));
   }
+   docType.isActive =false;
+   docType.save()
 
   successResponse(res, 200, "Document type deleted successfully", docType);
 });
 
 export const getAllDocumentTypes = asyncHandler(async (req, res, next) => {
-  const docTypes = await DocumentType.find();
+  const docTypes = await DocumentType.find({isActive:true});
 
   successResponse(res, 200, "Document types fetched successfully", docTypes);
 });
