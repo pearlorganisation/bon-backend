@@ -103,6 +103,20 @@ router.put(
   changePropertyStatus
 );
 
+
+
+//------admin--------//
+
+
+router.get(
+  "/get-property-by-id/:propertyId",
+optionalProtect,
+  getPublicPropertyById
+);
+
+
+
+
 //---------- Rooms routes ----------------
 
 router.post("/create-rooms/:propertyId", protect, uploadFields, createRooms);
