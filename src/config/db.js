@@ -18,7 +18,7 @@ const connectDB = async () => {
   if (!cached.promise) {
     cached.promise = mongoose.connect(process.env.MONGO_URI, {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 5000, // fail fast
+      serverSelectionTimeoutMS: 5000, // fail fasts
       socketTimeoutMS: 45000,
     });
   }
