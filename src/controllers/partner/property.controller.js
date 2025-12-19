@@ -7,6 +7,7 @@ import {
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
+import mongoose from "mongoose";
 
 // ✅ Create a new propertyw
 export const createProperty = asyncHandler(async (req, res, next) => {
@@ -360,14 +361,17 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
   );
 });
 
-// get property by id
 
+
+
+// get property by id
 export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
+  const id = new  mongoose.Types.ObjectId(propertyId)
 
   // 1️⃣ Fetch property
-  const property = await Property.findById(propertyId)
-    .populate("Rooms") // optional
+  const property = await Property.find({partnerId : id })
+    .populate("Rooms")      // optional
     .select(
       "name description address city state country geoLocation mapLink rating amenities Images Videos status createdAt updatedAt"
     );
@@ -377,7 +381,7 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   }
 
   // 2️⃣ Ensure property is public/active
-  if (property.status !== "active" && !isAdmin) {
+   if (property.status !== "active" && !isAdmin) {
     return next(
       new CustomError("This property is not available for public viewing", 403)
     );
@@ -386,3 +390,6 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   // 3️⃣ Return only public-safe data
   successResponse(res, 200, "Property fetched successfully", property);
 });
+
+
+
