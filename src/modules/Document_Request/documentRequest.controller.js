@@ -30,7 +30,7 @@ export const createDocument = asyncHandler(async (req, res, next) => {
   if (!documentTypeId) {
     return next(new CustomError("Please specify the document type", 400));
   }
- console.log(req.files.document,"a a ");
+  console.log(req.files.document, "a a ");
   const uploadResult = await uploadFileToCloudinary(
     req.files.document,
     "admin/documents"
@@ -154,7 +154,7 @@ export const softDeleteDocument = asyncHandler(async (req, res, next) => {
   }
 
   // 3️ If already deleted
-  if (isDeleted==undefined) {
+  if (isDeleted == undefined) {
     return next(new CustomError("delete value  required", 400));
   }
 
@@ -171,37 +171,24 @@ export const softDeleteDocument = asyncHandler(async (req, res, next) => {
 // for admin and sub-admins
 export const getDocuments = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
-
-  let response = {
-    isActive: [],
-    isInactive: [],
-    isDeleted: [],
-  };
-
   let documents = [];
 
-  // check role
   if (req.user.role === "ADMIN") {
-    documents = await Document.find().sort({ createdAt: 1 });
+    // Admin sees everything (except maybe hard-deleted)
+    documents = await Document.find({ isDeleted: false })
+      .populate("documentTypeId")
+      .populate("createdBy", "name email")
+      .sort({ createdAt: -1 });
   } else {
-    documents = await Document.find({ createdBy: userId }).sort({
-      createdAt: 1,
-    });
+    // Sub-Admin only sees what they created
+    documents = await Document.find({ createdBy: userId, isDeleted: false })
+      .populate("documentTypeId")
+      .sort({ createdAt: -1 });
   }
 
-  for (let doc of documents) {
-    if (doc.isDeleted) {
-      response["isDeleted"].push(doc);
-    } else if (doc.isActive) {
-      response["isActive"].push(doc);
-    } else {
-      response["isInctive"].push(doc);
-    }
-  }
-
-  return successResponse(res, 200, "documents fetch successfully", response);
+  // Return a flat array so frontend .filter() works
+  return successResponse(res, 200, "Documents fetched successfully", documents);
 });
-
 //for admin only
 
 export const getAllDocRequestsForAdmin = asyncHandler(
@@ -397,12 +384,12 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
       doc.country !== request.propertyId.country ||
       doc.state !== request.propertyId.state
     ) {
-         console.log("doc",doc.country,doc.state);
-           console.log(
-             "property",
-             request.propertyId.country,
-             request.propertyId.state
-           );
+      console.log("doc", doc.country, doc.state);
+      console.log(
+        "property",
+        request.propertyId.country,
+        request.propertyId.state
+      );
       throw new CustomError(
         "One or more documents do not match property (country",
         400
@@ -437,44 +424,42 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
   );
 });
 // ADMIN ONLY [ pending  ,rejected ]
-export const toggleDocumentRequestStatus = asyncHandler(async (req, res, next) => {
-  const { requestId } = req.params;
-  const { adminNote } = req.body;
+export const toggleDocumentRequestStatus = asyncHandler(
+  async (req, res, next) => {
+    const { requestId } = req.params;
+    const { adminNote } = req.body;
 
-  const request = await PartnerDocumentAccess.findById(requestId);
+    const request = await PartnerDocumentAccess.findById(requestId);
 
-  if (!request) {
-    return next(new CustomError("Request not found", 404));
+    if (!request) {
+      return next(new CustomError("Request not found", 404));
+    }
+
+    // Allowed transitions only
+    if (request.status === "pending") {
+      request.status = "rejected";
+    } else if (request.status === "rejected") {
+      request.status = "pending";
+    } else {
+      return next(
+        new CustomError("Only pending or rejected requests can be updated", 400)
+      );
+    }
+
+    // Update admin note (optional)
+    if (adminNote !== undefined) {
+      request.adminNote = adminNote;
+    }
+
+    await request.save();
+
+    successResponse(res, 200, "Request status updated successfully", {
+      _id: request._id,
+      status: request.status,
+      adminNote: request.adminNote,
+    });
   }
-
-  // Allowed transitions only
-  if (request.status === "pending") {
-    request.status = "rejected";
-  } else if (request.status === "rejected") {
-    request.status = "pending";
-  } else {
-    return next(
-      new CustomError(
-        "Only pending or rejected requests can be updated",
-        400
-      )
-    );
-  }
-
-  // Update admin note (optional)
-  if (adminNote !== undefined) {
-    request.adminNote = adminNote;
-  }
-
-  await request.save();
-
-  successResponse(res, 200, "Request status updated successfully", {
-    _id: request._id,
-    status: request.status,
-    adminNote: request.adminNote,
-  });
-});
-
+);
 
 // ==========================================
 // PARTNER DOCUMENT ACCESS CONTROLLERS
@@ -555,7 +540,7 @@ export const requestDocumentAccess = asyncHandler(async (req, res, next) => {
     requestedDocumentTypes: documentTypeIds,
     status: "pending",
     PartnerNote: partnerNote || "",
-    requestedAt:  Date.now(),
+    requestedAt: Date.now(),
   });
 
   successResponse(res, 201, "Request sent to admin successfully", newRequest);
@@ -703,7 +688,6 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
     });
   });
 
-  
   successResponse(res, 200, "Documents fetched successfully", {
     activeDocuments,
     expiredDocuments,
@@ -711,7 +695,6 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
     rejectedTypes,
   });
 });
-
 
 // ==========================================
 //  Document Type
@@ -747,7 +730,7 @@ export const createDocumentType = asyncHandler(async (req, res, next) => {
 export const updateDocumentType = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
   let { name, description } = req.body;
-    console.log(id);
+  console.log(id);
   const docType = await DocumentType.findById(id);
 
   if (!docType) {
@@ -786,14 +769,14 @@ export const deleteDocumentType = asyncHandler(async (req, res, next) => {
   if (!docType) {
     return next(new CustomError("Document type not found", 404));
   }
-   docType.isActive =false;
-   docType.save()
+  docType.isActive = false;
+  docType.save();
 
   successResponse(res, 200, "Document type deleted successfully", docType);
 });
 
 export const getAllDocumentTypes = asyncHandler(async (req, res, next) => {
-  const docTypes = await DocumentType.find({isActive:true});
+  const docTypes = await DocumentType.find({ isActive: true });
 
   successResponse(res, 200, "Document types fetched successfully", docTypes);
 });
