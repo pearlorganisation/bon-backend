@@ -5,8 +5,13 @@ const propertySchema = new mongoose.Schema(
     partnerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auth",
-      required: true,
     },
+
+    subAdminId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Auth",
+    },
+
 
     name: { type: String, required: true },
     description: String,
@@ -42,6 +47,11 @@ const propertySchema = new mongoose.Schema(
       otherPolicies: String,
     },
 
+    PartnerEmail: {
+      type: String,
+    },
+  
+
     documentVerification: {
       GSTIN: {
         gstin: String,
@@ -71,14 +81,7 @@ const propertySchema = new mongoose.Schema(
         },
       },
 
-      email: {
-        emailAddress: String,
-        status: {
-          type: String,
-          enum: ["pending", "verified"],
-          default: "pending",
-        },
-      },
+    
     },
 
     ratingsAverage: {
@@ -152,5 +155,17 @@ propertySchema.virtual("Bookings", {
 // To include virtuals in JSON output
 propertySchema.set("toJSON", { virtuals: true });
 propertySchema.set("toObject", { virtuals: true });
+
+
+
+propertySchema.pre("validate", function (next) {
+  if (!this.partnerId && !this.subAdminId) {
+    return next(
+      new Error("Either partnerId or subAdminId is required")
+    );
+  }
+  next();
+});
+
 
 export default mongoose.model("Property", propertySchema);

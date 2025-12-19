@@ -8,9 +8,19 @@ import {
 import Property from "../../models/Listing/property.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
-// ✅ Create a new propertyw
+
+
+// ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
-  const partnerId = req.user._id; // partner from auth middleware
+  const userId = req.user._id;
+  const role = req.user.role;
+
+  // ✅ SUB_ADMIN must send PartnerEmail
+  if (role === "SUB_ADMIN" && !req.body.PartnerEmail) {
+    return next(
+      new CustomError("Partner email is required", 400)
+    );
+  }
 
   let {
     name,
@@ -18,23 +28,26 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     city,
     state,
     country,
-    geoLocation, // { coordinates: [lng, lat] }
+    geoLocation,
     amenities,
     propertyType,
     status,
+    PartnerEmail,
   } = req.body;
-  console.log(req.body);
+
+  // ✅ Required fields
   if (!name || !address || !city || !state || !country) {
     return next(new CustomError("Required fields missing", 400));
   }
+
+  // ✅ Parse JSON fields
   if (geoLocation) geoLocation = JSON.parse(geoLocation);
   if (amenities) amenities = JSON.parse(amenities);
-  console.log(geoLocation, amenities);
 
-  // ✅ Upload images and videos if provided
+  // ✅ Upload images & videos
   let Images = [];
   let Videos = [];
-  console.log(req.files);
+
   if (req.files?.images) {
     Images = await uploadFileToCloudinary(
       req.files.images,
@@ -49,21 +62,38 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     );
   }
 
-  const property = await Property.create({
-    ...req.body,
+  // ✅ Build data object (IMPORTANT PART)
+  const propertyData = {
+    name,
+    address,
+    city,
+    state,
+    country,
+    propertyType,
+    status,
     amenities,
     geoLocation,
-    partnerId,
     Images,
     Videos,
-  });
+  };
 
-  if (!property) {
-    return next(new CustomError("property not created", 400));
+  if (role === "PARTNER") {
+    propertyData.partnerId = userId;
   }
 
-  successResponse(res, 201, "property created successfully ", property);
+  if (role === "SUB_ADMIN") {
+    propertyData.subAdminId = userId;
+    propertyData.PartnerEmail =PartnerEmail 
+  }
+
+  // ✅ Create property
+  const property = await Property.create(propertyData);
+
+  successResponse(res, 201, "Property created successfully", property);
 });
+
+
+
 
 // ✅ Update property
 export const updateProperty = asyncHandler(async (req, res, next) => {
