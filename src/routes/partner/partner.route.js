@@ -8,6 +8,9 @@ import {
   getAllProperties,
   changePropertyStatus,
   getPublicPropertyById,
+  requestPropertyApproval,
+  getPropertyApprovalRequests,
+  approveRejectProperty,
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
@@ -104,6 +107,19 @@ router.put(
 );
 
 
+router.patch(
+  "/properties/:propertyId/request-approval",
+  protect,
+   authorizeRoles("PARTNER"),
+  requestPropertyApproval
+);
+
+
+
+
+
+
+
 
 //------admin--------//
 
@@ -115,6 +131,19 @@ optionalProtect,
 );
 
 
+router.get(
+  "/admin/properties/approval-requests",
+  protect,
+   authorizeRoles("ADMIN"),
+  getPropertyApprovalRequests
+);
+
+router.patch(
+  "/admin/properties/:propertyId/approve",
+  protect,
+   authorizeRoles("ADMIN"),
+  approveRejectProperty
+);
 
 
 //---------- Rooms routes ----------------
