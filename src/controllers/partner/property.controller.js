@@ -8,8 +8,6 @@ import {
 import Property from "../../models/Listing/property.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
-
-
 // ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
@@ -17,9 +15,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
 
   // ✅ SUB_ADMIN must send PartnerEmail
   if (role === "SUB_ADMIN" && !req.body.PartnerEmail) {
-    return next(
-      new CustomError("Partner email is required", 400)
-    );
+    return next(new CustomError("Partner email is required", 400));
   }
 
   let {
@@ -83,7 +79,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
 
   if (role === "SUB_ADMIN") {
     propertyData.subAdminId = userId;
-    propertyData.PartnerEmail =PartnerEmail 
+    propertyData.PartnerEmail = PartnerEmail;
   }
 
   // ✅ Create property
@@ -93,16 +89,31 @@ export const createProperty = asyncHandler(async (req, res, next) => {
 });
 
 
-
-
-// ✅ Update property
 export const updateProperty = asyncHandler(async (req, res, next) => {
-  const partnerId = req.user._id;
-  const propertyId = req.params.propertyId;
+  const { propertyId } = req.params;
+  const { _id: userId, role } = req.user;
 
-  // 1️⃣ Find property
-  const property = await Property.findOne({ _id: propertyId, partnerId });
-  if (!property) return next(new CustomError("Property not found", 404));
+  /** -----------------------------
+   * 1️⃣ Build ownership condition
+   ------------------------------*/
+  let ownershipFilter = { _id: propertyId };
+
+  if (role === "SUB_ADMIN") {
+    ownershipFilter.subAdminId = userId;
+    ownershipFilter.partnerId = null;
+  }
+
+  if (role === "PARTNER") {
+    ownershipFilter.partnerId = userId;
+  }
+
+  /** -----------------------------
+   * 2️⃣ Find property
+   ------------------------------*/
+  const property = await Property.findOne(ownershipFilter);
+  if (!property) {
+    return next(new CustomError("Property not found or access denied", 404));
+  }
 
   // 2️⃣ Update simple fields (name, description, address, city, state, country, pincode, checkIn, checkOut, amenities, status)
   const updatableFields = [
