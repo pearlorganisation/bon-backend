@@ -392,4 +392,83 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
 });
 
 
+// partner 
 
+
+export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
+  const { propertyId } = req.params;
+  const partnerId = req.user._id;
+
+  const property = await Property.findOne({
+    _id: propertyId,
+    partnerId,
+  });
+
+  if (!property) {
+    return next(new CustomError("Property not found", 404));
+  }
+
+  if (property.verified !== "pending") {
+    return next(
+      new CustomError("Property already sent for review or processed", 400)
+    );
+  }
+
+  property.verified = "under_review";
+  property.propertyApproval.status = "pending";
+
+  await property.save();
+
+  successResponse(res, 200, "Property sent for admin approval", property);
+});
+
+
+// admin 
+
+export const getPropertyApprovalRequests = asyncHandler(
+  async (req, res, next) => {
+    const properties = await Property.find({
+      verified: "under_review",
+    }).populate("partnerId", "name email");
+
+    successResponse(
+      res,
+      200,
+      "Property approval requests fetched",
+      properties
+    );
+  }
+);
+
+
+export const approveRejectProperty = asyncHandler(
+  async (req, res, next) => {
+    const { propertyId } = req.params;
+    const { action, reason } = req.body;
+
+    if (!["approved", "rejected"].includes(action)) {
+      return next(new CustomError("Invalid action", 400));
+    }
+
+    const property = await Property.findById(propertyId);
+    if (!property) {
+      return next(new CustomError("Property not found", 404));
+    }
+
+    property.verified = action;
+    property.propertyApproval.status = action;
+
+    if (action === "rejected") {
+      property.propertyApproval.rejectionReason = reason || "Rejected by admin";
+    }
+
+    await property.save();
+
+    successResponse(
+      res,
+      200,
+      `Property ${action} successfully`,
+      property
+    );
+  }
+);
