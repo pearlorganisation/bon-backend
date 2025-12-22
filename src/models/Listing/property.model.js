@@ -5,11 +5,13 @@ const propertySchema = new mongoose.Schema(
     partnerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auth",
+      default:null
     },
 
     subAdminId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auth",
+      default:null
     },
 
 
