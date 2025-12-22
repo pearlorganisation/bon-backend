@@ -33,7 +33,7 @@ const auth_schema = new mongoose.Schema(
       },
     },
 
-    // ✅ For email verification
+    //  For email verification
     isVerified: { type: Boolean, default: false },
 
     password: { type: String, required: true },
