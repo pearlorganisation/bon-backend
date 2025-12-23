@@ -111,9 +111,27 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
 
 // GET partner KYC details
 export const getPartnerKYC = asyncHandler(async (req, res, next) => {
-  const userId = req.user._id;
+  let partnerQuery = {};
 
-  const partner = await Partner.findOne({ userId }).select(
+  // PARTNER: can see only own KYC
+  if (req.user.role === "partner") {
+    partnerQuery.userId = req.user._id;
+  }
+
+  // ADMIN: can see any partner's KYC
+  if (req.user.role === "admin") {
+    const { partnerUserId } = req.query;
+
+    if (!partnerUserId) {
+      return next(
+        new CustomError("partnerUserId is required for admin", 400)
+      );
+    }
+
+    partnerQuery.userId = partnerUserId;
+  }
+
+  const partner = await Partner.findOne(partnerQuery).select(
     "panDetails gstinList isVerified"
   );
 
@@ -131,6 +149,7 @@ export const getPartnerKYC = asyncHandler(async (req, res, next) => {
     },
   });
 });
+
 
 
 export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
