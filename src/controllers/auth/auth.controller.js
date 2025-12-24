@@ -8,7 +8,7 @@ import Partner from "../../models/Partner/partner.model.js";
 import { generateOTP } from "../../utils/otpUtils.js";
 import { sendOtpEmail } from "../../utils/mail/mailer.js";
 import jwt from "jsonwebtoken";
-
+//df
 export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password, role } = req?.body;
   const Roles = ["CUSTOMER", "PARTNER"];
