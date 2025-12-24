@@ -17,10 +17,6 @@ const parseArrayField = (field) => {
 };
 
 export const createRooms = asyncHandler(async (req, res, next) => {
-  // const propertyId = req.params.propertyId;
-  // const partnerId = req.user._id;
-
-
   const { propertyId } = req.params;
   const { _id: userId, role } = req.user;
 
@@ -37,6 +33,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
   if (role === "PARTNER") {
     ownershipFilter.partnerId = userId;
   }
+
+  console.log("ownership filter ", ownershipFilter);
 
   let {
     numberOfRooms,
@@ -73,10 +71,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     mediaAndTechnology,
   } = req.body;
 
-  const property = await Property.findOne({
-    _id: propertyId,
-    ownershipFilter,
-  });
+  const property = await Property.findOne(ownershipFilter);
 
   if (!property) {
     return next(
@@ -293,7 +288,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
 });
 
 export const updateRoomById = asyncHandler(async (req, res, next) => {
-
   const { roomId } = req.params;
   const { _id: userId, role } = req.user;
 
@@ -340,7 +334,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
       );
     }
   }
-  
+
   let {
     name,
     capacity,
@@ -555,33 +549,32 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   // const partnerId = req.user._id;
 
   const { propertyId } = req.params;
-const { _id: userId, role } = req.user;
+  const { _id: userId, role } = req.user;
 
-/** -----------------------------
+  /** -----------------------------
  * 1️⃣ Property authorization
  ------------------------------*/
-let propertyQuery = { _id: propertyId };
+  let propertyQuery = { _id: propertyId };
 
-if (role === "SUB_ADMIN") {
-  propertyQuery.subAdminId = userId;
-  propertyQuery.partnerId = null; // 🔒 must be unassigned
-}
+  if (role === "SUB_ADMIN") {
+    propertyQuery.subAdminId = userId;
+    propertyQuery.partnerId = null; // 🔒 must be unassigned
+  }
 
-if (role === "PARTNER") {
-  propertyQuery.partnerId = userId;
-}
+  if (role === "PARTNER") {
+    propertyQuery.partnerId = userId;
+  }
 
-const property = await Property.findOne(propertyQuery);
+  const property = await Property.findOne(propertyQuery);
 
-if (!property) {
-  return next(
-    new CustomError(
-      "You are not authorized to update rooms for this property",
-      403
-    )
-  );
-}
-
+  if (!property) {
+    return next(
+      new CustomError(
+        "You are not authorized to update rooms for this property",
+        403
+      )
+    );
+  }
 
   let {
     types,
@@ -618,7 +611,6 @@ if (!property) {
     roomFacilities,
     mediaAndTechnology,
   } = req.body;
-
 
   if (!types || !Array.isArray(types) || types.length === 0) {
     return next(
@@ -971,14 +963,8 @@ export const deleteRoom = asyncHandler(async (req, res, next) => {
    ------------------------------*/
   const deletedRoom = await Room.findByIdAndDelete(roomId);
 
-  return successResponse(
-    res,
-    200,
-    "Room deleted successfully",
-    deletedRoom
-  );
+  return successResponse(res, 200, "Room deleted successfully", deletedRoom);
 });
-
 
 export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
@@ -1011,66 +997,65 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
 
 export const setRoomsImagesandVideosInBulk = asyncHandler(
   async (req, res, next) => {
+    const { propertyId } = req.params;
+    const { _id: userId, role } = req.user;
 
-      const { propertyId } = req.params;
-      const { _id: userId, role } = req.user;
-  
-      let { types, imagesToDelete, videosToDelete } = req.body;
-  
-      if (!types) {
-        return next(
-          new CustomError("Room types are required and must be an array", 400)
-        );
-      }
-  
-      types = JSON.parse(types);
-  
-      if (!Array.isArray(types) || types.length === 0) {
-        return next(
-          new CustomError("Room types are required and must be an array", 400)
-        );
-      }
-  
-      types = types.map((t) => t.toLowerCase().trim());
-  
-      /** -----------------------------
+    let { types, imagesToDelete, videosToDelete } = req.body;
+
+    if (!types) {
+      return next(
+        new CustomError("Room types are required and must be an array", 400)
+      );
+    }
+
+    types = JSON.parse(types);
+
+    if (!Array.isArray(types) || types.length === 0) {
+      return next(
+        new CustomError("Room types are required and must be an array", 400)
+      );
+    }
+
+    types = types.map((t) => t.toLowerCase().trim());
+
+    /** -----------------------------
        * 1️⃣ Property authorization
        ------------------------------*/
-      const propertyQuery = { _id: propertyId };
-  
-      if (role === "SUB_ADMIN") {
-        propertyQuery.subAdminId = userId;
-        propertyQuery.partnerId = null; // 🔒 must be unassigned
-      }
-  
-      if (role === "PARTNER") {
-        propertyQuery.partnerId = userId;
-      }
-  
-      const property = await Property.findOne(propertyQuery);
-  
-      if (!property) {
-        return next(
-          new CustomError(
-            "You are not authorized to update rooms for this property",
-            403
-          )
-        );
-      }
-  
-      /** -----------------------------
+    const propertyQuery = { _id: propertyId };
+
+    if (role === "SUB_ADMIN") {
+      propertyQuery.subAdminId = userId;
+      propertyQuery.partnerId = null; // 🔒 must be unassigned
+    }
+
+    if (role === "PARTNER") {
+      propertyQuery.partnerId = userId;
+    }
+
+    const property = await Property.findOne(propertyQuery);
+
+    if (!property) {
+      return next(
+        new CustomError(
+          "You are not authorized to update rooms for this property",
+          403
+        )
+      );
+    }
+
+    /** -----------------------------
        * 2️⃣ Fetch rooms
        ------------------------------*/
-      const rooms = await Room.find({
-        propertyId,
-        type: { $in: types },
-      });
-  
-      if (!rooms.length) {
-        return next(
-          new CustomError("No rooms found for the specified types", 404)
-        );
-      }
+    const rooms = await Room.find({
+      propertyId,
+      type: { $in: types },
+    });
+
+    if (!rooms.length) {
+      return next(
+        new CustomError("No rooms found for the specified types", 404)
+      );
+    }
 
     let newImages = [];
     let newVideos = [];
@@ -1207,7 +1192,10 @@ export const setRoomImagesAndVideosById = asyncHandler(
      * Authorization
      ------------------------------*/
     if (role === "PARTNER") {
-      if (!property.partnerId || property.partnerId.toString() !== userId.toString()) {
+      if (
+        !property.partnerId ||
+        property.partnerId.toString() !== userId.toString()
+      ) {
         return next(
           new CustomError("You are not authorized to modify this room", 403)
         );
@@ -1355,8 +1343,6 @@ export const getRoomDetailsById = async (req, res) => {
     });
   }
 };
-
-
 
 export const getAllRooms = asyncHandler(async (req, res, next) => {
   const page = parseInt(req.query.page) || 1;
