@@ -8,7 +8,6 @@ import {
   getUserProfileById,
   deleteAllUsers,
   updateAllUsers,
-  createUserByAdmin,
 } from "../controllers/user.controller.js";
 
 const storage = multer.memoryStorage(); // or diskStorage
@@ -28,8 +27,6 @@ router.put(
   updateAllUsers
 );
 router.delete("/users/:id", protect, isAdmin, deleteAllUsers);
-
-router.post("/create", protect, isAdmin, createUserByAdmin);
 
 router.get("/profile/:userId", protect, getUserProfileById);
 
