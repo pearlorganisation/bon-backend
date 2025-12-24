@@ -126,7 +126,7 @@ const propertySchema = new mongoose.Schema(
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     verified: {
       type: String,
-      enum: ["pending", "under_review", "approved", "rejected"], //admin approved
+      enum: ["pending", "under_review", , "rejected"], //admin"approved" approved
       default: "pending",
     },
     //     commissionPercentage: { type: Number, default: 10 },
