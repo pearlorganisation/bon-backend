@@ -4,7 +4,7 @@ import {
   createProperty,
   getPartnerProperties,
   getPartnerPropertyByID,
-  addPropertyDetails,
+  
   getAllProperties,
   changePropertyStatus,
   getPublicPropertyById,
@@ -38,6 +38,7 @@ const upload = multer({ storage });
 const uploadFields = upload.fields([
   { name: "images", maxCount: 10 },
   { name: "videos", maxCount: 5 },
+  {name:"propertyDocument", maxCount:1}
 ]);
 
 
@@ -93,12 +94,6 @@ optionalProtect,
 );
 router.get("/get-all-properties", getAllProperties);
 
-router.put(
-  "/add-property-details/:propertyId",
-  protect,
-  upload.fields([]),
-  addPropertyDetails
-);
 
 router.put(
   "/change-property-status/:propertyId",
