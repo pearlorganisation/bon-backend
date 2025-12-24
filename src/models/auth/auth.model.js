@@ -22,7 +22,6 @@ const auth_schema = new mongoose.Schema(
     // ✅ Phone number - unique
     phoneNumber: {
       type: String,
-      required: true,
       validate: {
         validator: function (value) {
           // Indian phone number format (10 digits, starts with 6-9)d
