@@ -20,9 +20,10 @@ import {
   setRoomImagesAndVideosById,
   setRoomsImagesandVideosInBulk,
   getRoomDetailsById,
+
   
 } from "../../controllers/partner/room.controller.js";
-import {partner_KYC,verify_property_GSTIN} from "../../controllers/partner/parnter.controller.js"
+import {partner_KYC,verify_property_GSTIN, getPartnerKYC} from "../../controllers/partner/parnter.controller.js"
 import { authorizeRoles, protect, optionalProtect } from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
 
@@ -52,6 +53,14 @@ router.post(
   protect,
   authorizeRoles("PARTNER"),
   verify_property_GSTIN
+);
+
+router.get(
+  "/verify-gstin",
+  protect,
+  authorizeRoles("PARTNER", "ADMIN"),
+  
+  getPartnerKYC
 );
 
 
@@ -93,6 +102,20 @@ router.put(
   protect,
   changePropertyStatus
 );
+
+
+
+//------admin--------//
+
+
+router.get(
+  "/get-property-by-id/:propertyId",
+optionalProtect,
+  getPublicPropertyById
+);
+
+
+
 
 //---------- Rooms routes ----------------
 
