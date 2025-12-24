@@ -144,27 +144,83 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     property.amenities = JSON.parse(req.body.amenities); // { type: "Point", coordinates: [lng, lat] }
   }
 
-  if (req.body.imagesToDelete) {
-    let imagesToDelete = JSON.parse(req.body.imagesToDelete);
-    imagesToDelete.forEach(async (image) => {
-      const result = property.Images.filter(
-        (img) => img.public_id != image.public_id
-      );
-      property.Images = result;
-      await deleteFileFromCloudinary(image.public_id, "image");
-    });
+  if (req.body?.imagesToDelete) {
+    let imagesToDelete = [];
+
+    try {
+      imagesToDelete = JSON.parse(req.body.imagesToDelete);
+    } catch (err) {
+      return next(new CustomError("Invalid imagesToDelete format", 400));
+    }
+
+    const publicIdsToDelete = imagesToDelete.map((image) => image.public_id);
+
+    // Remove images from property (once)
+    property.Images = property.Images.filter(
+      (img) => !publicIdsToDelete.includes(img.public_id)
+    );
+
+    // Delete from Cloudinary (sequential & safe)
+    for (const publicId of publicIdsToDelete) {
+      await deleteFileFromCloudinary(publicId, "image");
+    }
   }
 
-  if (req.body?.videosToDelete) {
-    let videosToDelete = JSON.parse(req.body.videosToDelete);
-    videosToDelete.forEach(async (Video) => {
-      const result = property.Videos.filter(
-        (video) => video.public_id != Video.public_id
-      );
-      property.Videos = result;
-      await deleteFileFromCloudinary(Video.public_id, "video");
-    });
+    
+
+ if (req.body?.videosToDelete) {
+  let videosToDelete = [];
+
+  try {
+    videosToDelete = JSON.parse(req.body.videosToDelete);
+  } catch (err) {
+    return next(new CustomError("Invalid videosToDelete format", 400));
   }
+
+  const publicIdsToDelete = videosToDelete.map(
+    (video) => video.public_id
+  );
+
+  // Remove videos from property (once)
+  property.Videos = property.Videos.filter(
+    (video) => !publicIdsToDelete.includes(video.public_id)
+  );
+
+  // Delete from Cloudinary (sequential & safe)
+  for (const publicId of publicIdsToDelete) {
+    await deleteFileFromCloudinary(publicId, "video");
+  }
+}
+
+  if (req.body?.documentsToDelete) {
+    let documentsToDelete = [];
+
+    try {
+      documentsToDelete = JSON.parse(req.body.documentsToDelete);
+    } catch (err) {
+      return next(new CustomError("Invalid documentsToDelete format", 400));
+    }
+
+    const publicIdsToDelete = documentsToDelete.map((doc) => doc.public_id);
+
+    // Ensure array exists
+    if (!property.documentVerification?.PropertyDocuments) {
+      property.documentVerification.PropertyDocuments = [];
+    }
+
+    // Remove documents from property
+    property.documentVerification.PropertyDocuments =
+      property.documentVerification.PropertyDocuments.filter(
+        (doc) => !publicIdsToDelete.includes(doc.public_id)
+      );
+
+    // Delete from Cloudinary (sequential & safe)
+    for (const publicId of publicIdsToDelete) {
+      await deleteFileFromCloudinary(publicId, "image");
+    }
+  }
+
+
 
   // ✅ Upload images and videos if provided
   let Images = [];
@@ -183,6 +239,46 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
       "properties/videos"
     );
   }
+
+  if (req.files?.propertyDocument) {
+    const { document_name } = req.body;
+
+    if (!document_name) {
+      return next(new CustomError("Name of document is required", 400));
+    }
+
+    // Ensure array exists
+    if (!property.documentVerification.PropertyDocuments) {
+      property.documentVerification.PropertyDocuments = [];
+    }
+
+    const normalizedName = document_name.trim().toLowerCase();
+
+    // 🔍 Check duplicate document name
+    const duplicateName = property.documentVerification.PropertyDocuments.some(
+      (doc) => doc.document_name === normalizedName
+    );
+
+    if (duplicateName) {
+      return next(
+        new CustomError("Document with this name already exists", 400)
+      );
+    }
+
+    //  Upload to Cloudinary
+    const uploadedDocs = await uploadFileToCloudinary(
+      req.files.propertyDocument,
+      "properties/documents"
+    );
+
+    // 📎 Push document
+    property.documentVerification.PropertyDocuments.push({
+      document_name: normalizedName,
+      secure_url: uploadedDocs[0].secure_url,
+      public_id: uploadedDocs[0].public_id,
+    });
+  }
+
 
   property.Images.push(...Images);
   property.Videos.push(...Videos);
@@ -297,72 +393,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     property
   );
 });
-//export deleteParnterProperty = asyncHandler
 
-//  ADD PROPERTY DETAILS (Policies, Documents, Payment, Approval)
-export const addPropertyDetails = asyncHandler(async (req, res, next) => {
-  const partnerId = req.user._id;
-  const propertyId = req.params.propertyId;
-
-  // Find property
-  const property = await Property.findOne({ _id: propertyId, partnerId });
-  if (!property) {
-    return next(
-      new CustomError("Property not found or not owned by this partner", 404)
-    );
-  }
-
-  //  HOTEL POLICIES
-  if (req.body.policies) {
-    try {
-      property.policies = JSON.parse(req.body.policies);
-    } catch (error) {
-      return next(new CustomError("Invalid JSON in policies", 400));
-    }
-  }
-
-  //  DOCUMENT VERIFICATION
-  if (req.body.documentVerification) {
-    try {
-      property.documentVerification = JSON.parse(req.body.documentVerification);
-    } catch (error) {
-      return next(new CustomError("Invalid JSON in documentVerification", 400));
-    }
-  }
-
-  //  PROPERTY APPROVAL SECTION
-  if (req.body.propertyApproval) {
-    try {
-      property.propertyApproval = JSON.parse(req.body.propertyApproval);
-    } catch (error) {
-      return next(new CustomError("Invalid JSON in propertyApproval", 400));
-    }
-  }
-
-  //  PAYMENT DETAILS
-  if (req.body.paymentDetails) {
-    try {
-      property.paymentDetails = JSON.parse(req.body.paymentDetails);
-    } catch (error) {
-      return next(new CustomError("Invalid JSON in paymentDetails", 400));
-    }
-  }
-
-  //  MAP LINK (optional for location)
-  if (req.body.mapLink) {
-    property.mapLink = req.body.mapLink;
-  }
-
-  // FINAL: Save the updates
-  await property.save();
-
-  successResponse(
-    res,
-    200,
-    "Property details added/updated successfully",
-    property
-  );
-});
 
 export const getAllProperties = async (req, res) => {
   try {
@@ -416,8 +447,6 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
     property
   );
 });
-
-
 
 
 // get property by id

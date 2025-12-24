@@ -91,41 +91,6 @@ export const getUserProfileById = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "User profile fetched successfully", user);
 });
 
-export const createUserByAdmin = asyncHandler(async (req, res, next) => {
-  const { name, email, phoneNumber, password, role } = req.body;
-
-  if (!name || !email || !phoneNumber || !password || !role) {
-    return next(new CustomError("All fields are required", 400));
-  }
-
-  const existingUser = await Auth.findOne({ email });
-  if (existingUser) {
-    return next(new CustomError("User with this email already exists", 400));
-  }
-
-  const newUser = await Auth.create({
-    name,
-    email,
-    phoneNumber,
-    password,
-    role,
-    isVerified: true,
-  });
-
-  if (role === "PARTNER") {
-    await Partner.create({ userId: newUser._id });
-  } else if (role === "CUSTOMER") {
-    await Customer.create({ userId: newUser._id });
-  }
-  // Note: SUB_ADMIN and ADMIN might not have separate profile models in your current setup
-
-  return successResponse(
-    res,
-    201,
-    "User created successfully by Admin",
-    newUser
-  );
-});
 
 // updating all user details for admin
 

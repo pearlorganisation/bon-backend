@@ -5,10 +5,13 @@ import { OTP } from "../../models/otp/otp.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import Customer from "../../models/Customer/customer.model.js";
 import Partner from "../../models/Partner/partner.model.js";
+import Sub_Admin from "../../models/Sub_Admin/sub_admin.model.js";
 import { generateOTP } from "../../utils/otpUtils.js";
 import { sendOtpEmail } from "../../utils/mail/mailer.js";
 import jwt from "jsonwebtoken";
-//df
+import dayjs from "dayjs";
+import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.model.js";
+import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
 export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password, role } = req?.body;
   const Roles = ["CUSTOMER", "PARTNER"];
@@ -76,14 +79,14 @@ export const register = asyncHandler(async (req, res, next) => {
       isVerified: false,
     });
 
-    if(role === "CUSTOMER"){
-             await Customer.create({
-                 userId:newUser._id
-             });
-    }else{
-            await Partner.create({
-               userId: newUser._id
-            });
+    if (role === "CUSTOMER") {
+      await Customer.create({
+        userId: newUser._id,
+      });
+    } else {
+      await Partner.create({
+        userId: newUser._id,
+      });
     }
 
     // C. Send OTP via email
@@ -101,7 +104,7 @@ export const register = asyncHandler(async (req, res, next) => {
     );
   } catch (error) {
     console.error("Error during registration:", error);
-   
+
     return next(new CustomError(`Registration failed: ${error.message}`, 400));
   }
 });
@@ -134,6 +137,40 @@ export const login = asyncHandler(async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   setAuthCookies(res, accessToken, refreshToken);
+
+  if (user.role == "SUB_ADMIN") {
+    //for sub admin create sessions .
+
+    const now = new Date();
+    const today = dayjs().format("YYYY-MM-DD");
+
+    let session = await Sub_Admin_Session.findOne({
+      userId: user._id,
+      date: today,
+    });
+
+    // Create session only if not exists
+    if (!session) {
+      session = await Sub_Admin_Session.create({
+        userId: user._id,
+        date: today,
+        LoginAt: now,
+        lastPingAt: now,
+        activeDurationSec: 0,
+        lastActivity: {
+          path: "/login",
+          method: post,
+          at: now,
+        },
+        LogoutAt: null,
+      });
+    } else {
+      // Re-login same day → resume session
+      session.LogoutAt = null;
+      session.lastPingAt = now;
+      await session.save();
+    }
+  }
 
   return successResponse(res, 200, "Login successful", {
     accessToken,
@@ -233,14 +270,27 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 });
 
 export const logout = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
-
   if (userId) {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
   }
 
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
+
+  if (req.role == "SUB_ADMIN") {
+    const now = new Date();
+    const today = dayjs().format("YYYY-MM-DD");
+
+    let session = await Sub_Admin_Session.findOne({
+      userId: user._id,
+      date: today,
+    });
+
+    if (session) {
+      session.LogoutAt = now;
+      session.save();
+    }
+  }
 
   return successResponse(res, 200, "Logged out successfully");
 });
@@ -316,6 +366,81 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
   await user.save();
 
   return successResponse(res, 200, "Password reset Successfully");
+});
+
+//create sub admin
+
+export const create_sub_admin = asyncHandler(async (req, res, next) => {
+  let { name, email, password } = req.body;
+
+  if (!email || !password) {
+    return next(new CustomError("Email & password are required", 400));
+  }
+
+  const existingUser = await Auth.findOne({ email });
+  if (existingUser) {
+    return next(new CustomError("User with this email already exists", 400));
+  }
+
+  // Auto-generate name if not provided
+  if (!name) {
+    name = `SubAdmin-${Date.now()}`;
+  }
+
+  const newSubAdmin = await Auth.create({
+    name,
+    email,
+    password,
+    role: "SUB_ADMIN",
+    isVerified: true,
+  });
+
+  if (newSubAdmin) {
+    await Sub_Admin.create({
+      userId: newSubAdmin._id,
+    });
+
+    // 📧 Send email to sub-admin
+    sendSubAdminCreatedEmail(name, email, password)
+      .then(() => {
+        console.log("Sub-admin email sent");
+      })
+      .catch((err) => {
+        console.error("Failed to send sub-admin email:", err.message);
+      });
+  }
+
+  return successResponse(
+    res,
+    201,
+    "Sub-admin created successfully",
+    newSubAdmin
+  );
+});
+
+export const delete_user = asyncHandler(async (req, res, next) => {
+  const id = req.params.id;
+
+  const user = await Auth.findById(id);
+
+  if (!user) {
+    return next(new CustomError("user not found", 404));
+  }
+
+  if (user.role == "SUB_ADMIN") {
+    await Sub_Admin.findOneAndDelete({ userId: id });
+  } else if (user.role == "PARTNER") {
+    await Partner.findOneAndDelete({ userId: id });
+  } else if (user.role == "CUSTOMER") {
+    await Customer.findOneAndDelete({ userId: id });
+  } else {
+  }
+     if(user?.profileImageUrl?.public_id){
+         await deleteFileFromCloudinary(user?.profileImageUrl?.public_id,"image");
+     }
+
+      let deletedUser=await Auth.findByIdAndDelete(id);
+      return successResponse(res,200,"user deleted successfully",deletedUser);
 });
 
 const setAuthCookies = (res, accessToken, refreshToken) => {
