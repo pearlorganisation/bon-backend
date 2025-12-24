@@ -5,6 +5,7 @@ import Auth from "../../models/auth/auth.model.js";
 
 export const protect = asyncHandler(async (req, res, next) => {
   let token;
+  let refreshToken;
 
   // 1️⃣ Read token from cookies
   if (req.cookies && req.cookies.accessToken) {
@@ -26,6 +27,20 @@ export const protect = asyncHandler(async (req, res, next) => {
       return next(new CustomError("Invalid access token!", 401));
     }
     req.user = user;
+
+    /**
+     * 3️ SUB_ADMIN strict check
+     * Cron logout works HERE
+     */
+    if (user.role === "SUB_ADMIN") {
+      // DB refresh token removed by cron
+      if (!user.refresh_token) {
+        return next(
+          new CustomError("Session expired. Please login again.", 401)
+        );
+      }
+    }
+
     next();
   } catch (error) {
     return next(
@@ -56,7 +71,6 @@ export const authorizeRoles = (...allowedRoles) => {
   };
 };
 
-
 export const optionalProtect = asyncHandler(async (req, res, next) => {
   let token;
 
@@ -86,7 +100,5 @@ export const optionalProtect = asyncHandler(async (req, res, next) => {
     next();
   }
 });
-
-
 
 export const isAdmin = authorizeRoles("ADMIN");

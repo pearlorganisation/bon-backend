@@ -8,7 +8,8 @@ import Partner from "../../models/Partner/partner.model.js";
 import { generateOTP } from "../../utils/otpUtils.js";
 import { sendOtpEmail } from "../../utils/mail/mailer.js";
 import jwt from "jsonwebtoken";
-
+import dayjs from "dayjs";
+import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.model.js";
 export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password, role } = req?.body;
   const Roles = ["CUSTOMER", "PARTNER"];
@@ -76,14 +77,14 @@ export const register = asyncHandler(async (req, res, next) => {
       isVerified: false,
     });
 
-    if(role === "CUSTOMER"){
-             await Customer.create({
-                 userId:newUser._id
-             });
-    }else{
-            await Partner.create({
-               userId: newUser._id
-            });
+    if (role === "CUSTOMER") {
+      await Customer.create({
+        userId: newUser._id,
+      });
+    } else {
+      await Partner.create({
+        userId: newUser._id,
+      });
     }
 
     // C. Send OTP via email
@@ -101,7 +102,7 @@ export const register = asyncHandler(async (req, res, next) => {
     );
   } catch (error) {
     console.error("Error during registration:", error);
-   
+
     return next(new CustomError(`Registration failed: ${error.message}`, 400));
   }
 });
@@ -134,6 +135,40 @@ export const login = asyncHandler(async (req, res, next) => {
   await user.save({ validateBeforeSave: false });
 
   setAuthCookies(res, accessToken, refreshToken);
+
+  if (user.role == "SUB_ADMIN") {
+    //for sub admin create sessions .
+
+    const now = new Date();
+    const today = dayjs().format("YYYY-MM-DD");
+
+    let session = await Sub_Admin_Session.findOne({
+      userId: user._id,
+      date: today,
+    });
+
+    // Create session only if not exists
+    if (!session) {
+      session = await Sub_Admin_Session.create({
+        userId: user._id,
+        date: today,
+        LoginAt: now,
+        lastPingAt: now,
+        activeDurationSec: 0,
+        lastActivity: {
+          path: "/login",
+          method: post,
+          at: now,
+        },
+        LogoutAt: null,
+      });
+    } else {
+      // Re-login same day → resume session
+      session.LogoutAt = null;
+      session.lastPingAt = now;
+      await session.save();
+    }
+  }
 
   return successResponse(res, 200, "Login successful", {
     accessToken,
@@ -233,14 +268,30 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 });
 
 export const logout = asyncHandler(async (req, res, next) => {
-  const userId = req.user?._id;
-
+ 
   if (userId) {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
+   
   }
 
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
+ 
+  if (req.role == "SUB_ADMIN") {
+    const now = new Date();
+    const today = dayjs().format("YYYY-MM-DD");
+
+    let session = await Sub_Admin_Session.findOne({
+      userId: user._id,
+      date: today,
+    });
+
+    if (session) {
+      session.LogoutAt = now;
+      session.save();
+    }
+  }
+    
 
   return successResponse(res, 200, "Logged out successfully");
 });
@@ -316,6 +367,12 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
   await user.save();
 
   return successResponse(res, 200, "Password reset Successfully");
+});
+
+//create sub admin 
+export const  create_sub_admin  = asyncHandler(async(req,res,next)=>{
+           
+   
 });
 
 const setAuthCookies = (res, accessToken, refreshToken) => {
