@@ -10,7 +10,7 @@ const Sub_Admin_Session_Schema = new mongoose.Schema(
     },
 
     role: {
-      type: String,
+      type: String, //SUB_ADMIN
       required: true, //only subAdmin
     },
 
@@ -25,7 +25,7 @@ const Sub_Admin_Session_Schema = new mongoose.Schema(
     },
     LogoutAt: {
       type: Date,
-      default:null
+      default: null,
     },
 
     lastPingAt: {
@@ -54,7 +54,6 @@ const Sub_Admin_Session_Schema = new mongoose.Schema(
 );
 
 Sub_Admin_Session_Schema.index({ userId: 1, date: 1 }, { unique: true });
-
 
 export const Sub_Admin_Session = mongoose.model(
   "Sub_Admin_Session",
