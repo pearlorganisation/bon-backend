@@ -160,7 +160,7 @@ export const login = asyncHandler(async (req, res, next) => {
         activeDurationSec: 0,
         lastActivity: {
           path: "/login",
-          method:"post",
+          method: "post",
           at: now,
         },
         LogoutAt: null,
@@ -271,15 +271,17 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 });
 
 export const logout = asyncHandler(async (req, res, next) => {
-  const userId  =req.user._id;
+  const userId = req.user._id;
   if (userId) {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
   }
 
+
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
 
-  if (req.role == "SUB_ADMIN") {
+
+  if (req.user.role == "SUB_ADMIN") {
     const now = new Date();
     const today = dayjs().format("YYYY-MM-DD");
 
@@ -288,11 +290,15 @@ export const logout = asyncHandler(async (req, res, next) => {
       date: today,
     });
 
+    console.log("sessin ", session);
+
     if (session) {
       session.LogoutAt = now;
       session.save();
     }
   }
+
+
 
   return successResponse(res, 200, "Logged out successfully");
 });
@@ -437,12 +443,12 @@ export const delete_user = asyncHandler(async (req, res, next) => {
     await Customer.findOneAndDelete({ userId: id });
   } else {
   }
-     if(user?.profileImageUrl?.public_id){
-         await deleteFileFromCloudinary(user?.profileImageUrl?.public_id,"image");
-     }
+  if (user?.profileImageUrl?.public_id) {
+    await deleteFileFromCloudinary(user?.profileImageUrl?.public_id, "image");
+  }
 
-      let deletedUser=await Auth.findByIdAndDelete(id);
-      return successResponse(res,200,"user deleted successfully",deletedUser);
+  let deletedUser = await Auth.findByIdAndDelete(id);
+  return successResponse(res, 200, "user deleted successfully", deletedUser);
 });
 
 const setAuthCookies = (res, accessToken, refreshToken) => {
@@ -461,3 +467,41 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 };
+
+
+export const getMyTodayStatus = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id; // assuming auth middleware sets req.user
+  const today = dayjs().format("YYYY-MM-DD");
+  const now = Date.now();
+
+  const session = await Sub_Admin_Session.findOne({
+    userId,
+    role: "SUB_ADMIN",
+    date: today,
+  }).lean();
+
+  if (!session) {
+    return next(new CustomError("No session found for today", 404));
+  }
+
+  const lastPingDiffSec = (now - new Date(session.lastPingAt)) / 1000;
+  const isOnline = lastPingDiffSec <= HEARTBEAT_SEC;
+
+  let sessionState = "OFFLINE";
+  if (isOnline) sessionState = "ONLINE";
+  else if (!session.LogoutAt) sessionState = "IDLE";
+
+  const activeHours = +(session.activeDurationSec / 3600).toFixed(2);
+
+  return successResponse(res, 200, "Today's status fetched successfully", {
+    userId: session.userId,
+    date: today,
+    sessionState,
+    isOnline,
+    activeDurationSec: session.activeDurationSec,
+    activeHours,
+    LoginAt: session.LoginAt,
+    LogoutAt: session.LogoutAt,
+    lastPingAt: session.lastPingAt,
+  });
+});
