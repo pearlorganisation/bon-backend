@@ -21,7 +21,7 @@ export const protect = asyncHandler(async (req, res, next) => {
     const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
     // const decoded_refresh = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
     const user = await Auth.findById(decoded._id).select(
-      "-password -refresh_token"
+      "-password "
     );
     if (!user) {
       return next(new CustomError("Invalid access token!", 401));
@@ -32,7 +32,7 @@ export const protect = asyncHandler(async (req, res, next) => {
      * 3️ SUB_ADMIN strict check
      * Cron logout works HERE
      */
-    if (user.role === "SUB_ADMIN") {
+    if (user.role == "SUB_ADMIN") {
       // DB refresh token removed by cron
       if (!user.refresh_token) {
         return next(
