@@ -156,10 +156,11 @@ export const login = asyncHandler(async (req, res, next) => {
         date: today,
         LoginAt: now,
         lastPingAt: now,
+        role: "SUB_ADMIN",
         activeDurationSec: 0,
         lastActivity: {
           path: "/login",
-          method: post,
+          method:"post",
           at: now,
         },
         LogoutAt: null,
