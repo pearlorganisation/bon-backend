@@ -452,14 +452,11 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
 // get property by id
 export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
-  const id = new  mongoose.Types.ObjectId(propertyId)
+  
 
   // 1️⃣ Fetch property
-  const property = await Property.find({partnerId : id })
-    .populate("Rooms")      // optional
-    .select(
-      "name description address city state country geoLocation mapLink rating amenities Images Videos status createdAt updatedAt"
-    );
+  const property = await Property.find({_id: propertyId })
+    .populate("Rooms");    // optional
 
   if (!property) {
     return next(new CustomError("Property not found", 404));

@@ -93,23 +93,23 @@ const propertySchema = new mongoose.Schema(
       default: 0,
     },
 
-    propertyApproval: {
-      status: {
-        type: String,
-        enum: ["pending", "approved", "rejected"],
-        default: "pending",
-      },
-      termsAndConditions: {
-        type: String,
-        enum: ["pending", "accepted"],
-        default: "pending",
-      },
-      invoiceStatus: {
-        type: String,
-        enum: ["unpaid", "paid"],
-        default: "unpaid",
-      },
-    },
+    // propertyApproval: {
+    //   status: {
+    //     type: String,
+    //     enum: ["pending", "approved", "rejected"],
+    //     default: "pending",
+    //   },
+    //   termsAndConditions: {
+    //     type: String,
+    //     enum: ["pending", "accepted"],
+    //     default: "pending",
+    //   },
+    //   invoiceStatus: {
+    //     type: String,
+    //     enum: ["unpaid", "paid"],
+    //     default: "unpaid",
+    //   },
+    // },
 
     paymentDetails: {
       bankName: String,
