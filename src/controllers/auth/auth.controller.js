@@ -1,5 +1,6 @@
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
+import { sendSubAdminCreatedEmail } from "../../utils/mail/mailer.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
 import { OTP } from "../../models/otp/otp.model.js";
 import Auth from "../../models/auth/auth.model.js";

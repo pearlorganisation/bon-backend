@@ -17,6 +17,7 @@ import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
 export const createDocument = asyncHandler(async (req, res, next) => {
   const { title, description, country, state, city, documentTypeId } = req.body;
+
   const userId = req.user._id;
 
   if (!req.files || !req.files.document) {
@@ -30,11 +31,15 @@ export const createDocument = asyncHandler(async (req, res, next) => {
   if (!documentTypeId) {
     return next(new CustomError("Please specify the document type", 400));
   }
+
+
   console.log(req.files.document, "a a ");
   const uploadResult = await uploadFileToCloudinary(
     req.files.document,
     "admin/documents"
   );
+
+  console.log("upload docu ", uploadResult);
   const documentUrl = uploadResult[0].secure_url;
   const public_id = uploadResult[0].public_id;
 
