@@ -133,9 +133,39 @@ export const getReviewsByRoom = asyncHandler(async (req, res, next) => {
 
 // @desc    Delete Review
 // @route   DELETE /api/reviews/:reviewId
+// export const deleteReview = asyncHandler(async (req, res, next) => {
+//   const { reviewId } = req.params;
+//   const userId = req.user._id;
+
+//   const review = await Review.findById(reviewId);
+
+//   if (!review) {
+//     return next(new CustomError("Review not found", 404));
+//   }
+
+//   // Allow deletion if user owns the review OR if user is an Admin (add admin check if needed)
+//   if (review.userId.toString() !== userId.toString()) {
+//     // You might also check if req.user.role === 'admin' here
+//     return next(
+//       new CustomError("You are not authorized to delete this review", 403)
+//     );
+//   }
+
+//   // Delete images from Cloudinary
+//   if (review.images && review.images.length > 0) {
+//     for (const img of review.images) {
+//       await deleteFileFromCloudinary(img.public_id, "image");
+//     }
+//   }
+
+//   await Review.findByIdAndDelete(reviewId);
+
+//   return successResponse(res, 200, "Review deleted successfully", {});
+// });
+
 export const deleteReview = asyncHandler(async (req, res, next) => {
   const { reviewId } = req.params;
-  const userId = req.user._id;
+  const { _id: userId, role } = req.user;
 
   const review = await Review.findById(reviewId);
 
@@ -143,16 +173,18 @@ export const deleteReview = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Review not found", 404));
   }
 
-  // Allow deletion if user owns the review OR if user is an Admin (add admin check if needed)
-  if (review.userId.toString() !== userId.toString()) {
-    // You might also check if req.user.role === 'admin' here
+  // ✅ Authorization logic
+  const isOwner = review.userId.toString() === userId.toString();
+  const isAdmin = role === "ADMIN";
+
+  if (!isOwner && !isAdmin) {
     return next(
       new CustomError("You are not authorized to delete this review", 403)
     );
   }
 
-  // Delete images from Cloudinary
-  if (review.images && review.images.length > 0) {
+  // 🖼️ Delete images from Cloudinary
+  if (review.images?.length > 0) {
     for (const img of review.images) {
       await deleteFileFromCloudinary(img.public_id, "image");
     }

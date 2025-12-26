@@ -1,5 +1,6 @@
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
+import { sendSubAdminCreatedEmail } from "../../utils/mail/mailer.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
 import { OTP } from "../../models/otp/otp.model.js";
 import Auth from "../../models/auth/auth.model.js";
@@ -160,7 +161,7 @@ export const login = asyncHandler(async (req, res, next) => {
         activeDurationSec: 0,
         lastActivity: {
           path: "/login",
-          method:"post",
+          method: "post",
           at: now,
         },
         LogoutAt: null,
@@ -271,15 +272,17 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 });
 
 export const logout = asyncHandler(async (req, res, next) => {
-  const userId  =req.user._id;
+  const userId = req.user._id;
   if (userId) {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
   }
 
+
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
 
-  if (req.role == "SUB_ADMIN") {
+
+  if (req.user.role == "SUB_ADMIN") {
     const now = new Date();
     const today = dayjs().format("YYYY-MM-DD");
 
@@ -288,11 +291,15 @@ export const logout = asyncHandler(async (req, res, next) => {
       date: today,
     });
 
+    console.log("sessin ", session);
+
     if (session) {
       session.LogoutAt = now;
       session.save();
     }
   }
+
+
 
   return successResponse(res, 200, "Logged out successfully");
 });
@@ -437,12 +444,12 @@ export const delete_user = asyncHandler(async (req, res, next) => {
     await Customer.findOneAndDelete({ userId: id });
   } else {
   }
-     if(user?.profileImageUrl?.public_id){
-         await deleteFileFromCloudinary(user?.profileImageUrl?.public_id,"image");
-     }
+  if (user?.profileImageUrl?.public_id) {
+    await deleteFileFromCloudinary(user?.profileImageUrl?.public_id, "image");
+  }
 
-      let deletedUser=await Auth.findByIdAndDelete(id);
-      return successResponse(res,200,"user deleted successfully",deletedUser);
+  let deletedUser = await Auth.findByIdAndDelete(id);
+  return successResponse(res, 200, "user deleted successfully", deletedUser);
 });
 
 const setAuthCookies = (res, accessToken, refreshToken) => {
@@ -461,3 +468,4 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 };
+

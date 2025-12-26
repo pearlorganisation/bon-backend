@@ -8,6 +8,7 @@ const IGNORE_ACTIVITY_ROUTES = ["/health", "/heartbeat", "/ping"];
 export const activityTrackerMiddleware = asyncHandler(
   async (req, res, next) => {
     try {
+      if(req.user.role!="SUB_ADMIN")return next()
       const userId = req._id;
       if (!userId) return next();
 
