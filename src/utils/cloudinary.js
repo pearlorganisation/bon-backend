@@ -8,8 +8,6 @@ cloudinary.config({
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-
-
 // export const uploadFileToCloudinary = async (files, folder = "images") => {
 //   try {
 //     const fileArray = Array.isArray(files) ? files : [files];
@@ -71,10 +69,7 @@ export const uploadFileToCloudinary = async (files, folder = "images") => {
             },
             (error, result) => {
               if (error) {
-                console.error(
-                  `Upload failed for ${file.originalname}:`,
-                  error
-                );
+                console.error(`Upload failed for ${file.originalname}:`, error);
                 reject(error);
               } else {
                 resolve({
@@ -97,7 +92,6 @@ export const uploadFileToCloudinary = async (files, folder = "images") => {
     return [];
   }
 };
-
 
 export const deleteFileFromCloudinary = async (
   public_id,
