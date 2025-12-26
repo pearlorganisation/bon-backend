@@ -271,6 +271,7 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 });
 
 export const logout = asyncHandler(async (req, res, next) => {
+  const userId  =req.user._id;
   if (userId) {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
   }
@@ -283,7 +284,7 @@ export const logout = asyncHandler(async (req, res, next) => {
     const today = dayjs().format("YYYY-MM-DD");
 
     let session = await Sub_Admin_Session.findOne({
-      userId: user._id,
+      userId,
       date: today,
     });
 
