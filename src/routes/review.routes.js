@@ -29,7 +29,7 @@ router.get("/all", getAllReviews);
 router.get("/property/:propertyId", getReviewsByProperty);
 
 // Get Reviews specific to a Room (Public)
-router.get("/room/:roomId", getReviewsByRoom);
+// router.get("/room/:roomId", getReviewsByRoom);
 
 // Delete a review (Requires Login)
 router.delete("/delete/:reviewId", protect, deleteReview);

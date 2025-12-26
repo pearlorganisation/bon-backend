@@ -93,23 +93,23 @@ const propertySchema = new mongoose.Schema(
       default: 0,
     },
 
-    propertyApproval: {
-      status: {
-        type: String,
-        enum: ["pending", "approved", "rejected"],
-        default: "pending",
-      },
-      termsAndConditions: {
-        type: String,
-        enum: ["pending", "accepted"],
-        default: "pending",
-      },
-      invoiceStatus: {
-        type: String,
-        enum: ["unpaid", "paid"],
-        default: "unpaid",
-      },
-    },
+    // propertyApproval: {
+    //   status: {
+    //     type: String,
+    //     enum: ["pending", "approved", "rejected"],
+    //     default: "pending",
+    //   },
+    //   termsAndConditions: {
+    //     type: String,
+    //     enum: ["pending", "accepted"],
+    //     default: "pending",
+    //   },
+    //   invoiceStatus: {
+    //     type: String,
+    //     enum: ["unpaid", "paid"],
+    //     default: "unpaid",
+    //   },
+    // },
 
     paymentDetails: {
       bankName: String,
@@ -126,7 +126,7 @@ const propertySchema = new mongoose.Schema(
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     verified: {
       type: String,
-      enum: ["pending", "under_review", , "rejected"], //admin"approved" approved
+      enum: ["pending", "under_review", "approved", "rejected"], //admin"approved" approved
       default: "pending",
     },
     //     commissionPercentage: { type: Number, default: 10 },
