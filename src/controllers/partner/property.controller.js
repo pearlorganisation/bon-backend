@@ -452,14 +452,11 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
 // get property by id
 export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
-  const id = new  mongoose.Types.ObjectId(propertyId)
+  
 
   // 1️⃣ Fetch property
-  const property = await Property.find({partnerId : id })
-    .populate("Rooms")      // optional
-    .select(
-      "name description address city state country geoLocation mapLink rating amenities Images Videos status createdAt updatedAt"
-    );
+  const property = await Property.find({_id: propertyId })
+    .populate("Rooms");    // optional
 
   if (!property) {
     return next(new CustomError("Property not found", 404));
@@ -499,6 +496,11 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
     );
   }
 
+  // ✅ FIX: initialize propertyApproval if missing
+  if (!property.propertyApproval) {
+    property.propertyApproval = {};
+  }
+
   property.verified = "under_review";
   property.propertyApproval.status = "pending";
 
@@ -506,6 +508,7 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
 
   successResponse(res, 200, "Property sent for admin approval", property);
 });
+
 
 
 // admin 
@@ -541,6 +544,12 @@ export const approveRejectProperty = asyncHandler(
     }
 
     property.verified = action;
+
+    // Initialize propertyApproval if it doesn't exist
+    if (!property.propertyApproval) {
+      property.propertyApproval = {};
+    }
+
     property.propertyApproval.status = action;
 
     if (action === "rejected") {
