@@ -36,6 +36,6 @@ cron.schedule("59 23 * * *", async () => {
 
     console.log(" All sub-admins logged out for today");
   } catch (err) {
-    console.error("" 11:59 PM cron failed:", err);
+    console.error(" 11:59 PM cron failed:", err);
   }
 });

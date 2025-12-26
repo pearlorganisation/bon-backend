@@ -48,104 +48,123 @@ export const heartbeat = asyncHandler(async (req, res, next) => {
 
 
 
-export const getAllPartnerActiveTime = asyncHandler(
-  async (req, res, next) => {
-    const today = dayjs().format("YYYY-MM-DD");
+export const getTodaySubAdminSession = asyncHandler(async (req, res) => {
+  const today = dayjs().format("YYYY-MM-DD");
 
-    const sessions = await Sub_Admin_Session.find(
-      {
-        role: "SUB_ADMIN",
-        date: today,
-      },
-    ).lean();
+  // 1️⃣ Get ALL sub-admins
+  const subAdmins = await Auth.find({ role: "SUB_ADMIN" })
+    .select("_id name email")
+    .lean();
 
-    const data = sessions.map((s) => ({
-      userId: s.userId,
-      activeDurationSec: s.activeDurationSec,
-      activeHours: +(s.activeDurationSec / 3600).toFixed(2),
-      LoginAt: s.LoginAt,
-      LogoutAt: s.LogoutAt,
-      lastPingAt: s.lastPingAt,
-      lastActivity:s.lastActivity
-    }));
+  // 2️⃣ Get TODAY sessions
+  const sessions = await Sub_Admin_Session.find({ date: today }).lean();
 
-    return successResponse(
-      res,
-      200,
-      "Today's active time for each partner fetched successfully",
-      {
-        date: today,
-        totalPartners: data.length,
-        data,
-      }
-    );
-  }
-);
+  // 3️⃣ Create map for quick lookup
+  const sessionMap = new Map();
+  sessions.forEach((s) => {
+    sessionMap.set(String(s.userId), s);
+  });
 
+  // 4️⃣ Build final response
+  const data = subAdmins.map((user) => {
+    const session = sessionMap.get(String(user._id));
+     
 
-export const getPartnerActiveHistoryByUserId = asyncHandler(
-  async (req, res, next) => {
-    const { userId } = req.params;
-    const now = Date.now();
-
-    const sessions = await Sub_Admin_Session.find(
-      {
-        userId,
-        role: "SUB_ADMIN",
-      },
-      {
-        date: 1,
-        LoginAt: 1,
-        LogoutAt: 1,
-        lastPingAt: 1,
-        activeDurationSec: 1,
-        _id: 0,
-      }
-    )
-      .sort({ date: -1 }) // latest first
-      .lean();
-
-    if (!sessions.length) {
-      return next(new CustomError("No session history found", 404));
+    if (!session) {
+      // ❌ Not logged in today
+      return {
+        userId: user._id,
+        name: user.name,
+        email: user.email,
+        loggedIn: false,
+        loginAt: null,
+        logoutAt: null,
+        activeHours: 0,
+        lastActivity: null,
+        lastPingAt: null,
+        sessionState: "OFFLINE"
+      };
     }
 
-    const data = sessions.map((s) => {
-      const lastPingDiffSec =
-        (now - new Date(s.lastPingAt)) / 1000;
+    // ✅ Logged in today
+    const now  =Date.now();
+    const lastPingDiffSec = (now - new Date(session.lastPingAt)) / 1000;
 
-      const isOnline = !s.LogoutAt && lastPingDiffSec <= HEARTBEAT_SEC;
+    const isOnline = !session.LogoutAt && lastPingDiffSec <= HEARTBEAT_SEC+ GRACE_SEC;
 
-      let sessionState = "OFFLINE";
-      if (isOnline) sessionState = "ONLINE";
-      else if (!s.LogoutAt) sessionState = "IDLE";
+    let sessionState = "OFFLINE";
+    if (isOnline) sessionState = "ONLINE";
+    return {
+      userId: user._id,
+      name: user.name,
+      email: user.email,
+      loggedIn: true,
+      loginAt: session.LoginAt,
+      logoutAt: session.LogoutAt,
+      activeHours: +(session.activeDurationSec / 3600).toFixed(2),
+      lastActivity: session.lastActivity,
+      lastPingAt: session.lastPingAt,
+      sessionState,
+    };
+  });
 
-      return {
-        date: s.date,
+  // 5️⃣ Summary
+  const summary = {
+    date: today,
+    totalSubAdmins: subAdmins.length,
+    loggedInCount: data.filter((d) => d.loggedIn).length,
+    notLoggedInCount: data.filter((d) => !d.loggedIn).length,
+  };
 
-        sessionState,
-        isOnline,
+  return successResponse(res, 200, "Today's sub-admin activity report", {
+    summary,
+    data,
+  });
+});
 
-        activeDurationSec: s.activeDurationSec,
-        activeHours: +(s.activeDurationSec / 3600).toFixed(2),
 
-        LoginAt: s.LoginAt,
-        LogoutAt: s.LogoutAt,
-        lastPingAt: s.lastPingAt,
-      };
-    });
+export const getSubAdminSessionHistory = asyncHandler(async (req, res) => {
+  const { id: subAdminId } = req.params;
 
-    return successResponse(
-      res,
-      200,
-      "Partner active history fetched successfully",
-      {
-        userId,
-        totalDays: data.length,
-        history: data,
-      }
-    );
+  // 1️ Validate sub-admin
+  const subAdmin = await Auth.findOne({
+    _id: subAdminId,
+    role: "SUB_ADMIN",
+  })
+    .select("_id name email")
+    .lean();
+
+  if (!subAdmin) {
+    throw new CustomError("Sub-admin not found", 404);
   }
-);
+
+  // 2️ Fetch ALL sessions (history)
+  const sessions = await Sub_Admin_Session.find({
+    userId: subAdminId,
+  })
+    .sort({ date: -1 }) // latest first
+    .lean();
+
+  // 3️ Format response
+  const data = sessions.map((s) => ({
+    date: s.date,
+    loginAt: s.LoginAt,
+    logoutAt: s.LogoutAt,
+    activeHours: +(s.activeDurationSec / 3600).toFixed(2),
+    lastActivity: s.lastActivity,
+    lastPingAt: s.lastPingAt,
+  }));
+
+  return res.status(200).json({
+    status: true,
+    message: "Sub-admin session history fetched successfully",
+    data: {
+      subAdmin,
+      totalDays: data.length,
+      sessions: data,
+    },
+  });
+});
 
 
 
@@ -162,23 +181,14 @@ export const getMyTodayStatus = asyncHandler(async (req, res, next) => {
   }).lean();
 
   if (!session) {
-    return next(new CustomError("No session found for today", 404));
+    return next(new CustomError("No session found for today", 401));
   }
-
-  const lastPingDiffSec = (now - new Date(session.lastPingAt)) / 1000;
-  const isOnline = lastPingDiffSec <= HEARTBEAT_SEC;
-
-  let sessionState = "OFFLINE";
-  if (isOnline) sessionState = "ONLINE";
-  else if (!session.LogoutAt) sessionState = "IDLE";
 
   const activeHours = +(session.activeDurationSec / 3600).toFixed(2);
 
   return successResponse(res, 200, "Today's status fetched successfully", {
     userId: session.userId,
     date: today,
-    sessionState,
-    isOnline,
     activeDurationSec: session.activeDurationSec,
     activeHours,
     LoginAt: session.LoginAt,
