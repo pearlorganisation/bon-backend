@@ -80,7 +80,7 @@ const propertySchema = new mongoose.Schema(
         },
       ],
     },
-
+    //df
     ratingsAverage: {
       type: Number,
       default: 4.5,
