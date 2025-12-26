@@ -10,8 +10,8 @@ import RoomsRouter from "./room.route.js";
 import SuportCallRouter from "../modules/Support/supportCall/supportCall.routes.js";
 import SupportEmail from "../modules/Support/supportEmail/supportEmail.routes.js";
 import SupportTicket from "../modules/Support/supportTicket/support.routes.js"
-import subAdminRoute from "../routes/subAdmin/subAdmin.route.js"
-
+import subAdminRoute from "./subAdmin/subAdmin.route.js"
+import adminRoute from  "./admin/admin.routes.js"
 const router = express.Router();
 
 router.use("/auth", AuthRouter);
@@ -24,6 +24,7 @@ router.use("/supportEmail",SupportEmail);
 router.use("/supportCall", SuportCallRouter);
 router.use("/supportTickets",SupportTicket);
 router.use("/subAdmin",subAdminRoute);
+router.use("/admin",adminRoute);
 router.use("/", UserRouter);
 
 export default router;
