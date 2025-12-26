@@ -496,6 +496,11 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
     );
   }
 
+  // ✅ FIX: initialize propertyApproval if missing
+  if (!property.propertyApproval) {
+    property.propertyApproval = {};
+  }
+
   property.verified = "under_review";
   property.propertyApproval.status = "pending";
 
@@ -503,6 +508,7 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
 
   successResponse(res, 200, "Property sent for admin approval", property);
 });
+
 
 
 // admin 
@@ -538,6 +544,12 @@ export const approveRejectProperty = asyncHandler(
     }
 
     property.verified = action;
+
+    // Initialize propertyApproval if it doesn't exist
+    if (!property.propertyApproval) {
+      property.propertyApproval = {};
+    }
+
     property.propertyApproval.status = action;
 
     if (action === "rejected") {
