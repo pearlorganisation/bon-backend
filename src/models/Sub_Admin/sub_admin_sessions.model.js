@@ -30,7 +30,7 @@ const Sub_Admin_Session_Schema = new mongoose.Schema(
 
     lastPingAt: {
       type: Date,
-      required: true,
+      required: true, //heartbeat
     },
 
     lastActivity: {
