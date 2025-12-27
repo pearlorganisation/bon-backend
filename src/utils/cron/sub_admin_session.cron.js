@@ -3,6 +3,8 @@ import dayjs from "dayjs";
 import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.model.js";
 import Auth from "../../models/auth/auth.model.js";
 
+const sub_admin_cron =()=>{
+
 cron.schedule("59 23 * * *", async () => {
   try {
     console.log("🌙 11:59 PM cron started");
@@ -39,3 +41,7 @@ cron.schedule("59 23 * * *", async () => {
     console.error(" 11:59 PM cron failed:", err);
   }
 });
+console.log("✅ sub admin  automatic logout  cron initialized");
+};
+
+export default sub_admin_cron;
