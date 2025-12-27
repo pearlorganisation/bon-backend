@@ -32,7 +32,6 @@ export const createDocument = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Please specify the document type", 400));
   }
 
-
   console.log(req.files.document, "a a ");
   const uploadResult = await uploadFileToCloudinary(
     req.files.document,
@@ -279,43 +278,32 @@ export const getAllDocRequestsForAdmin = asyncHandler(
 );
 
 // ADMIN ONLY
-export const getDocumentsByQuery = asyncHandler(async (req, res, next) => {
+export const getDocumentsByQuery = asyncHandler(async (req, res) => {
   const { country, state, city, documentTypeId } = req.query;
 
   const filter = { isActive: true };
 
-  /* --------------------------------------------
-     LOCATION FILTERS (CASE-INSENSITIVE)
-  -------------------------------------------- */
+  const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
   if (country) {
-    filter.country = { $regex: new RegExp(`^${country}$`, "i") };
+    filter.country = { $regex: escapeRegex(country), $options: "i" };
   }
 
   if (state) {
-    filter.state = { $regex: new RegExp(`^${state}$`, "i") };
+    filter.state = { $regex: escapeRegex(state), $options: "i" };
   }
 
   if (city) {
-    filter.city = { $regex: new RegExp(`^${city}$`, "i") };
+    filter.city = { $regex: escapeRegex(city), $options: "i" };
   }
 
-  /* --------------------------------------------
-     DOCUMENT TYPE FILTER (ObjectId)
-  -------------------------------------------- */
-  if (documentTypeId) {
-    filter.documentTypeId = documentTypeId;
+  if (documentTypeId && mongoose.Types.ObjectId.isValid(documentTypeId)) {
+    filter.documentTypeId = new mongoose.Types.ObjectId(documentTypeId);
   }
 
   const documents = await Document.find(filter)
-    .populate({
-      path: "documentTypeId",
-      select: "name description",
-    })
-    .populate({
-      path: "createdBy",
-      select: "name email",
-    })
-    .sort({ createdAt: -1 })
+    .populate("documentTypeId", "name description")
+    .populate("createdBy", "name email")
     .lean();
 
   successResponse(res, 200, "Documents fetched successfully", documents);
@@ -376,7 +364,7 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
   );
 
   docsToAssign.forEach((doc) => {
-    // document type check
+    // 1. Document type check
     if (!requestedTypeIds.includes(doc.documentTypeId.toString())) {
       throw new CustomError(
         "One or more documents do not match requested document types",
@@ -384,19 +372,19 @@ export const grantDocumentAccess = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // location check
-    if (
-      doc.country !== request.propertyId.country ||
-      doc.state !== request.propertyId.state
-    ) {
-      console.log("doc", doc.country, doc.state);
-      console.log(
-        "property",
-        request.propertyId.country,
-        request.propertyId.state
-      );
+    // 2. Location check (FIX: Added .toLowerCase() and .trim() to both sides)
+    const docCountry = (doc.country || "").trim().toLowerCase();
+    const docState = (doc.state || "").trim().toLowerCase();
+    const propCountry = (request.propertyId.country || "").trim().toLowerCase();
+    const propState = (request.propertyId.state || "").trim().toLowerCase();
+
+    if (docCountry !== propCountry || docState !== propState) {
+      console.log("Mismatch detected:");
+      console.log(`Document: ${docCountry}, ${docState}`);
+      console.log(`Property: ${propCountry}, ${propState}`);
+
       throw new CustomError(
-        "One or more documents do not match property (country",
+        `Document "${doc.title}" does not match the property location (${request.propertyId.country}, ${request.propertyId.state})`,
         400
       );
     }
@@ -701,7 +689,7 @@ export const getMyPropertyDocuments = asyncHandler(async (req, res, next) => {
   });
 });
 
-// ==========================================
+// ==========================================d
 //  Document Type
 // ==========================================
 
