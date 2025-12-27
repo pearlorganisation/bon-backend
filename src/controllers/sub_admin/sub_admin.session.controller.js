@@ -3,6 +3,7 @@ import asyncHandler from "../../middleware/asyncHandler.js";
 import CustomError from "../../utils/error/customError.js";
 import successResponse from "../../utils/error/successResponse.js";
 import dayjs from "dayjs";
+import Auth from "../../models/auth/auth.model.js";
 
 const HEARTBEAT_SEC = 300; // 5 min
 const GRACE_SEC = 180;     // 3 min

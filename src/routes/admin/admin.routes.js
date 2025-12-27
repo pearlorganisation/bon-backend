@@ -5,7 +5,7 @@ import { heartbeat ,getSubAdminSessionHistory,getTodaySubAdminSession} from "../
 import { protect,authorizeRoles } from "../../middleware/auth/auth.middleware.js";
 
 route.use(protect);
-route.use(authorizeRoles("ADMIN"))
+route.use(authorizeRoles("ADMIN","SUB_ADMIN"))
 
 
 route.get("/get-subAdmin-sessions-history/:id",getSubAdminSessionHistory);
