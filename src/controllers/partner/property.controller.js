@@ -166,31 +166,27 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     }
   }
 
-    
+  if (req.body?.videosToDelete) {
+    let videosToDelete = [];
 
- if (req.body?.videosToDelete) {
-  let videosToDelete = [];
+    try {
+      videosToDelete = JSON.parse(req.body.videosToDelete);
+    } catch (err) {
+      return next(new CustomError("Invalid videosToDelete format", 400));
+    }
 
-  try {
-    videosToDelete = JSON.parse(req.body.videosToDelete);
-  } catch (err) {
-    return next(new CustomError("Invalid videosToDelete format", 400));
+    const publicIdsToDelete = videosToDelete.map((video) => video.public_id);
+
+    // Remove videos from property (once)
+    property.Videos = property.Videos.filter(
+      (video) => !publicIdsToDelete.includes(video.public_id)
+    );
+
+    // Delete from Cloudinary (sequential & safe)
+    for (const publicId of publicIdsToDelete) {
+      await deleteFileFromCloudinary(publicId, "video");
+    }
   }
-
-  const publicIdsToDelete = videosToDelete.map(
-    (video) => video.public_id
-  );
-
-  // Remove videos from property (once)
-  property.Videos = property.Videos.filter(
-    (video) => !publicIdsToDelete.includes(video.public_id)
-  );
-
-  // Delete from Cloudinary (sequential & safe)
-  for (const publicId of publicIdsToDelete) {
-    await deleteFileFromCloudinary(publicId, "video");
-  }
-}
 
   if (req.body?.documentsToDelete) {
     let documentsToDelete = [];
@@ -219,8 +215,6 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
       await deleteFileFromCloudinary(publicId, "image");
     }
   }
-
-
 
   // ✅ Upload images and videos if provided
   let Images = [];
@@ -278,7 +272,6 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
       public_id: uploadedDocs[0].public_id,
     });
   }
-
 
   property.Images.push(...Images);
   property.Videos.push(...Videos);
@@ -394,7 +387,6 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   );
 });
 
-
 export const getAllProperties = async (req, res) => {
   try {
     const properties = await Property.find();
@@ -448,22 +440,19 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
   );
 });
 
-
 // get property by id
 export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
-  
 
   // 1️⃣ Fetch property
-  const property = await Property.find({_id: propertyId })
-    .populate("Rooms");    // optional
+  const property = await Property.find({ _id: propertyId }).populate("Rooms"); // optional
 
   if (!property) {
     return next(new CustomError("Property not found", 404));
   }
 
   // 2️⃣ Ensure property is public/active
-   if (property.status !== "active" && !isAdmin) {
+  if (property.status !== "active" && !isAdmin) {
     return next(
       new CustomError("This property is not available for public viewing", 403)
     );
@@ -473,18 +462,26 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "Property fetched successfully", property);
 });
 
-
-// partner 
-
+// partner
 
 export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
   const { propertyId } = req.params;
+  const role = req.user.role;
   const partnerId = req.user._id;
 
-  const property = await Property.findOne({
-    _id: propertyId,
-    partnerId,
-  });
+  let property;
+
+  if (role === "SUB_ADMIN") {
+    property = await Property.findOne({
+      _id: propertyId,
+      subAdminId: partnerId,
+    });
+  } else {
+    property = await Property.findOne({
+      _id: propertyId,
+      partnerId,
+    });
+  }
 
   if (!property) {
     return next(new CustomError("Property not found", 404));
@@ -509,9 +506,7 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "Property sent for admin approval", property);
 });
 
-
-
-// admin 
+// admin
 
 export const getPropertyApprovalRequests = asyncHandler(
   async (req, res, next) => {
@@ -519,50 +514,37 @@ export const getPropertyApprovalRequests = asyncHandler(
       verified: "under_review",
     }).populate("partnerId", "name email");
 
-    successResponse(
-      res,
-      200,
-      "Property approval requests fetched",
-      properties
-    );
+    successResponse(res, 200, "Property approval requests fetched", properties);
   }
 );
 
+export const approveRejectProperty = asyncHandler(async (req, res, next) => {
+  const { propertyId } = req.params;
+  const { action, reason } = req.body;
 
-export const approveRejectProperty = asyncHandler(
-  async (req, res, next) => {
-    const { propertyId } = req.params;
-    const { action, reason } = req.body;
-
-    if (!["approved", "rejected"].includes(action)) {
-      return next(new CustomError("Invalid action", 400));
-    }
-
-    const property = await Property.findById(propertyId);
-    if (!property) {
-      return next(new CustomError("Property not found", 404));
-    }
-
-    property.verified = action;
-
-    // Initialize propertyApproval if it doesn't exist
-    if (!property.propertyApproval) {
-      property.propertyApproval = {};
-    }
-
-    property.propertyApproval.status = action;
-
-    if (action === "rejected") {
-      property.propertyApproval.rejectionReason = reason || "Rejected by admin";
-    }
-
-    await property.save();
-
-    successResponse(
-      res,
-      200,
-      `Property ${action} successfully`,
-      property
-    );
+  if (!["approved", "rejected"].includes(action)) {
+    return next(new CustomError("Invalid action", 400));
   }
-);
+
+  const property = await Property.findById(propertyId);
+  if (!property) {
+    return next(new CustomError("Property not found", 404));
+  }
+
+  property.verified = action;
+
+  // Initialize propertyApproval if it doesn't exist
+  if (!property.propertyApproval) {
+    property.propertyApproval = {};
+  }
+
+  property.propertyApproval.status = action;
+
+  if (action === "rejected") {
+    property.propertyApproval.rejectionReason = reason || "Rejected by admin";
+  }
+
+  await property.save();
+
+  successResponse(res, 200, `Property ${action} successfully`, property);
+});

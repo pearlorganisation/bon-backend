@@ -105,7 +105,7 @@ router.put(
 router.patch(
   "/properties/:propertyId/request-approval",
   protect,
-   authorizeRoles("PARTNER"),
+   authorizeRoles("PARTNER","SUB_ADMIN"),
   requestPropertyApproval
 );
 
