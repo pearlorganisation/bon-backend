@@ -14,7 +14,14 @@ const roomSchema = new mongoose.Schema(
       type: Number, // percent or flat
       default: 0,
     },
-    type: {
+    // How many physical rooms of this exact type exist in the property
+    numberOfRooms: {
+      type: Number,
+      required: true,
+      min: 1,
+      default: 1,
+    },
+    typeOfRoom: {
       type: String,
       enum: ["single", "double", "deluxe", "suite", "triple", "family"],
       default: "single",

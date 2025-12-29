@@ -207,6 +207,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
+
   let uploadedImages = [];
   let uploadedVideos = [];
 
@@ -230,12 +231,28 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
+      if (type) {
+        const isPresent = await Room.findOne({
+          propertyId,
+          typeOfRoom: type.toLowerCase(),
+        });
+        if (isPresent) {
+          return next(
+            new CustomError(
+              "rooms with this type is allready present please update them",
+              400
+            )
+          );
+        }
+      }
+
+
   const baseRoomData = {
     propertyId,
     name: name.trim(),
     capacity: capacity || 2,
     pricePerNight,
-    type: type.toLowerCase(),
+    typeOfRoom: type.toLowerCase(),
     // Parse arrays (handle single string vs array)
     amenities: parseArrayField(amenities).map((item) => item.trim()),
     bedType: bedType.toLowerCase(),
@@ -268,16 +285,12 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bathroomFeatures,
     roomFacilities,
     mediaAndTechnology,
+    numberOfRooms,
   };
 
-  const roomsToCreate = [];
-  for (let i = 0; i < numberOfRooms; i++) {
-    roomsToCreate.push({
-      ...baseRoomData,
-    });
-  }
+ 
 
-  const createdRooms = await Room.insertMany(roomsToCreate);
+  const createdRooms = await Room.create(baseRoomData);
 
   return successResponse(
     res,
@@ -287,6 +300,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
   );
 });
 
+//id ->type
 export const updateRoomById = asyncHandler(async (req, res, next) => {
   const { roomId } = req.params;
   const { _id: userId, role } = req.user;
@@ -367,6 +381,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     bathroomFeatures,
     roomFacilities,
     mediaAndTechnology,
+    numberOfRooms
   } = req.body;
 
   // =================================================================
@@ -492,11 +507,70 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     room.videos.push(...newVideos);
   }
 
+   if(type){
+         const isPresent = await Room.findOne({
+           propertyId:property._id,
+           typeOfRoom: type.toLowerCase(),
+         });
+         if(isPresent){
+           return next(
+             new CustomError(
+               "rooms with this type is allready present please update them",
+               400
+             )
+           );
+         }
+   }
+    if (req.body?.imagesToDelete) {
+      let imagesToDelete = [];
+
+      try {
+        imagesToDelete = JSON.parse(req.body.imagesToDelete);
+      } catch (err) {
+        return next(new CustomError("Invalid imagesToDelete format", 400));
+      }
+
+      const publicIdsToDelete = imagesToDelete.map((image) => image.public_id);
+
+      // Remove images from property (once)
+      room.images = room.images.filter(
+        (img) => !publicIdsToDelete.includes(img.public_id)
+      );
+
+      // Delete from Cloudinary (sequential & safe)
+      for (const publicId of publicIdsToDelete) {
+        await deleteFileFromCloudinary(publicId, "image");
+      }
+    }
+
+    if (req.body?.videosToDelete) {
+      let videosToDelete = [];
+
+      try {
+        videosToDelete = JSON.parse(req.body.videosToDelete);
+      } catch (err) {
+        return next(new CustomError("Invalid videosToDelete format", 400));
+      }
+
+      const publicIdsToDelete = videosToDelete.map((video) => video.public_id);
+
+      // Remove videos from property (once)
+      room.videos = room.videos.filter(
+        (video) => !publicIdsToDelete.includes(video.public_id)
+      );
+
+      // Delete from Cloudinary (sequential & safe)
+      for (const publicId of publicIdsToDelete) {
+        await deleteFileFromCloudinary(publicId, "video");
+      }
+    }
+
+  if (numberOfRooms && Number(numberOfRooms)>=1) room.numberOfRooms = Number(numberOfRooms);
   if (name) room.name = name.trim().toLowerCase();
   if (capacity) room.capacity = capacity;
   if (pricePerNight) room.pricePerNight = pricePerNight;
   if (discount) room.discount = discount;
-  if (type) room.type = type.toLowerCase();
+  if (typeOfRoom) room.type = type.toLowerCase();
   if (amenities)
     room.amenities = parseArrayField(amenities).map((a) => a.toLowerCase());
   if (bedType) room.bedType = bedType.toLowerCase();
@@ -533,6 +607,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
   return successResponse(res, 200, "Room updated successfully", room);
 });
+
 
 // ... (rest of the file remains unchanged: updateRoomsInBulk, getTypesOfRoomsInProperty, etc.)
 export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
@@ -610,6 +685,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     bathroomFeatures,
     roomFacilities,
     mediaAndTechnology,
+    numberOfRooms
   } = req.body;
 
   if (!types || !Array.isArray(types) || types.length === 0) {
@@ -622,7 +698,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
 
   const rooms = await Room.find({
     propertyId,
-    type: { $in: types },
+    typeOfRoom: { $in: types },
   });
   if (!rooms.length) {
     return next(
@@ -697,6 +773,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   }
 
   const updateFields = {};
+  if(numberOfRooms && Number(numberOfRooms)>=1) updateFields.numberOfRooms = Number(numberOfRooms);
   if (pricePerNight !== undefined)
     updateFields.pricePerNight = Number(pricePerNight);
   if (discount !== undefined) updateFields.discount = Number(discount);
@@ -843,7 +920,7 @@ export const getTypesOfRoomsInProperty = asyncHandler(
       );
     }
 
-    const rooms = await Room.distinct("type", {
+    const rooms = await Room.distinct("typeOfRoom", {
       propertyId: propertyId,
     });
 
@@ -894,7 +971,7 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
    ------------------------------*/
   const deleteResult = await Room.deleteMany({
     propertyId,
-    type: { $in: types },
+    typeOfRoom: { $in: types },
   });
 
   if (deleteResult.deletedCount === 0) {
@@ -910,7 +987,8 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
     deletedRooms: deleteResult.deletedCount,
   });
 });
-
+ 
+//delete room by id ->single type  deleted
 export const deleteRoom = asyncHandler(async (req, res, next) => {
   const { roomId } = req.params;
   const { _id: userId, role } = req.user;
@@ -986,329 +1064,329 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   const typesOfRooms = {};
 
   for (let room of rooms) {
-    if (!typesOfRooms[room.type]) {
-      typesOfRooms[room.type] = [];
-    }
-    typesOfRooms[room.type].push(room);
+    // if (!typesOfRooms[room.type]) {
+    //   typesOfRooms[room.type] = "";
+    // }
+    typesOfRooms[room.type]=room;
   }
 
   return successResponse(res, 200, "Rooms fetched Successfully ", typesOfRooms);
 });
 
-export const setRoomsImagesandVideosInBulk = asyncHandler(
-  async (req, res, next) => {
-    const { propertyId } = req.params;
-    const { _id: userId, role } = req.user;
+// export const setRoomsImagesandVideosInBulk = asyncHandler(
+//   async (req, res, next) => {
+//     const { propertyId } = req.params;
+//     const { _id: userId, role } = req.user;
 
-    let { types, imagesToDelete, videosToDelete } = req.body;
+//     let { types, imagesToDelete, videosToDelete } = req.body;
 
-    if (!types) {
-      return next(
-        new CustomError("Room types are required and must be an array", 400)
-      );
-    }
+//     if (!types) {
+//       return next(
+//         new CustomError("Room types are required and must be an array", 400)
+//       );
+//     }
 
-    types = JSON.parse(types);
+//     types = JSON.parse(types);
 
-    if (!Array.isArray(types) || types.length === 0) {
-      return next(
-        new CustomError("Room types are required and must be an array", 400)
-      );
-    }
+//     if (!Array.isArray(types) || types.length === 0) {
+//       return next(
+//         new CustomError("Room types are required and must be an array", 400)
+//       );
+//     }
 
-    types = types.map((t) => t.toLowerCase().trim());
+//     types = types.map((t) => t.toLowerCase().trim());
 
-    /** -----------------------------
-       * 1️⃣ Property authorization
-       ------------------------------*/
-    const propertyQuery = { _id: propertyId };
+//     /** -----------------------------
+//        * 1️⃣ Property authorization
+//        ------------------------------*/
+//     const propertyQuery = { _id: propertyId };
 
-    if (role === "SUB_ADMIN") {
-      propertyQuery.subAdminId = userId;
-      propertyQuery.partnerId = null; // 🔒 must be unassigned
-    }
+//     if (role === "SUB_ADMIN") {
+//       propertyQuery.subAdminId = userId;
+//       propertyQuery.partnerId = null; // 🔒 must be unassigned
+//     }
 
-    if (role === "PARTNER") {
-      propertyQuery.partnerId = userId;
-    }
+//     if (role === "PARTNER") {
+//       propertyQuery.partnerId = userId;
+//     }
 
-    const property = await Property.findOne(propertyQuery);
+//     const property = await Property.findOne(propertyQuery);
 
-    if (!property) {
-      return next(
-        new CustomError(
-          "You are not authorized to update rooms for this property",
-          403
-        )
-      );
-    }
+//     if (!property) {
+//       return next(
+//         new CustomError(
+//           "You are not authorized to update rooms for this property",
+//           403
+//         )
+//       );
+//     }
 
-    /** -----------------------------
-       * 2️⃣ Fetch rooms
-       ------------------------------*/
-    const rooms = await Room.find({
-      propertyId,
-      type: { $in: types },
-    });
+//     /** -----------------------------
+//        * 2️⃣ Fetch rooms
+//        ------------------------------*/
+//     const rooms = await Room.find({
+//       propertyId,
+//       type: { $in: types },
+//     });
 
-    if (!rooms.length) {
-      return next(
-        new CustomError("No rooms found for the specified types", 404)
-      );
-    }
+//     if (!rooms.length) {
+//       return next(
+//         new CustomError("No rooms found for the specified types", 404)
+//       );
+//     }
 
-    let newImages = [];
-    let newVideos = [];
+//     let newImages = [];
+//     let newVideos = [];
 
-    if (req.files?.images) {
-      const errMsg = validateFileSize(req.files.images, "image");
-      if (errMsg) {
-        return next(new CustomError(errMsg, 400));
-      }
-      newImages = await uploadFileToCloudinary(
-        req.files.images,
-        "rooms/images"
-      );
-    }
+//     if (req.files?.images) {
+//       const errMsg = validateFileSize(req.files.images, "image");
+//       if (errMsg) {
+//         return next(new CustomError(errMsg, 400));
+//       }
+//       newImages = await uploadFileToCloudinary(
+//         req.files.images,
+//         "rooms/images"
+//       );
+//     }
 
-    if (req.files?.videos) {
-      const errMsg = validateFileSize(req.files.videos, "video");
-      if (errMsg) {
-        return next(new CustomError(errMsg, 400));
-      }
-      newVideos = await uploadFileToCloudinary(
-        req.files.videos,
-        "rooms/videos"
-      );
-    }
+//     if (req.files?.videos) {
+//       const errMsg = validateFileSize(req.files.videos, "video");
+//       if (errMsg) {
+//         return next(new CustomError(errMsg, 400));
+//       }
+//       newVideos = await uploadFileToCloudinary(
+//         req.files.videos,
+//         "rooms/videos"
+//       );
+//     }
 
-    if (imagesToDelete) {
-      imagesToDelete = JSON.parse(imagesToDelete);
-      for (let img of imagesToDelete) {
-        await deleteFileFromCloudinary(img.public_id, "image");
-      }
+//     if (imagesToDelete) {
+//       imagesToDelete = JSON.parse(imagesToDelete);
+//       for (let img of imagesToDelete) {
+//         await deleteFileFromCloudinary(img.public_id, "image");
+//       }
 
-      await Room.updateMany(
-        {
-          propertyId,
-          type: {
-            $in: types,
-          },
-        },
-        {
-          $pull: {
-            images: {
-              public_id: {
-                $in: imagesToDelete.map((i) => i.public_id),
-              },
-            },
-          },
-        }
-      );
-    }
+//       await Room.updateMany(
+//         {
+//           propertyId,
+//           type: {
+//             $in: types,
+//           },
+//         },
+//         {
+//           $pull: {
+//             images: {
+//               public_id: {
+//                 $in: imagesToDelete.map((i) => i.public_id),
+//               },
+//             },
+//           },
+//         }
+//       );
+//     }
 
-    if (videosToDelete) {
-      videosToDelete = JSON.parse(videosToDelete);
-      for (let vid of videosToDelete) {
-        await deleteFileFromCloudinary(vid.public_id, "video");
-      }
+//     if (videosToDelete) {
+//       videosToDelete = JSON.parse(videosToDelete);
+//       for (let vid of videosToDelete) {
+//         await deleteFileFromCloudinary(vid.public_id, "video");
+//       }
 
-      await Room.updateMany(
-        {
-          propertyId,
-          type: {
-            $in: types,
-          },
-        },
-        {
-          $pull: {
-            videos: {
-              public_id: {
-                $in: videosToDelete.map((v) => v.public_id),
-              },
-            },
-          },
-        }
-      );
-    }
+//       await Room.updateMany(
+//         {
+//           propertyId,
+//           type: {
+//             $in: types,
+//           },
+//         },
+//         {
+//           $pull: {
+//             videos: {
+//               public_id: {
+//                 $in: videosToDelete.map((v) => v.public_id),
+//               },
+//             },
+//           },
+//         }
+//       );
+//     }
 
-    console.log(newImages, newVideos);
-    if (newImages.length > 0 || newVideos.length > 0) {
-      await Room.updateMany(
-        {
-          propertyId,
-          type: {
-            $in: types,
-          },
-        },
-        {
-          $push: {
-            images: {
-              $each: newImages,
-            },
-            videos: {
-              $each: newVideos,
-            },
-          },
-        }
-      );
-    }
+//     console.log(newImages, newVideos);
+//     if (newImages.length > 0 || newVideos.length > 0) {
+//       await Room.updateMany(
+//         {
+//           propertyId,
+//           type: {
+//             $in: types,
+//           },
+//         },
+//         {
+//           $push: {
+//             images: {
+//               $each: newImages,
+//             },
+//             videos: {
+//               $each: newVideos,
+//             },
+//           },
+//         }
+//       );
+//     }
 
-    const updatedRooms = await Room.find({
-      propertyId,
-      type: {
-        $in: types,
-      },
-    });
+//     const updatedRooms = await Room.find({
+//       propertyId,
+//       type: {
+//         $in: types,
+//       },
+//     });
 
-    return successResponse(
-      res,
-      200,
-      "Room images/videos updated successfully",
-      {
-        updatedRooms,
-        addedImages: newImages,
-        addedVideos: newVideos,
-        deletedImages: imagesToDelete || [],
-        deletedVideos: videosToDelete || [],
-      }
-    );
-  }
-);
+//     return successResponse(
+//       res,
+//       200,
+//       "Room images/videos updated successfully",
+//       {
+//         updatedRooms,
+//         addedImages: newImages,
+//         addedVideos: newVideos,
+//         deletedImages: imagesToDelete || [],
+//         deletedVideos: videosToDelete || [],
+//       }
+//     );
+//   }
+// );
 
-export const setRoomImagesAndVideosById = asyncHandler(
-  async (req, res, next) => {
-    const { roomId } = req.params;
-    const { _id: userId, role } = req.user;
+// export const setRoomImagesAndVideosById = asyncHandler(
+//   async (req, res, next) => {
+//     const { roomId } = req.params;
+//     const { _id: userId, role } = req.user;
 
-    const room = await Room.findById(roomId).populate("propertyId");
-    if (!room) {
-      return next(new CustomError("Room not found", 404));
-    }
+//     const room = await Room.findById(roomId).populate("propertyId");
+//     if (!room) {
+//       return next(new CustomError("Room not found", 404));
+//     }
 
-    const property = room.propertyId;
+//     const property = room.propertyId;
 
-    /** -----------------------------
-     * Authorization
-     ------------------------------*/
-    if (role === "PARTNER") {
-      if (
-        !property.partnerId ||
-        property.partnerId.toString() !== userId.toString()
-      ) {
-        return next(
-          new CustomError("You are not authorized to modify this room", 403)
-        );
-      }
-    }
+//     /** -----------------------------
+//      * Authorization
+//      ------------------------------*/
+//     if (role === "PARTNER") {
+//       if (
+//         !property.partnerId ||
+//         property.partnerId.toString() !== userId.toString()
+//       ) {
+//         return next(
+//           new CustomError("You are not authorized to modify this room", 403)
+//         );
+//       }
+//     }
 
-    if (role === "SUB_ADMIN") {
-      if (
-        property.partnerId !== null ||
-        property.subAdminId.toString() !== userId.toString()
-      ) {
-        return next(
-          new CustomError("You are not authorized to modify this room", 403)
-        );
-      }
-    }
+//     if (role === "SUB_ADMIN") {
+//       if (
+//         property.partnerId !== null ||
+//         property.subAdminId.toString() !== userId.toString()
+//       ) {
+//         return next(
+//           new CustomError("You are not authorized to modify this room", 403)
+//         );
+//       }
+//     }
 
-    /** -----------------------------
-     * Delete images
-     ------------------------------*/
-    if (req.body.imagesToDelete) {
-      const imagesToDelete = JSON.parse(req.body.imagesToDelete);
+//     /** -----------------------------
+//      * Delete images
+//      ------------------------------*/
+//     if (req.body.imagesToDelete) {
+//       const imagesToDelete = JSON.parse(req.body.imagesToDelete);
 
-      await Promise.all(
-        imagesToDelete.map((img) =>
-          deleteFileFromCloudinary(img.public_id, "image")
-        )
-      );
+//       await Promise.all(
+//         imagesToDelete.map((img) =>
+//           deleteFileFromCloudinary(img.public_id, "image")
+//         )
+//       );
 
-      await Room.updateOne(
-        { _id: roomId },
-        {
-          $pull: {
-            images: {
-              public_id: {
-                $in: imagesToDelete.map((img) => img.public_id),
-              },
-            },
-          },
-        }
-      );
-    }
+//       await Room.updateOne(
+//         { _id: roomId },
+//         {
+//           $pull: {
+//             images: {
+//               public_id: {
+//                 $in: imagesToDelete.map((img) => img.public_id),
+//               },
+//             },
+//           },
+//         }
+//       );
+//     }
 
-    /** -----------------------------
-     * Delete videos
-     ------------------------------*/
-    if (req.body.videosToDelete) {
-      const videosToDelete = JSON.parse(req.body.videosToDelete);
+//     /** -----------------------------
+//      * Delete videos
+//      ------------------------------*/
+//     if (req.body.videosToDelete) {
+//       const videosToDelete = JSON.parse(req.body.videosToDelete);
 
-      await Promise.all(
-        videosToDelete.map((vid) =>
-          deleteFileFromCloudinary(vid.public_id, "video")
-        )
-      );
+//       await Promise.all(
+//         videosToDelete.map((vid) =>
+//           deleteFileFromCloudinary(vid.public_id, "video")
+//         )
+//       );
 
-      await Room.updateOne(
-        { _id: roomId },
-        {
-          $pull: {
-            videos: {
-              public_id: {
-                $in: videosToDelete.map((vid) => vid.public_id),
-              },
-            },
-          },
-        }
-      );
-    }
+//       await Room.updateOne(
+//         { _id: roomId },
+//         {
+//           $pull: {
+//             videos: {
+//               public_id: {
+//                 $in: videosToDelete.map((vid) => vid.public_id),
+//               },
+//             },
+//           },
+//         }
+//       );
+//     }
 
-    /** -----------------------------
-     * Upload new media
-     ------------------------------*/
-    let uploadedImages = [];
-    let uploadedVideos = [];
+//     /** -----------------------------
+//      * Upload new media
+//      ------------------------------*/
+//     let uploadedImages = [];
+//     let uploadedVideos = [];
 
-    if (req.files?.images) {
-      uploadedImages = await uploadFileToCloudinary(
-        req.files.images,
-        "rooms/images"
-      );
-    }
+//     if (req.files?.images) {
+//       uploadedImages = await uploadFileToCloudinary(
+//         req.files.images,
+//         "rooms/images"
+//       );
+//     }
 
-    if (req.files?.videos) {
-      uploadedVideos = await uploadFileToCloudinary(
-        req.files.videos,
-        "rooms/videos"
-      );
-    }
+//     if (req.files?.videos) {
+//       uploadedVideos = await uploadFileToCloudinary(
+//         req.files.videos,
+//         "rooms/videos"
+//       );
+//     }
 
-    if (uploadedImages.length || uploadedVideos.length) {
-      await Room.updateOne(
-        { _id: roomId },
-        {
-          $push: {
-            images: { $each: uploadedImages },
-            videos: { $each: uploadedVideos },
-          },
-        }
-      );
-    }
+//     if (uploadedImages.length || uploadedVideos.length) {
+//       await Room.updateOne(
+//         { _id: roomId },
+//         {
+//           $push: {
+//             images: { $each: uploadedImages },
+//             videos: { $each: uploadedVideos },
+//           },
+//         }
+//       );
+//     }
 
-    const updatedRoom = await Room.findById(roomId);
+//     const updatedRoom = await Room.findById(roomId);
 
-    return successResponse(
-      res,
-      200,
-      "Room media updated successfully",
-      updatedRoom
-    );
-  }
-);
+//     return successResponse(
+//       res,
+//       200,
+//       "Room media updated successfully",
+//       updatedRoom
+//     );
+//   }
+// );
 
-// GET room details by Room ID
+// GET room details by Room ID <->type
 export const getRoomDetailsById = async (req, res) => {
   try {
     const { roomId } = req.params;
@@ -1324,7 +1402,7 @@ export const getRoomDetailsById = async (req, res) => {
       return res.status(404).json({
         success: false,
         statusCode: 404,
-        message: "Room not found",
+        message: "Rooms content not found",
         data: {},
       });
     }
@@ -1377,7 +1455,7 @@ export const getAllRooms = asyncHandler(async (req, res, next) => {
   }
 
   if (req.query.type && req.query.type !== "all") {
-    query.type = req.query.type.toLowerCase();
+    query.typeOfRoom = req.query.type.toLowerCase();
   }
 
   if (req.query.capacity) {
