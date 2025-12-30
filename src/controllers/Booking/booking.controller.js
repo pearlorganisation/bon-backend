@@ -329,7 +329,7 @@ export const cancelBooking = async (req, res) => {
       });
     }
 
-    // Status Check
+    // Status Checkdf
     if (["cancelled", "checked_out", "rejected"].includes(booking.status)) {
       return res.status(400).json({
         success: false,
@@ -373,4 +373,3 @@ export const getAllBookingsAdmin = async (req, res) => {
     });
   }
 };
-
