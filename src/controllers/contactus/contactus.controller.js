@@ -36,7 +36,7 @@ export const createContact = async (req, res) => {
 
 export const getAllContacts = async (req, res) => {
   try {
-    const contacts = await Contact.find().sort({ createdAt: -1 });
+    const contacts = await contactusModel.find().sort({ createdAt: -1 });
 
     res.status(200).json({
       success: true,
