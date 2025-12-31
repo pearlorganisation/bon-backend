@@ -5,372 +5,857 @@ import asyncHandler from "../../middleware/asyncHandler.js";
 import { sendEmail } from "../../utils/mail/mailer.js";
 import CustomError from "../../utils/error/customError.js";
 import mongoose from "mongoose";
+import { check } from "express-validator";
+import successResponse from "../../utils/error/successResponse.js";
 
-const generateBookingId = () => {
-  return `BK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-};
+// const generateBookingId = () => {
+//   return `BK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+// };
 
-export const createBooking = async (req, res) => {
-  try {
-    const { roomId, checkIn, checkOut, guestDetails } = req.body;
-    const userId = req.user._id;
+// export const createBooking = async (req, res) => {
+//   try {
+//     const { roomId, checkIn, checkOut, guestDetails } = req.body;
+//     const userId = req.user._id;
 
-    // 1️⃣ Validate required fields
-    if (!roomId || !checkIn || !checkOut) {
-      throw new Error("Room ID, Check-in, and Check-out dates are required.");
-    }
+//     // 1️⃣ Validate required fields
+//     if (!roomId || !checkIn || !checkOut) {
+//       throw new Error("Room ID, Check-in, and Check-out dates are required.");
+//     }
 
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
+//     const start = new Date(checkIn);
+//     const end = new Date(checkOut);
+//     const now = new Date();
+//     now.setHours(0, 0, 0, 0);
 
-    // 2️⃣ Validate dates
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      throw new Error("Invalid date format.");
-    }
-    if (start < now) {
-      throw new Error("Check-in date cannot be in the past.");
-    }
-    if (end <= start) {
-      throw new Error("Check-out must be after check-in.");
-    }
+//     // 2️⃣ Validate dates
+//     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+//       throw new Error("Invalid date format.");
+//     }
+//     if (start < now) {
+//       throw new Error("Check-in date cannot be in the past.");
+//     }
+//     if (end <= start) {
+//       throw new Error("Check-out must be after check-in.");
+//     }
 
-    // 3️⃣ Fetch room with populated property
-    const room = await Room.findById(roomId).populate("propertyId");
+//     // 3️⃣ Fetch room with populated property
+//     const room = await Room.findById(roomId).populate("propertyId");
 
-    if (!room) throw new Error("Room not found.");
-    if (!room.propertyId)
-      throw new Error("This room is not linked to a valid property.");
-    if (room.propertyId.status !== "active")
-      throw new Error("Property is currently inactive.");
+//     if (!room) throw new Error("Room not found.");
+//     if (!room.propertyId)
+//       throw new Error("This room is not linked to a valid property.");
+//     if (room.propertyId.status !== "active")
+//       throw new Error("Property is currently inactive.");
 
-    // 4️⃣ Validate guest count
-    const guests = guestDetails || req.body.guests || {};
-    const totalGuests =
-      (Number(guests.adults) || 1) + (Number(guests.children) || 0);
+//     // 4️⃣ Validate guest count
+//     const guests = guestDetails || req.body.guests || {};
+//     const totalGuests =
+//       (Number(guests.adults) || 1) + (Number(guests.children) || 0);
 
-    if (totalGuests > room.capacity) {
-      throw new Error(`Room capacity exceeded. Max allowed: ${room.capacity}`);
-    }
+//     if (totalGuests > room.capacity) {
+//       throw new Error(`Room capacity exceeded. Max allowed: ${room.capacity}`);
+//     }
 
-    // 5️⃣ Check for existing bookings
-    const existingBooking = await Booking.findOne({
-      roomId,
-      status: { $in: ["confirmed", "pending", "checked_in"] },
-      $or: [{ checkIn: { $lt: end }, checkOut: { $gt: start } }],
+//     // 5️⃣ Check for existing bookings
+//     const existingBooking = await Booking.findOne({
+//       roomId,
+//       status: { $in: ["confirmed", "pending", "checked_in"] },
+//       $or: [{ checkIn: { $lt: end }, checkOut: { $gt: start } }],
+//     });
+
+//     if (existingBooking) {
+//       throw new Error("Room is already booked for these dates.");
+//     }
+
+//     // 6️⃣ Check for blocked dates
+//     if (room.blockedDates && room.blockedDates.length > 0) {
+//       const isBlocked = room.blockedDates.some((block) => {
+//         const blockStart = new Date(block.startDate);
+//         const blockEnd = new Date(block.endDate);
+//         return start < blockEnd && end > blockStart;
+//       });
+//       if (isBlocked) {
+//         throw new Error(
+//           "Room is under maintenance or blocked for these dates."
+//         );
+//       }
+//     }
+
+//     // 7️⃣ Calculate price
+//     const oneDay = 24 * 60 * 60 * 1000;
+//     const nights = Math.max(1, Math.round((end - start) / oneDay));
+//     let pricePerNight = room.pricePerNight;
+
+//     if (room.discount && room.discount > 0) {
+//       pricePerNight = pricePerNight - (pricePerNight * room.discount) / 100;
+//     }
+
+//     const totalAmount = pricePerNight * nights;
+
+//     // 8️⃣ Create and save booking
+//     const newBooking = new Booking({
+//       userId,
+//       roomId,
+//       propertyId: room.propertyId._id,
+//       bookingId: generateBookingId(),
+//       checkIn: start,
+//       checkOut: end,
+//       guestDetails: {
+//         adults: guests.adults || 1,
+//         children: guests.children || 0,
+//       },
+//       pricePerNight,
+//       totalNights: nights,
+//       totalAmount,
+//       status: "confirmed", // Or 'pending' if using payment gateway
+//     });
+
+//     await newBooking.save();
+
+//     // 9️⃣ Send response
+//     res.status(201).json({
+//       success: true,
+//       message: "Room booked successfully",
+//       booking: newBooking,
+//     });
+//   } catch (error) {
+//     console.error("Booking error:", error);
+//     res.status(400).json({ success: false, message: error.message });
+//   }
+// };
+
+// export const getMyBookings = async (req, res) => {
+//   try {
+//     const bookings = await Booking.find({ userId: req.user._id })
+//       .populate({
+//         path: "propertyId",
+//         select: "name city images address",
+//       })
+//       .populate({
+//         path: "roomId",
+//         select: "name type images",
+//       })
+//       .sort({ createdAt: -1 });
+
+//     res.status(200).json({ success: true, count: bookings.length, bookings });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+// export const getBookingDetail = async (req, res) => {
+//   try {
+//     const { bookingId } = req.params;
+
+//     const bookingDetail = await Booking.findOne({
+//       _id: bookingId,
+//       userId: req.user._id,
+//     })
+//       .populate({
+//         path: "userId",
+//         select: "name email phoneNumber createdAt profileImageUrl", // ✅ FIXED
+//       })
+//       .populate({
+//         path: "propertyId",
+//         select: "name city images address",
+//       })
+//       .populate({
+//         path: "roomId",
+//         select: "name type images pricePerNight", // ❌ profileImageUrl removed (room doesn't have it)
+//       });
+
+//     if (!bookingDetail) {
+//       return res.status(404).json({ message: "Booking not found" });
+//     }
+
+//     // Booking timeline
+//     const bookingTimeline = [
+//       { title: "Booking created", date: bookingDetail.createdAt },
+//       {
+//         title: "Payment completed",
+//         date: bookingDetail.paymentCompletedAt || null,
+//       },
+//       {
+//         title: "Hotel confirmed",
+//         date: bookingDetail.hotelConfirmedAt || null,
+//       },
+//       { title: "User check-in", date: bookingDetail.checkIn },
+//       { title: "User check-out", date: bookingDetail.checkOut },
+//     ];
+
+//     // Final formatted response
+//     const formattedBooking = {
+//       bookingId: bookingDetail._id,
+//       checkIn: bookingDetail.checkIn,
+//       checkOut: bookingDetail.checkOut,
+//       guestDetails: bookingDetail.guestDetails || {},
+//       totalAmount: bookingDetail.totalAmount,
+//       tax: bookingDetail.tax || 0,
+//       status: bookingDetail.status,
+
+//       property: {
+//         name: bookingDetail.propertyId?.name || "N/A",
+//         city: bookingDetail.propertyId?.city || "N/A",
+//         address: bookingDetail.propertyId?.address || "N/A",
+//         images: bookingDetail.propertyId?.images || [],
+//       },
+
+//       room: {
+//         name: bookingDetail.roomId?.name || "N/A",
+//         type: bookingDetail.roomId?.type || "N/A",
+//         images: bookingDetail.roomId?.images || [],
+//         pricePerNight: bookingDetail.roomId?.pricePerNight || 0,
+//       },
+
+//       user: {
+//         name: bookingDetail.userId?.name || "Unknown",
+//         email: bookingDetail.userId?.email || "N/A",
+//         phone: bookingDetail.userId?.phoneNumber || "N/A", // ✅ FIXED
+//         registered: bookingDetail.userId?.createdAt || null,
+//         profileImageUrl: bookingDetail.userId?.profileImageUrl || null, // ✅ FIXED
+//       },
+
+//       paymentDetails: {
+//         amount: bookingDetail.amount || 0,
+//         tax: bookingDetail.tax || 0,
+//         total: bookingDetail.totalAmount || 0,
+//       },
+
+//       bookingTimeline,
+//     };
+
+//     res.status(200).json({ success: true, bookingDetail: formattedBooking });
+//   } catch (error) {
+//     console.error(error);
+//     res.status(500).json({ message: "Server error", error });
+//   }
+// };
+
+// export const getPartnerBookings = async (req, res) => {
+//   try {
+//     const partnerId = req.user._id;
+//     const properties = await Property.find({ partnerId }).select("_id");
+//     if (!properties.length) {
+//       return res.status(200).json({ success: true, bookings: [] });
+//     }
+//     const propertyIds = properties.map((p) => p._id);
+//     const bookings = await Booking.find({ propertyId: { $in: propertyIds } })
+//       .populate("userId", "name email phone")
+//       .populate("roomId", "name type")
+//       .populate("propertyId", "name city")
+//       .sort({ createdAt: -1 });
+
+//     res.status(200).json({ success: true, count: bookings.length, bookings });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+// export const getPartnerBookingByProperty = async (req, res) => {
+//   try {
+//     const partnerId = req.user._id;
+//     const propertyId = req.params.propertyId;
+
+//     const property = await Property.findOne({
+//       _id: propertyId,
+//       partnerId: partnerId,
+//     });
+
+//     if (!property) {
+//       return res.status(404).json({
+//         success: false,
+//         message: "Property not found or not assigned to this partner",
+//       });
+//     }
+
+//     const bookings = await Booking.find({ propertyId })
+//       .populate("userId", "name email phone")
+//       .populate("roomId", "name type images")
+//       .populate("propertyId", "name city address")
+//       .sort({ createdAt: -1 });
+
+//     return res.status(200).json({
+//       success: true,
+//       count: bookings.length,
+//       bookings,
+//     });
+//   } catch (err) {
+//     return res.status(500).json({
+//       success: false,
+//       message: err.message,
+//     });
+//   }
+// };
+
+// // ==========================================
+// // 4. Cancel Booking
+// // ==========================================
+// export const cancelBooking = async (req, res) => {
+//   try {
+//     const { bookingId } = req.params;
+//     const { reason } = req.body;
+//     const userId = req.user._id;
+//     const role = req.user.role;
+
+//     const booking = await Booking.findById(bookingId).populate("propertyId");
+
+//     if (!booking) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Booking not found" });
+//     }
+
+//     // Authorization Check
+//     let isAuthorized = false;
+
+//     // 1. User owns the booking
+//     if (role === "user" && booking.userId.toString() === userId.toString()) {
+//       isAuthorized = true;
+//     }
+//     // 2. Partner owns the property
+//     else if (
+//       role === "partner" &&
+//       booking.propertyId.partnerId.toString() === userId.toString()
+//     ) {
+//       isAuthorized = true;
+//     }
+//     // 3. Admin overrides
+//     else if (role === "admin") {
+//       isAuthorized = true;
+//     }
+
+//     if (!isAuthorized) {
+//       return res.status(403).json({
+//         success: false,
+//         message: "You are not authorized to cancel this booking.",
+//       });
+//     }
+
+//     // Status Check
+//     if (["cancelled", "checked_out", "rejected"].includes(booking.status)) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `Booking is already ${booking.status}`,
+//       });
+//     }
+
+//     booking.status = "cancelled";
+//     booking.cancelledBy = role;
+//     booking.cancellationReason = reason || "No reason provided";
+
+//     await booking.save();
+
+//     res.status(200).json({
+//       success: true,
+//       message: "Booking cancelled successfully",
+//       booking,
+//     });
+//   } catch (error) {
+//     res.status(500).json({ success: false, message: error.message });
+//   }
+// };
+
+// export const getAllBookingsAdmin = async (req, res) => {
+//   try {
+//     const bookings = await Booking.find()
+//       .populate("userId", "name email phoneNumber")
+//       .populate("roomId", "name type images")
+//       .populate("propertyId", "name city address partnerId")
+//       .sort({ createdAt: -1 });
+
+//     res.status(200).json({
+//       success: true,
+//       count: bookings.length,
+//       bookings,
+//     });
+//   } catch (error) {
+//     res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// };
+
+// Frontend → Create booking (pending)
+// → Redirect to payment
+// → Payment success → confirm booking
+// → Payment failed → delete booking
+
+//avaliblity check logic
+//Uses strict inequalities (< and >) → allows same-day check-out/check-in (most common hotel policy)
+
+const isRoomAvailable = async ({
+  roomId,
+  checkInDate,
+  checkOutDate,
+  quantity,
+  blockedDates,
+  totalRooms,
+}) => {
+  const checkIn = new Date(checkInDate);
+  const checkOut = new Date(checkOutDate);
+
+  if (blockedDates?.length) {
+    const isBlocked = blockedDates.some((block) => {
+      const blockStart = new Date(block.startDate);
+      const blockEnd = new Date(block.endDate);
+
+      return checkIn < blockEnd && checkOut > blockStart;
     });
 
-    if (existingBooking) {
-      throw new Error("Room is already booked for these dates.");
+    if (isBlocked) {
+      return {
+        available: false,
+        reason: "Room is blocked for selected dates",
+      };
     }
-
-    // 6️⃣ Check for blocked dates
-    if (room.blockedDates && room.blockedDates.length > 0) {
-      const isBlocked = room.blockedDates.some((block) => {
-        const blockStart = new Date(block.startDate);
-        const blockEnd = new Date(block.endDate);
-        return start < blockEnd && end > blockStart;
-      });
-      if (isBlocked) {
-        throw new Error(
-          "Room is under maintenance or blocked for these dates."
-        );
-      }
-    }
-
-    // 7️⃣ Calculate price
-    const oneDay = 24 * 60 * 60 * 1000;
-    const nights = Math.max(1, Math.round((end - start) / oneDay));
-    let pricePerNight = room.pricePerNight;
-
-    if (room.discount && room.discount > 0) {
-      pricePerNight = pricePerNight - (pricePerNight * room.discount) / 100;
-    }
-
-    const totalAmount = pricePerNight * nights;
-
-    // 8️⃣ Create and save booking
-    const newBooking = new Booking({
-      userId,
-      roomId,
-      propertyId: room.propertyId._id,
-      bookingId: generateBookingId(),
-      checkIn: start,
-      checkOut: end,
-      guestDetails: {
-        adults: guests.adults || 1,
-        children: guests.children || 0,
-      },
-      pricePerNight,
-      totalNights: nights,
-      totalAmount,
-      status: "confirmed", // Or 'pending' if using payment gateway
-    });
-
-    await newBooking.save();
-
-    // 9️⃣ Send response
-    res.status(201).json({
-      success: true,
-      message: "Room booked successfully",
-      booking: newBooking,
-    });
-  } catch (error) {
-    console.error("Booking error:", error);
-    res.status(400).json({ success: false, message: error.message });
   }
-};
 
-export const getMyBookings = async (req, res) => {
-  try {
-    const bookings = await Booking.find({ userId: req.user._id })
-      .populate({
-        path: "propertyId",
-        select: "name city images address",
-      })
-      .populate({
-        path: "roomId",
-        select: "name type images",
-      })
-      .sort({ createdAt: -1 });
+  //2 Check overlapping bookings
+  const overlappingBookings = await Booking.aggregate([
+    {
+      $match: {
+        "rooms.roomId": roomId,
+        status: { $in: ["pending", "confirmed"] },
+        checkInDate: { $lt: checkOut },
+        checkOutDate: { $gt: checkIn },
+      },
+    },
+    { $unwind: "$rooms" },
+    { $match: { "rooms.roomId": roomId } },
+    {
+      $group: {
+        _id: null,
+        totalBooked: { $sum: "$rooms.quantity" },
+      },
+    },
+  ]);
 
-    res.status(200).json({ success: true, count: bookings.length, bookings });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+  const booked = overlappingBookings[0]?.totalBooked || 0;
+
+  // 3️ Final availability check
+  if (booked + quantity > totalRooms) {
+    return {
+      available: false,
+      reason: "Not enough rooms available",
+    };
   }
+
+  return {
+    available: true,
+  };
 };
 
-export const getBookingDetail = async (req, res) => {
-  try {
-    const { bookingId } = req.params;
+export const createBooking = asyncHandler(async (req, res, next) => {
+  const {
+    propertyId,
+    rooms,
+    checkInDate,
+    checkOutDate,
+    numberOfGuests,
+    primaryGuestDetails,
+    specialRequests,
+  } = req.body;
 
-    const bookingDetail = await Booking.findOne({
-      _id: bookingId,
-      userId: req.user._id,
-    })
-      .populate({
-        path: "userId",
-        select: "name email phoneNumber createdAt profileImageUrl", // ✅ FIXED
-      })
-      .populate({
-        path: "propertyId",
-        select: "name city images address",
-      })
-      .populate({
-        path: "roomId",
-        select: "name type images pricePerNight", // ❌ profileImageUrl removed (room doesn't have it)
-      });
+  const userId = req.user._id;
 
-    if (!bookingDetail) {
-      return res.status(404).json({ message: "Booking not found" });
+  // BASIC BODY VALIDATION
+  if (!propertyId) {
+    return next(new CustomError("Property ID is required", 400));
+  }
+
+  if (!Array.isArray(rooms) || rooms.length === 0) {
+    return next(new CustomError("At least one room is required", 400));
+  }
+
+  if (!checkInDate || !checkOutDate) {
+    return next(
+      new CustomError("Check-in and check-out dates are required", 400)
+    );
+  }
+
+  if (!numberOfGuests) {
+    return next(new CustomError("Adult guest count is required", 400));
+  }
+
+  const requiredKeys = [
+    "fullName",
+    "email",
+    "phone",
+    "address",
+    "city",
+    "country",
+  ];
+
+  const allKeyExists = requiredKeys.every((key) => primaryGuestDetails?.[key]);
+
+  if (!allKeyExists) {
+    return next(new CustomError("All primary guest fields are required", 400));
+  }
+
+  // 1️ Validate dates
+  const checkIn = new Date(checkInDate);
+  const checkOut = new Date(checkOutDate);
+
+  if (isNaN(checkIn) || isNaN(checkOut)) {
+    return next(new CustomError("Invalid date format", 400));
+  }
+
+  if (checkOut <= checkIn) {
+    return next(
+      new CustomError("Check-out date must be after check-in date", 400)
+    );
+  }
+
+  // 2️ Fetch property
+  const property = await Property.findById(propertyId).select(
+    "status childrenCharge "
+  );
+  if (!property) {
+    return next(new CustomError("Property not found", 404));
+  }
+
+  if (property.status !== "active") {
+    return next(new CustomError("Property is currently inactive", 400));
+  }
+
+  // 3️ Calculate nights
+  const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+
+  let basePrice = 0;
+  let discountAmount = 0;
+  let extraFees = 0;
+  let childrenCharge = 0;
+  const roomsData = [];
+  // 4️ Loop rooms
+  let totalCapacity = 0;
+
+  for (const item of rooms) {
+    if (!item.roomId) {
+      return next(new CustomError("Room ID is required", 400));
     }
 
-    // Booking timeline
-    const bookingTimeline = [
-      { title: "Booking created", date: bookingDetail.createdAt },
-      {
-        title: "Payment completed",
-        date: bookingDetail.paymentCompletedAt || null,
-      },
-      {
-        title: "Hotel confirmed",
-        date: bookingDetail.hotelConfirmedAt || null,
-      },
-      { title: "User check-in", date: bookingDetail.checkIn },
-      { title: "User check-out", date: bookingDetail.checkOut },
-    ];
+    if (!item.quantity || item.quantity < 1) {
+      return next(new CustomError("Room quantity must be at least 1", 400));
+    }
 
-    // Final formatted response
-    const formattedBooking = {
-      bookingId: bookingDetail._id,
-      checkIn: bookingDetail.checkIn,
-      checkOut: bookingDetail.checkOut,
-      guestDetails: bookingDetail.guestDetails || {},
-      totalAmount: bookingDetail.totalAmount,
-      tax: bookingDetail.tax || 0,
-      status: bookingDetail.status,
+    const room = await Room.findById(item.roomId);
+    if (!room) {
+      return next(new CustomError("Room not found", 404));
+    }
 
-      property: {
-        name: bookingDetail.propertyId?.name || "N/A",
-        city: bookingDetail.propertyId?.city || "N/A",
-        address: bookingDetail.propertyId?.address || "N/A",
-        images: bookingDetail.propertyId?.images || [],
-      },
+    const checkAvailability = await isRoomAvailable({
+      roomId: item.roomId,
+      checkInDate: checkIn,
+      checkOutDate: checkOut,
+      quantity: item.quantity,
+      blockedDates: room.blockedDates,
+      totalRooms: room.numberOfRooms,
+    });
 
-      room: {
-        name: bookingDetail.roomId?.name || "N/A",
-        type: bookingDetail.roomId?.type || "N/A",
-        images: bookingDetail.roomId?.images || [],
-        pricePerNight: bookingDetail.roomId?.pricePerNight || 0,
-      },
+    if (!checkAvailability.available) {
+      return next(new CustomError(checkAvailability.reason, 404));
+    }
 
-      user: {
-        name: bookingDetail.userId?.name || "Unknown",
-        email: bookingDetail.userId?.email || "N/A",
-        phone: bookingDetail.userId?.phoneNumber || "N/A", // ✅ FIXED
-        registered: bookingDetail.userId?.createdAt || null,
-        profileImageUrl: bookingDetail.userId?.profileImageUrl || null, // ✅ FIXED
-      },
-
-      paymentDetails: {
-        amount: bookingDetail.amount || 0,
-        tax: bookingDetail.tax || 0,
-        total: bookingDetail.totalAmount || 0,
-      },
-
-      bookingTimeline,
+    let roomDetails = {
+      roomId: item.roomId,
+      quantity: item.quantity,
+      pricePerNight: room.pricePerNight,
+      discount: room.discount,
+      extraServices: [],
     };
 
-    res.status(200).json({ success: true, bookingDetail: formattedBooking });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error", error });
-  }
-};
+    totalCapacity += room.capacity * item.quantity;
 
-export const getPartnerBookings = async (req, res) => {
-  try {
-    const partnerId = req.user._id;
-    const properties = await Property.find({ partnerId }).select("_id");
-    if (!properties.length) {
-      return res.status(200).json({ success: true, bookings: [] });
+    // 4.3️ Room pricing
+    const roomPrice = room.pricePerNight * item.quantity * nights;
+
+    basePrice += roomPrice;
+
+    // Room discount
+    if (room.discount > 0) {
+      discountAmount +=
+        (room.discount / 100) * room.pricePerNight * item.quantity * nights;
     }
-    const propertyIds = properties.map((p) => p._id);
-    const bookings = await Booking.find({ propertyId: { $in: propertyIds } })
-      .populate("userId", "name email phone")
-      .populate("roomId", "name type")
-      .populate("propertyId", "name city")
-      .sort({ createdAt: -1 });
-
-    res.status(200).json({ success: true, count: bookings.length, bookings });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
-export const getPartnerBookingByProperty = async (req, res) => {
-  try {
-    const partnerId = req.user._id;
-    const propertyId = req.params.propertyId;
-
-    const property = await Property.findOne({
-      _id: propertyId,
-      partnerId: partnerId,
-    });
-
-    if (!property) {
-      return res.status(404).json({
-        success: false,
-        message: "Property not found or not assigned to this partner",
+    // Extra services
+    if (item.extraServices?.length) {
+      item.extraServices.forEach((service) => {
+        if (
+          room.servicesAndExtras[service] &&
+          room.servicesAndExtras[service]?.available
+        ) {
+          roomDetails.extraServices.push({
+            name: service,
+            fee: room.servicesAndExtras[service]?.fee,
+          });
+          extraFees += room.servicesAndExtras[service]?.fee * item.quantity* nights;
+        } else {
+          return next(new CustomError(`${service} is not avilable`, 404));
+        }
       });
     }
 
-    const bookings = await Booking.find({ propertyId })
-      .populate("userId", "name email phone")
-      .populate("roomId", "name type images")
-      .populate("propertyId", "name city address")
-      .sort({ createdAt: -1 });
+    roomsData.push(roomDetails);
+  }
 
-    return res.status(200).json({
-      success: true,
-      count: bookings.length,
-      bookings,
-    });
-  } catch (err) {
-    return res.status(500).json({
-      success: false,
-      message: err.message,
+  // 5️ Children charges (property-level)
+  const childCharge = property?.childrenCharge;
+  let childCount = 0; // child >=childernCharge.age
+  if (numberOfGuests.children?.length) {
+    numberOfGuests.children.forEach((child) => {
+      if (Number(child) >= Number(childCharge.age)) {
+        childCount++;
+      }
     });
   }
-};
 
-// ==========================================
-// 4. Cancel Booking
-// ==========================================
-export const cancelBooking = async (req, res) => {
-  try {
-    const { bookingId } = req.params;
-    const { reason } = req.body;
-    const userId = req.user._id;
-    const role = req.user.role;
+  if (numberOfGuests.adults > totalCapacity) {
+    return next(
+      new CustomError(" number of guest is more that total capacity of rooms")
+    );
+  } else {
+    const overflow = Math.max(
+      0,
+      numberOfGuests.adults + childCount - totalCapacity
+    );
+    if (overflow > 0) {
+      childrenCharge = childCharge.charge * overflow;
+    }
+  }
 
-    const booking = await Booking.findById(bookingId).populate("propertyId");
+  // 6️ Taxes & platform fee
+  const platformFee = 100;
+  const taxes =
+    (basePrice - discountAmount + platformFee + extraFees + childrenCharge) *
+    0.12;
 
-    if (!booking) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Booking not found" });
+  // 7️ Final price
+  const totalPrice =
+    basePrice -
+    discountAmount +
+    taxes +
+    platformFee +
+    extraFees +
+    childrenCharge;
+
+  // 8️ Create booking
+  const booking = await Booking.create({
+    userId,
+    propertyId,
+    rooms: roomsData,
+    checkInDate: checkIn,
+    checkOutDate: checkOut,
+    numberOfGuests,
+    primaryGuestDetails,
+    specialRequests,
+
+    priceBreakdown: {
+      basePrice,
+      discountAmount,
+      taxes,
+      extraServicesfee: extraFees,
+      platformFee,
+      childrenCharge,
+    },
+    totalPrice,
+    status: "pending",
+    paymentStatus: "pending",
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
+
+  successResponse(res, 201, "booking created successfuly", booking);
+});
+
+
+
+
+export const updateBooking = asyncHandler(async (req, res, next) => {
+  const { bookingId } = req.params;
+  const userId = req.user._id;
+
+  const {
+    rooms,
+    checkInDate,
+    checkOutDate,
+    numberOfGuests,
+    primaryGuestDetails,
+    specialRequests,
+  } = req.body;
+
+  // 1️ Fetch booking
+  const booking = await Booking.findOne({
+    _id: bookingId,
+    userId,
+  });
+
+  if (!booking) {
+    return next(new CustomError("Booking not found", 404));
+  }
+
+  if (booking.status !== "pending") {
+    return next(new CustomError("Only pending bookings can be updated", 400));
+  }
+
+  // 2️ Validate dates
+  const checkIn = new Date(checkInDate);
+  const checkOut = new Date(checkOutDate);
+
+  if (isNaN(checkIn) || isNaN(checkOut)) {
+    return next(new CustomError("Invalid date format", 400));
+  }
+
+  if (checkOut <= checkIn) {
+    return next(
+      new CustomError("Check-out date must be after check-in date", 400)
+    );
+  }
+
+  // 3️ Fetch property
+  const property = await Property.findById(booking.propertyId).select(
+    "status childrenCharge"
+  );
+
+  if (!property || property.status !== "active") {
+    return next(new CustomError("Property is inactive", 400));
+  }
+
+  const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+
+  let basePrice = 0;
+  let discountAmount = 0;
+  let extraFees = 0;
+  let childrenCharge = 0;
+  let totalCapacity = 0;
+  const roomsData = [];
+
+  // 4️ Loop rooms
+  for (const item of rooms) {
+    const room = await Room.findById(item.roomId);
+    if (!room) {
+      return next(new CustomError("Room not found", 404));
     }
 
-    // Authorization Check
-    let isAuthorized = false;
+    // Availability check (exclude current booking)
+    const overlappingBookings = await Booking.aggregate([
+      {
+        $match: {
+          _id: { $ne: booking._id },
+          "rooms.roomId": item.roomId,
+          status: { $in: ["pending", "confirmed"] },
+          checkInDate: { $lt: checkOut },
+          checkOutDate: { $gt: checkIn },
+        },
+      },
+      { $unwind: "$rooms" },
+      { $match: { "rooms.roomId": item.roomId } },
+      {
+        $group: {
+          _id: null,
+          totalBooked: { $sum: "$rooms.quantity" },
+        },
+      },
+    ]);
 
-    // 1. User owns the booking
-    if (role === "user" && booking.userId.toString() === userId.toString()) {
-      isAuthorized = true;
-    }
-    // 2. Partner owns the property
-    else if (
-      role === "partner" &&
-      booking.propertyId.partnerId.toString() === userId.toString()
-    ) {
-      isAuthorized = true;
-    }
-    // 3. Admin overrides
-    else if (role === "admin") {
-      isAuthorized = true;
+    const booked = overlappingBookings[0]?.totalBooked || 0;
+
+    if (booked + item.quantity > room.numberOfRooms) {
+      return next(new CustomError("Not enough rooms available", 400));
     }
 
-    if (!isAuthorized) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not authorized to cancel this booking.",
+    totalCapacity += room.capacity * item.quantity;
+
+    const roomPrice = room.pricePerNight * item.quantity * nights;
+    basePrice += roomPrice;
+
+    if (room.discount > 0) {
+      discountAmount +=
+        (room.discount / 100) * room.pricePerNight * item.quantity * nights;
+    }
+
+    const roomDetails = {
+      roomId: item.roomId,
+      quantity: item.quantity,
+      pricePerNight: room.pricePerNight,
+      discount: room.discount,
+      extraServices: [],
+    };
+
+    if (item.extraServices?.length) {
+      item.extraServices.forEach((service) => {
+        if (room.servicesAndExtras?.[service]?.available) {
+          roomDetails.extraServices.push({
+            name: service,
+            fee: room.servicesAndExtras[service].fee,
+          });
+          extraFees +=
+            room.servicesAndExtras[service].fee * item.quantity * nights;
+        }
       });
     }
 
-    // Status Check
-    if (["cancelled", "checked_out", "rejected"].includes(booking.status)) {
-      return res.status(400).json({
-        success: false,
-        message: `Booking is already ${booking.status}`,
-      });
-    }
-
-    booking.status = "cancelled";
-    booking.cancelledBy = role;
-    booking.cancellationReason = reason || "No reason provided";
-
-    await booking.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Booking cancelled successfully",
-      booking,
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    roomsData.push(roomDetails);
   }
-};
 
-export const getAllBookingsAdmin = async (req, res) => {
-  try {
-    const bookings = await Booking.find()
-      .populate("userId", "name email phoneNumber")
-      .populate("roomId", "name type images")
-      .populate("propertyId", "name city address partnerId")
-      .sort({ createdAt: -1 });
+  // 5️⃣ Children charge
+  const childConfig = property.childrenCharge;
+  let childCount = 0;
 
-    res.status(200).json({
-      success: true,
-      count: bookings.length,
-      bookings,
-    });
-  } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: error.message,
+  if (numberOfGuests.children?.length && childConfig) {
+    numberOfGuests.children.forEach((child) => {
+      if (Number(child) >= childConfig.age) {
+        childCount++;
+      }
     });
   }
-};
 
+  if (numberOfGuests.adults > totalCapacity) {
+    return next(new CustomError("Guests exceed room capacity", 400));
+  }
+
+  const overflow = Math.max(
+    0,
+    numberOfGuests.adults + childCount - totalCapacity
+  );
+
+  if (overflow > 0 && childConfig) {
+    childrenCharge = childConfig.charge * overflow;
+  }
+
+  // 6️⃣ Taxes & final price
+  const platformFee = 100;
+  const taxes =
+    (basePrice - discountAmount + platformFee + extraFees + childrenCharge) *
+    0.12;
+
+  const totalPrice =
+    basePrice -
+    discountAmount +
+    taxes +
+    platformFee +
+    extraFees +
+    childrenCharge;
+
+  // 7️⃣ Update booking
+  booking.rooms = roomsData;
+  booking.checkInDate = checkIn;
+  booking.checkOutDate = checkOut;
+  booking.numberOfGuests = numberOfGuests;
+  booking.primaryGuestDetails = primaryGuestDetails;
+  booking.specialRequests = specialRequests;
+
+  booking.priceBreakdown = {
+    basePrice,
+    discountAmount,
+    taxes,
+    extraServicesfee: extraFees,
+    platformFee,
+    childrenCharge,
+  };
+
+  booking.totalPrice = totalPrice;
+  booking.expiresAt = Date.now() + 10 * 60 * 1000;
+
+  await booking.save();
+
+  successResponse(res, 200, "Booking updated successfully", booking);
+});

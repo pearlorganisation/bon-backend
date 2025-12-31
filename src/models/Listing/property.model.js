@@ -119,8 +119,12 @@ const propertySchema = new mongoose.Schema(
       branchName: String,
     },
 
-    checkIn: { type: Date },
-    checkOut: { type: Date },
+    checkIn: { type: Date },//time
+    checkOut: { type: Date },//time
+    childrenCharge: {
+       age: Number,
+       charge: {type: Number,require:true,default:0}
+    },
     Images: [{ secure_url: String, public_id: String }],
     Videos: [{ secure_url: String, public_id: String }],
     status: { type: String, enum: ["active", "inactive"], default: "active" },

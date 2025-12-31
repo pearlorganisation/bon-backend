@@ -22,7 +22,19 @@ const bookingSchema = new mongoose.Schema(
           ref: "Room",
           required: true,
         },
-        
+        quantity: {
+          type: Number,
+          required: true,
+          default: 1,
+        },
+        pricePerNight: { type: Number, default: 0 },
+        discount: { type: Number, default: 0 },
+        extraServices: [
+          {
+            name: String,
+            fee: { type: Number, default: 0 },
+          },
+        ],
       },
     ],
     // Booking dates (applied to all rooms in the booking)
@@ -36,9 +48,8 @@ const bookingSchema = new mongoose.Schema(
     },
     // Total number of guests (sum across all rooms, validated against capacities)
     numberOfGuests: {
-      type: Number,
-      required: true,
-      min: 1,
+      adults: { type: Number },
+      childern: [{ age: Number, }],
     },
     // Total price (sum of all room subtotals + taxes/fees)
     totalPrice: {
@@ -51,7 +62,9 @@ const bookingSchema = new mongoose.Schema(
       basePrice: { type: Number, default: 0 },
       discountAmount: { type: Number, default: 0 },
       taxes: { type: Number, default: 0 },
-      fees: { type: Number, default: 0 }, // e.g., service fees, cleaning fees
+      extraServicesFee: { type: Number, default: 0 }, // e.g., service fees, cleaning fees
+      platformFee: {type:Number},
+      childrenCharge:{type: Number}
     },
     // Payment information
     paymentMethod: {
@@ -133,6 +146,6 @@ bookingSchema.pre("save", function (next) {
   next();
 });
 
-const Booking =new mongoose.model("Booking",bookingSchema);
+const Booking = new mongoose.model("Booking", bookingSchema);
 
 export default Booking;
