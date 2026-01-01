@@ -49,7 +49,7 @@ const bookingSchema = new mongoose.Schema(
     // Total number of guests (sum across all rooms, validated against capacities)
     numberOfGuests: {
       adults: { type: Number },
-      childern: [{ age: Number, }],
+      childern: [{ age: Number }],
     },
     // Total price (sum of all room subtotals + taxes/fees)
     totalPrice: {
@@ -63,8 +63,8 @@ const bookingSchema = new mongoose.Schema(
       discountAmount: { type: Number, default: 0 },
       taxes: { type: Number, default: 0 },
       extraServicesFee: { type: Number, default: 0 }, // e.g., service fees, cleaning fees
-      platformFee: {type:Number},
-      childrenCharge:{type: Number}
+      platformFee: { type: Number },
+      childrenCharge: { type: Number },
     },
     // Payment information
     paymentMethod: {
@@ -72,12 +72,18 @@ const bookingSchema = new mongoose.Schema(
       enum: [
         "credit_card",
         "debit_card",
-        "paypal",
+        "",
         "bank_transfer",
         "cash_on_arrival",
         "other",
       ],
       default: "credit_card",
+    },
+    payment: {
+      razorpayOrderId: { type: String ,default: null },
+      razorpayPaymentId: { type: String },
+      amount: { type: Number },
+      currency: { type: String, default: "INR" },
     },
     paymentStatus: {
       type: String,
@@ -119,6 +125,7 @@ const bookingSchema = new mongoose.Schema(
     confirmationCode: {
       type: String,
       unique: true,
+      sparse: true, // allows null for pending bookings
     },
   },
   { timestamps: true }
@@ -129,6 +136,7 @@ bookingSchema.index({ propertyId: 1 });
 bookingSchema.index({ checkInDate: 1, checkOutDate: 1 });
 bookingSchema.index({ userId: 1 });
 bookingSchema.index({ status: 1 });
+bookingSchema.index({ confirmationCode: 1 });
 
 // Virtual for calculating number of nights
 bookingSchema.virtual("numberOfNights").get(function () {
