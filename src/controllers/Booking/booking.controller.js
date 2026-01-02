@@ -8,7 +8,7 @@ import mongoose from "mongoose";
 import { check } from "express-validator";
 import successResponse from "../../utils/error/successResponse.js";
 import { razorpay } from "../../config/razorpayConfig.js";
- import crypto from "crypto";
+import crypto from "crypto";
 // const generateBookingId = () => {
 //   return `BK-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 // };
@@ -446,6 +446,15 @@ const isRoomAvailable = async ({
     available: true,
   };
 };
+const getPaymentMethod = (paymentEntity) => {
+  if (!paymentEntity?.method) return "other";
+
+  if (paymentEntity.method === "card") {
+    return paymentEntity.card?.type === "debit" ? "debit_card" : "credit_card";
+  } else {
+    return payment?.method;
+  }
+};
 
 export const createBooking = asyncHandler(async (req, res, next) => {
   const {
@@ -662,7 +671,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     totalPrice,
     status: "pending",
     paymentStatus: "pending",
-   // expiresAt: Date.now() + 10 * 60 * 1000,
+    // expiresAt: Date.now() + 10 * 60 * 1000,
   });
 
   successResponse(res, 201, "booking created successfuly", booking);
@@ -859,13 +868,12 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
   };
 
   booking.totalPrice = totalPrice;
- // booking.expiresAt = Date.now() + 10 * 60 * 1000;
+  // booking.expiresAt = Date.now() + 10 * 60 * 1000;
 
   await booking.save();
 
   successResponse(res, 200, "Booking updated successfully", booking);
 });
-
 
 // Create Booking (pending)
 //         ↓
@@ -883,14 +891,13 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 //  │ Time Expired  │ → Expire booking
 //  └───────────────┘
 
-
 //payment
 
 export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
   const { bookingId } = req.body;
 
-  const booking = await Booking.findOne({_id:bookingId,userId});
+  const booking = await Booking.findOne({ _id: bookingId, userId });
 
   if (!booking) {
     return next(new CustomError("Booking not found", 404));
@@ -913,32 +920,30 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
 
     await booking.save();
 
-    const data ={
+    const data = {
       orderId: order.id,
       amount: order.amount,
-    }
-    
-    successResponse(res,201,"successfully created booking",data)
+    };
 
+    successResponse(res, 201, "successfully created booking", data);
   } catch (error) {
-  if (error?.error) {
+    if (error?.error) {
+      return next(
+        new CustomError(
+          error?.error?.description ||
+            "Unable to initiate payment. Please try again.",
+          error.statusCode || 502
+        )
+      );
+    }
+
+    console.error("Error:", error);
+
     return next(
-      new CustomError(
-        error?.error?.description || "Unable to initiate payment. Please try again.",
-        error.statusCode || 502
-      )
+      new CustomError("Unable to initiate payment. Please try again.", 502)
     );
-    
   }
-
-  console.error("Error:", error);
-
-  return next(
-    new CustomError("Unable to initiate payment. Please try again.", 502)
-  );
-}
 });
-
 
 export const razorpayWebhook = asyncHandler(async (req, res, next) => {
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
@@ -985,12 +990,12 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Order ID missing in webhook", 400));
   }
 
-    const booking = await Booking.findOne({ "payment.razorpayOrderId": orderId });
+  const booking = await Booking.findOne({ "payment.razorpayOrderId": orderId });
 
-    if (booking?.paymentStatus === "paid") {
-      return res.status(200).json({ success: true });
-    }
-       
+  if (booking?.paymentStatus === "paid") {
+    return res.status(200).json({ success: true });
+  }
+
   //  Handle supported events
   switch (eventType) {
     case "payment.captured": {
@@ -1000,6 +1005,7 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
           paymentStatus: "paid",
           status: "confirmed",
           "payment.razorpayPaymentId": paymentId,
+          paymentMethod: getPaymentMethod(paymentEntity),
         },
         { new: true }
       );
@@ -1017,6 +1023,7 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
         {
           paymentStatus: "failed",
           status: "cancelled",
+          paymentMethod: getPaymentMethod(paymentEntity),
         },
         { new: true }
       );
@@ -1041,32 +1048,21 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
   res.status(200).json({ success: true });
 });
 
-
-export const getBookingStatus = asyncHandler(async (req, res, next) => {
+export const getBookingStatusById = asyncHandler(async (req, res, next) => {
   const { bookingId } = req.params;
-  const userId = req.user._id;
 
   if (!bookingId) {
     return next(new CustomError("Booking ID is required", 400));
   }
 
-  const booking = await Booking.findOne({
-    _id: bookingId,
-    userId,
-  }).select("status paymentStatus totalPrice");
+  const booking = await Booking.findById(bookingId)
+    .populate({ path: "propertyId", select: "name policies" })
+    .populate({ path: "userId", select: "name" })
+    .populate({ path: "rooms.roomId", select: "name typeOfRoom" });
 
   if (!booking) {
     return next(new CustomError("Booking not found", 404));
   }
 
-  return res.status(200).json({
-    success: true,
-    data: {
-      bookingId: booking._id,
-      status: booking.status, // pending | confirmed | cancelled
-      paymentStatus: booking.paymentStatus, // pending | paid | failed
-      totalPrice: booking.totalPrice,
-    },
-  });
+  successResponse(res, 200, "successfully fetch booking ", booking);
 });
-

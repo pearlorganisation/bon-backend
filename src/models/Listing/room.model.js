@@ -68,14 +68,11 @@ const roomSchema = new mongoose.Schema(
     // =========================================================
 
     // 1. Services & Extras
-    servicesAndExtras: {
-      wakeUpService: { type: Boolean, default: false },
-      roomService: { type: Boolean, default: false },
-      laundryService: { type: Boolean, default: false },
-      dailyHousekeeping: { type: Boolean, default: false },
-      suitPress: { type: Boolean, default: false },
-    },
 
+    servicesAndExtras: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     // 2. Accessibility
     accessibility: {
       accessibleByElevator: { type: Boolean, default: false },
