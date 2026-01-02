@@ -69,15 +69,6 @@ const bookingSchema = new mongoose.Schema(
     // Payment information
     paymentMethod: {
       type: String,
-      enum: [
-        "credit_card",
-        "debit_card",
-        "",
-        "bank_transfer",
-        "cash_on_arrival",
-        "other",
-      ],
-      default: "credit_card",
     },
     payment: {
       razorpayOrderId: { type: String ,default: null },
@@ -90,9 +81,7 @@ const bookingSchema = new mongoose.Schema(
       enum: ["pending", "paid", "refunded", "failed"],
       default: "pending",
     },
-    transactionId: {
-      type: String, // From payment gateway
-    },
+   
     // Booking status for lifecycle management
     status: {
       type: String,

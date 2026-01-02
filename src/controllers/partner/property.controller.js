@@ -7,7 +7,7 @@ import {
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
-import mongoose from "mongoose";
+
 
 // ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
@@ -30,6 +30,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     propertyType,
     status,
     PartnerEmail,
+    policies,
   } = req.body;
 
   // ✅ Required fields
@@ -40,7 +41,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   // ✅ Parse JSON fields
   if (geoLocation) geoLocation = JSON.parse(geoLocation);
   if (amenities) amenities = JSON.parse(amenities);
-
+  if (policies) policies = JSON.parse(policies);
   // ✅ Upload images & videos
   let Images = [];
   let Videos = [];
@@ -59,7 +60,49 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     );
   }
 
-  // ✅ Build data object (IMPORTANT PART)
+  if (policies) {
+    // ✅ Build data object (IMPORTANT PART)
+    if (policies.checkInTime && typeof policies.checkInTime !== "string") {
+      return res.status(400).json({ message: "checkInTime must be a string" });
+    }
+    if (policies.checkOutTime && typeof policies.checkOutTime !== "string") {
+      return res.status(400).json({ message: "checkOutTime must be a string" });
+    }
+
+    // 3. Validate cancellationPolicy Array
+    if (!Array.isArray(policies.cancellationPolicy)) {
+      return res
+        .status(400)
+        .json({ message: "cancellationPolicy must be an array" });
+    }
+
+    // 4. Logic to validate each item in the array
+    for (let i = 0; i < policies.cancellationPolicy.length; i++) {
+      const policy = policies.cancellationPolicy[i];
+
+      // Check for daysBeforeCheckIn
+      if (
+        typeof policy.daysBeforeCheckIn !== "number" ||
+        policy.daysBeforeCheckIn < 0
+      ) {
+        return res.status(400).json({
+          message: `Invalid daysBeforeCheckIn at index ${i}. Must be a positive number.`,
+        });
+      }
+
+      // Check for refundPercentage (0 - 100)
+      if (
+        typeof policy.refundPercentage !== "number" ||
+        policy.refundPercentage < 0 ||
+        policy.refundPercentage > 100
+      ) {
+        return res.status(400).json({
+          message: `Invalid refundPercentage at index ${i}. Must be between 0 and 100.`,
+        });
+      }
+    }
+  }
+
   const propertyData = {
     name,
     address,
@@ -72,6 +115,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     geoLocation,
     Images,
     Videos,
+    policies,
   };
 
   if (role === "PARTNER") {
@@ -142,6 +186,57 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   }
   if (req.body?.amenities) {
     property.amenities = JSON.parse(req.body.amenities); // { type: "Point", coordinates: [lng, lat] }
+  }
+
+  if (req.body?.policies) {
+    let policies = {};
+    try {
+      policies = JSON.parse(req.body.policies);
+    } catch (err) {
+      return next(new CustomError("Invalid policies format", 400));
+    }
+
+    if (policies.checkInTime && typeof policies.checkInTime !== "string") {
+      return res.status(400).json({ message: "checkInTime must be a string" });
+    }
+    if (policies.checkOutTime && typeof policies.checkOutTime !== "string") {
+      return res.status(400).json({ message: "checkOutTime must be a string" });
+    }
+
+    // 3. Validate cancellationPolicy Array
+    if (!Array.isArray(policies.cancellationPolicy)) {
+      return res
+        .status(400)
+        .json({ message: "cancellationPolicy must be an array" });
+    }
+
+    // 4. Logic to validate each item in the array
+    for (let i = 0; i < policies.cancellationPolicy.length; i++) {
+      const policy = policies.cancellationPolicy[i];
+
+      // Check for daysBeforeCheckIn
+      if (
+        typeof policy.daysBeforeCheckIn !== "number" ||
+        policy.daysBeforeCheckIn < 0
+      ) {
+        return res.status(400).json({
+          message: `Invalid daysBeforeCheckIn at index ${i}. Must be a positive number.`,
+        });
+      }
+
+      // Check for refundPercentage (0 - 100)
+      if (
+        typeof policy.refundPercentage !== "number" ||
+        policy.refundPercentage < 0 ||
+        policy.refundPercentage > 100
+      ) {
+        return res.status(400).json({
+          message: `Invalid refundPercentage at index ${i}. Must be between 0 and 100.`,
+        });
+      }
+    }
+
+    property.policies =policies;
   }
 
   if (req.body?.imagesToDelete) {

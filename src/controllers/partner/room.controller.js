@@ -52,7 +52,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bathroomCount,
     distanceToBathroom,
     bathroomAmenities,
-    servicesAndExtras,
     accessibility,
     safetyAndSecurity,
     activitiesAndSports,
@@ -69,6 +68,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bathroomFeatures,
     roomFacilities,
     mediaAndTechnology,
+    
   } = req.body;
 
   const property = await Property.findOne(ownershipFilter);
@@ -207,6 +207,42 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
+ let servicesAndExtras = {};
+   if(req.body?.servicesAndExtras){
+    
+     try{
+         servicesAndExtras = JSON.parse(re.body?.servicesAndExtras);
+     }catch(error){
+          return next(
+            new CustomError("Invalid format for servicesAndExtras,", 400)
+          );
+     }
+     if (servicesAndExtras && (typeof servicesAndExtras !== 'object' || Array.isArray(servicesAndExtras))) {
+    return res.status(400).json({ message: "servicesAndExtras must be an object" });
+  }
+
+  // 2. Iterate through each dynamic key (e.g., "WiFi", "Laundry")
+  const serviceKeys = Object.keys(servicesAndExtras || {});
+  
+  for (const service of serviceKeys) {
+    const data = servicesAndExtras[service];
+
+    // Validate 'available' field (must be a boolean)
+    if (typeof data.available !== 'boolean') {
+      return res.status(400).json({ 
+        message: `Field 'available' for service '${service}' must be true or false.` 
+      });
+    }
+
+    // Validate 'fee' field (must be a number and >= 0)
+    if (typeof data.fee !== 'number' || data.fee < 0) {
+      return res.status(400).json({ 
+        message: `Field 'fee' for service '${service}' must be a positive number.` 
+      });
+    }
+  }
+
+   }
 
   let uploadedImages = [];
   let uploadedVideos = [];
@@ -364,7 +400,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     bathroomCount,
     distanceToBathroom,
     bathroomAmenities,
-    servicesAndExtras,
     accessibility,
     safetyAndSecurity,
     activitiesAndSports,
@@ -485,6 +520,49 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     );
   }
 
+  let servicesAndExtras = {};
+
+  if (req.body?.servicesAndExtras) {
+    try {
+      servicesAndExtras = JSON.parse(re.body?.servicesAndExtras);
+    } catch (error) {
+      return next(
+        new CustomError("Invalid format for servicesAndExtras,", 400)
+      );
+    }
+    if (
+      servicesAndExtras &&
+      (typeof servicesAndExtras !== "object" ||
+        Array.isArray(servicesAndExtras))
+    ) {
+      return res
+        .status(400)
+        .json({ message: "servicesAndExtras must be an object" });
+    }
+
+    // 2. Iterate through each dynamic key (e.g., "WiFi", "Laundry")
+    const serviceKeys = Object.keys(servicesAndExtras || {});
+
+    for (const service of serviceKeys) {
+      const data = servicesAndExtras[service];
+
+      // Validate 'available' field (must be a boolean)
+      if (typeof data.available !== "boolean") {
+        return res.status(400).json({
+          message: `Field 'available' for service '${service}' must be true or false.`,
+        });
+      }
+
+      // Validate 'fee' field (must be a number and >= 0)
+      if (typeof data.fee !== "number" || data.fee < 0) {
+        return res.status(400).json({
+          message: `Field 'fee' for service '${service}' must be a positive number.`,
+        });
+      }
+    }
+     room.servicesAndExtras = servicesAndExtras;
+  }
+    
   if (req.files?.images) {
     const errMsg = validateFileSize(req.files.images, "image");
     if (errMsg) return next(new CustomError(errMsg, 400));
@@ -510,7 +588,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
    if(type){
          const isPresent = await Room.findOne({
            propertyId:property._id,
-           typeOfRoom: type.toLowerCase(),
+           typeOfRoom: type.toLowerCase()
          });
          if(isPresent){
            return next(
@@ -585,7 +663,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
       a.toLowerCase()
     );
 
-  if (servicesAndExtras) room.servicesAndExtras = servicesAndExtras;
   if (accessibility) room.accessibility = accessibility;
   if (safetyAndSecurity) room.safetyAndSecurity = safetyAndSecurity;
   if (activitiesAndSports) room.activitiesAndSports = activitiesAndSports;
