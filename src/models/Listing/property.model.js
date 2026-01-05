@@ -41,9 +41,22 @@ const propertySchema = new mongoose.Schema(
     amenities: [String],
 
     policies: {
-      checkInTime: String,
-      checkOutTime: String,
-      cancellationPolicy: String,
+      checkInTime: {type: String, default: "2:00 PM"},
+      checkOutTime:  {type: String, default: "12:00 PM"},
+      cancellationPolicy: [
+        {
+          daysBeforeCheckIn: {
+            type: Number,
+            required: true,
+          },
+          refundPercentage: {
+            type: Number, // 0 – 100
+            required: true,
+            min: 0,
+            max: 100,
+          },
+        },
+      ],
       petPolicy: String,
       otherPolicies: String,
     },
@@ -119,8 +132,12 @@ const propertySchema = new mongoose.Schema(
       branchName: String,
     },
 
-    checkIn: { type: Date },
-    checkOut: { type: Date },
+    // checkIn: { type: Date }, //time
+    // checkOut: { type: Date }, //time
+    childrenCharge: {
+      age: Number,
+      charge: { type: Number, require: true, default: 0 },
+    },
     Images: [{ secure_url: String, public_id: String }],
     Videos: [{ secure_url: String, public_id: String }],
     status: { type: String, enum: ["active", "inactive"], default: "active" },

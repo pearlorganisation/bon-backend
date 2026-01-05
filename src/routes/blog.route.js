@@ -1,8 +1,8 @@
 // routes/blogRoutes.js
 import express from "express";
-import { createBlog, deleteBlog, getAllBlogs, getBlogBySlug, updateBlog } from "../controllers/blog/blog.controller.js";
+import { createBlog, deleteBlog, getAllBlogs, getBlogByIdAndSlug, updateBlog } from "../controllers/blog/blog.controller.js";
 import { authorizeRoles, protect } from "../middleware/auth/auth.middleware.js";
-import { uploadBlogImage } from "../utils/blog/blog.uploads.js";
+
 import upload from "../middleware/multer.js";
 
 
@@ -21,7 +21,7 @@ router.post(
 
 
 router.get("/", getAllBlogs);
-router.get("/:slug", getBlogBySlug);
+router.get("/:id/:slug", getBlogByIdAndSlug);
 
 router.patch(
   "/:id",

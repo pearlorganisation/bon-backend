@@ -14,7 +14,14 @@ const roomSchema = new mongoose.Schema(
       type: Number, // percent or flat
       default: 0,
     },
-    type: {
+    // How many physical rooms of this exact type exist in the property
+    numberOfRooms: {
+      type: Number,
+      required: true,
+      min: 1,
+      default: 1,
+    },
+    typeOfRoom: {
       type: String,
       enum: ["single", "double", "deluxe", "suite", "triple", "family"],
       default: "single",
@@ -61,14 +68,11 @@ const roomSchema = new mongoose.Schema(
     // =========================================================
 
     // 1. Services & Extras
-    servicesAndExtras: {
-      wakeUpService: { type: Boolean, default: false },
-      roomService: { type: Boolean, default: false },
-      laundryService: { type: Boolean, default: false },
-      dailyHousekeeping: { type: Boolean, default: false },
-      suitPress: { type: Boolean, default: false },
-    },
 
+    servicesAndExtras: {
+      type: mongoose.Schema.Types.Mixed,
+      default: {},
+    },
     // 2. Accessibility
     accessibility: {
       accessibleByElevator: { type: Boolean, default: false },
