@@ -20,8 +20,6 @@ import {
   getTypesOfRoomsInProperty,
   deleteRoomsByTypes,
   deleteRoom,
-  setRoomImagesAndVideosById,
-  setRoomsImagesandVideosInBulk,
   getRoomDetailsById,
 
   
@@ -163,18 +161,8 @@ router.get(
 );
 router.delete("/delete-rooms", protect, deleteRoomsByTypes);
 router.delete("/delete-single-room/:roomId", protect, deleteRoom);
-router.post(
-  "/set-rooms-img-vid-inbulk/:propertyId",
-  protect,
-  uploadFields,
-  setRoomsImagesandVideosInBulk
-);
-router.post(
-  "/set-room-img-vid/:roomId",
-  protect,
-  uploadFields,
-  setRoomImagesAndVideosById
-);
+
+
 
 router.get("/RoomDetails/:roomId", getRoomDetailsById);
 

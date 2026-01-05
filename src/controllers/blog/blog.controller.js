@@ -73,9 +73,11 @@ export const getAllBlogs = async (req, res) => {
 
 
 
-export const getBlogBySlug = async (req, res) => {
+export const getBlogByIdAndSlug = async (req, res) => {
   try {
-    const blog = await blogModel.findOne({ slug: req.params.slug });
+    const { id } = req.params;
+
+    const blog = await blogModel.findById(id);
 
     if (!blog) {
       return res
@@ -83,7 +85,7 @@ export const getBlogBySlug = async (req, res) => {
         .json({ success: false, message: "Blog not found" });
     }
 
-    res.json({ success: true, data: blog });
+    res.status(200).json({ success: true, data: blog });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
