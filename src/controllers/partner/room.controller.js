@@ -211,7 +211,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
    if(req.body?.servicesAndExtras){
     
      try{
-         servicesAndExtras = JSON.parse(re.body?.servicesAndExtras);
+         servicesAndExtras = JSON.parse(res.body?.servicesAndExtras);
      }catch(error){
           return next(
             new CustomError("Invalid format for servicesAndExtras,", 400)
@@ -267,20 +267,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
-      if (type) {
-        const isPresent = await Room.findOne({
-          propertyId,
-          typeOfRoom: type.toLowerCase(),
-        });
-        if (isPresent) {
-          return next(
-            new CustomError(
-              "rooms with this type is allready present please update them",
-              400
-            )
-          );
-        }
-      }
 
 
   const baseRoomData = {
@@ -585,20 +571,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     room.videos.push(...newVideos);
   }
 
-   if(type){
-         const isPresent = await Room.findOne({
-           propertyId:property._id,
-           typeOfRoom: type.toLowerCase()
-         });
-         if(isPresent){
-           return next(
-             new CustomError(
-               "rooms with this type is allready present please update them",
-               400
-             )
-           );
-         }
-   }
+  
     if (req.body?.imagesToDelete) {
       let imagesToDelete = [];
 
@@ -1141,10 +1114,10 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   const typesOfRooms = {};
 
   for (let room of rooms) {
-    // if (!typesOfRooms[room.type]) {
-    //   typesOfRooms[room.type] = "";
-    // }
-    typesOfRooms[room.type]=room;
+    if (!typesOfRooms[room.type]) {
+      typesOfRooms[room.typeOfRoom] = [];
+    }
+    typesOfRooms[typeOfRoom].push(room);
   }
 
   return successResponse(res, 200, "Rooms fetched Successfully ", typesOfRooms);
