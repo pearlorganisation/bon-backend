@@ -15,7 +15,7 @@ const roomSchema = new mongoose.Schema(
       default: 0,
     },
     // How many physical rooms of this exact type exist in the property
-    numberOfRooms: {
+    numberOfRooms: {      
       type: Number,
       required: true,
       min: 1,
@@ -72,6 +72,7 @@ const roomSchema = new mongoose.Schema(
     servicesAndExtras: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
+    
     },
     // 2. Accessibility
     accessibility: {
@@ -242,12 +243,12 @@ const roomSchema = new mongoose.Schema(
     // =========================================================
 
     // ✅ Partner-defined availability periods
-    availability: [
-      {
-        startDate: { type: Date, required: true },
-        endDate: { type: Date, required: true },
-      },
-    ],
+    // availability: [
+    //   {
+    //     startDate: { type: Date, required: true },
+    //     endDate: { type: Date, required: true },
+    //   },
+    // ],
 
     // Optional: blocked dates (maintenance, holidays)
     blockedDates: [
