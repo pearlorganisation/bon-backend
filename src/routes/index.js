@@ -13,7 +13,9 @@ import SupportTicket from "../modules/Support/supportTicket/support.routes.js"
 import subAdminRoute from "./subAdmin/subAdmin.route.js"
 import adminRoute from  "./admin/admin.routes.js"
 import ContactRouter from "../routes/contactus.routes.js"
+import BlogRouter from "../routes/blog.route.js"
 const router = express.Router();
+
 
 router.use("/auth", AuthRouter);
 router.use("/doc", DocRouter);
@@ -28,5 +30,6 @@ router.use("/subAdmin",subAdminRoute);
 router.use("/admin",adminRoute);
 router.use("/", UserRouter);
 router.use("/contact", ContactRouter);
+router.use("/blog", BlogRouter)
 
 export default router;
