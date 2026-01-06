@@ -3,14 +3,17 @@ import contactusModel from "../../models/Contactus/contactus.model.js";
 
 export const createContact = async (req, res) => {
   try {
-    const { name, email, phone, message } = req.body;
+    const { name, email, phone, message ,subject
+    } = req.body;
+
+    console.log("welcome")
 
     // Basic validation
-    if (!name || !email || !phone || !message) {
+    if (!name || !email || !phone || !message | !subject) {
       return res.status(400).json({
         success: false,
         message: "All fields are required",
-      });
+      });  
     }
 
     const contact = await contactusModel.create({
@@ -18,6 +21,7 @@ export const createContact = async (req, res) => {
       email,
       phone,
       message,
+      subject
     });
 
     res.status(201).json({
