@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Razorpay Manual Order Payment</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+</head>
+
+<body>
+    <h2>Razorpay Test Payment (Manual Order)</h2>
+    <button type="submit" id="payBtn">Pay Now</button>
+
+    <script>
+        document.getElementById("payBtn").onclick = function () {
+
+            // 🔴 MANUALLY ENTER THESE
+            const MANUAL_ORDER_ID = "order_S0Y42VWUnpD1vb"; // from backend
+            const MANUAL_AMOUNT = 145824; // in paise (₹14224)
+
+            const options = {
+                key: "rzp_test_RyXrfJ5pYhBTWO", // Test Key ID
+                amount: MANUAL_AMOUNT,
+                currency: "INR",
+                name: "Booking Test",
+                description: "Manual Order Payment",
+                order_id: MANUAL_ORDER_ID,
+
+                handler: function (response) {
+                    console.log("Payment Success:", response);
+                    alert("Payment Successful");
+                },
+
+                prefill: {
+                    name: "Test User",
+                    email: "test@example.com",
+                    contact: "9999999999",
+                },
+
+                theme: {
+                    color: "#3399cc",
+                },
+            };
+
+            const rzp = new Razorpay(options);
+            rzp.open();
+        };
+    </script>
+</body>
+
+</html>
