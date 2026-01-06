@@ -1052,7 +1052,7 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
   res.status(200).json({ success: true });
 });
 
-export const getBookingStatusById = asyncHandler(async (req, res, next) => {
+export const getBookingById = asyncHandler(async (req, res, next) => {
   const { bookingId } = req.params;
 
   if (!bookingId) {
@@ -1133,10 +1133,15 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
 
   const wasPaid = booking.paymentStatus === "paid";
 
-  const refundPercentage = calculateRefundPercentage({
-    cancellationPolicy: booking.propertyId.cancellationPolicy,
-    checkInDate: booking.checkInDate,
-  });
+  const refundPercentage = 0;
+  if (req.user?.role == "PARTNER") {
+    refundPercentage = 100;
+  } else {
+    refundPercentage = calculateRefundPercentage({
+      cancellationPolicy: booking.propertyId.cancellationPolicy,
+      checkInDate: booking.checkInDate,
+    });
+  }
 
   const refundAmount = (booking.totalPrice * refundPercentage) / 100;
 
@@ -1245,4 +1250,197 @@ export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
   }
 
   res.status(200).json({ success: true });
+});
+
+export const deleteBooking = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+
+  const { bookingId } = req.params;
+
+  const booking = await Booking.findOne({ _id: bookingId, userId });
+
+  if (!booking) {
+    return next(new CustomError("booking not found", 404));
+  }
+
+  if (booking.status != "pending") {
+    return next(new CustomError("not allowed to delete  paid booking", 400));
+  }
+
+  await Booking.findByIdAndDelete(bookingId);
+
+  successResponse(res, 200, "booking deleted successfully");
+});
+
+export const getMyBooking = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+
+  const {
+    page = 1,
+    limit = 10,
+    status, // optional filter
+  } = req.query;
+
+  const query = {
+    userId,
+  };
+
+  if (status) {
+    query.status = status;
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const bookings = await Booking.find(query)
+    .populate("propertyId", "name ")
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(Number(limit));
+
+  const total = await Booking.countDocuments(query);
+
+  successResponse(res, 200, "My bookings fetched successfully", {
+    total,
+    page: Number(page),
+    limit: Number(limit),
+    bookings,
+  });
+});
+
+export const getBookingForProperty = asyncHandler(async (req, res, next) => {
+  const { propertyId } = req.params;
+
+  const {
+    status,
+    paymentStatus,
+    fromDate,
+    toDate,
+    page = 1,
+    limit = 10,
+  } = req.query;
+
+  // if property belongs to logged-in user
+  const property = await Property.findOne({
+    _id: propertyId,
+    partnerId: req.user._id,
+  });
+  if (!property) return next(new CustomError("Unauthorized access", 403));
+
+  const query = { propertyId };
+
+  if (status) query.status = status;
+  if (paymentStatus) query.paymentStatus = paymentStatus;
+
+  if (fromDate || toDate) {
+    query.checkInDate = {};
+    if (fromDate) query.checkInDate.$gte = new Date(fromDate);
+    if (toDate) query.checkInDate.$lte = new Date(toDate);
+  }
+
+  const skip = (Number(page) - 1) * Number(limit);
+
+  const [bookings, total] = await Promise.all([
+    Booking.find(query)
+      .populate("userId", "name email phone")
+      .populate("rooms.roomId", "name typeOfRoom")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(Number(limit)),
+
+    Booking.countDocuments(query),
+  ]);
+
+  successResponse(res, 200, "Property bookings fetched", {
+    bookings,
+    pagination: {
+      total,
+      page: Number(page),
+      limit: Number(limit),
+      totalPages: Math.ceil(total / limit),
+    },
+  });
+});
+
+export const getBooking = asyncHandler(async (req, res, next) => {
+  const {
+    page = 1,
+    limit = 10,
+    status,
+    paymentStatus,
+    propertyId,
+    fromDate,
+    toDate,
+    dateType = "checkin",
+    sortBy = "createdAt",
+    order = "desc",
+  } = req.query;
+
+  const query = {};
+
+  if (req.user.role == "PARTNER") {
+    if (!req.query.propertyId)
+      return next(new CustomError("propertyId required for partner", 400));
+
+    // for partner
+    const property = await Property.findOne({
+      _id: propertyId,
+      partnerId: req.user._id,
+    });
+    if (!property) return next(new CustomError("Unauthorized access", 403));
+  }
+  // ================= Filters =================
+
+  if (status) query.status = status;
+  if (paymentStatus) query.paymentStatus = paymentStatus;
+  if (propertyId) query.propertyId = propertyId;
+
+  // ================= Date Filtering =================
+  if (fromDate && toDate) {
+    const from = new Date(fromDate);
+    const to = new Date(toDate);
+
+    if (isNaN(from) || isNaN(to)) {
+      return next(new CustomError("Invalid date format", 400));
+    }
+
+    if (dateType === "booking") {
+      query.createdAt = { $gte: from, $lte: to };
+    } else if (dateType === "stay") {
+      query.$or = [
+        {
+          checkInDate: { $lte: to },
+          checkOutDate: { $gte: from },
+        },
+      ];
+    } else {
+      // default: check-in
+      query.checkInDate = { $gte: from, $lte: to };
+    }
+  }
+
+  // ================= Pagination =================
+  const skip = (Number(page) - 1) * Number(limit);
+
+  // ================= Sorting =================
+  const sort = {
+    [sortBy]: order === "asc" ? 1 : -1,
+  };
+
+  // ================= Query =================
+  const bookings = await Booking.find(query)
+    .populate("userId", "name email phone")
+    .populate("propertyId", "name ")
+    .sort(sort)
+    .skip(skip)
+    .limit(Number(limit));
+
+  const total = await Booking.countDocuments(query);
+
+  successResponse(res, 200, "Bookings fetched successfully", {
+    total,
+    page: Number(page),
+    limit: Number(limit),
+    totalPages: Math.ceil(total / limit),
+    bookings,
+  });
 });
