@@ -433,7 +433,7 @@ const isRoomAvailable = async ({
   ]);
 
   const booked = overlappingBookings[0]?.totalBooked || 0;
- console.log(booked);
+  console.log(booked);
   // 3️ Final availability check
   if (booked + quantity > totalRooms) {
     return {
@@ -895,7 +895,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 
 export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const { bookingId } = req.body;
+  const { bookingId } = req.params;
 
   const booking = await Booking.findOne({ _id: bookingId, userId });
 
@@ -1099,7 +1099,7 @@ const calculateRefundPercentage = ({
 };
 
 export const cancelBooking = asyncHandler(async (req, res, next) => {
-  const bookingId = req.params.id;
+  const { bookingId } = req.params;
   const userId = req.user._id;
   const { reason } = req.body;
 
@@ -1175,6 +1175,15 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
 
       booking.paymentStatus = "refund_failed";
       await booking.save();
+      if (error?.error) {
+        return next(
+          new CustomError(
+            error?.error?.description ||
+              "Cancellation done but refund initiation failed.",
+            error.statusCode || 502
+          )
+        );
+      }
 
       return next(
         new CustomError(
