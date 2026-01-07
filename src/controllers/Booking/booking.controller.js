@@ -903,8 +903,8 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Booking not found", 404));
   }
 
-  if (booking.payment?.razorpayOrderId) {
-    return next(new CustomError("Payment already initiated", 400));
+  if (booking.payment?.razorpayOrderId && booking.paymentStatus== "paid" ) {
+    return next(new CustomError("order allready created ", 400));
   }
 
   try {
@@ -1003,20 +1003,28 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
   //  Handle supported events
   switch (eventType) {
     case "payment.captured": {
-      const booking = await Booking.findOneAndUpdate(
-        { "payment.razorpayOrderId": orderId },
-        {
-          paymentStatus: "paid",
-          status: "confirmed",
-          "payment.razorpayPaymentId": paymentId,
-          "payment.paymentMethod": getPaymentMethod(paymentEntity),
-        },
-        { new: true }
-      );
+      const booking = await Booking.findOne({
+        "payment.razorpayOrderId": orderId,
+      });
 
       if (!booking) {
         return next(new CustomError("Booking not found for order", 404));
       }
+
+      // Assign confirmation code ONLY once
+      if (!booking.confirmationCode) {
+        booking.confirmationCode = `BK-${booking._id
+          .toString()
+          .slice(-6)
+          .toUpperCase()}`;
+      }
+
+      booking.paymentStatus = "paid";
+      booking.status = "confirmed";
+      booking.payment.razorpayPaymentId = paymentId;
+      booking.payment.paymentMethod = getPaymentMethod(paymentEntity);
+
+      await booking.save();
 
       break;
     }
@@ -1027,7 +1035,6 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
         {
           paymentStatus: "failed",
           "payment.paymentMethod": getPaymentMethod(paymentEntity),
-          "payment.razorpayOrderId": null,
         },
         { new: true }
       );
@@ -1051,7 +1058,7 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
   //  Always respond 200 to Razorpay
   res.status(200).json({ success: true });
 });
-
+        
 export const getBookingById = asyncHandler(async (req, res, next) => {
   const { bookingId } = req.params;
 
@@ -1307,59 +1314,59 @@ export const getMyBooking = asyncHandler(async (req, res, next) => {
   });
 });
 
-export const getBookingForProperty = asyncHandler(async (req, res, next) => {
-  const { propertyId } = req.params;
+// export const getBookingForProperty = asyncHandler(async (req, res, next) => {
+//   const { propertyId } = req.params;
 
-  const {
-    status,
-    paymentStatus,
-    fromDate,
-    toDate,
-    page = 1,
-    limit = 10,
-  } = req.query;
+//   const {
+//     status,
+//     paymentStatus,
+//     fromDate,
+//     toDate,
+//     page = 1,
+//     limit = 10,
+//   } = req.query;
 
-  // if property belongs to logged-in user
-  const property = await Property.findOne({
-    _id: propertyId,
-    partnerId: req.user._id,
-  });
-  if (!property) return next(new CustomError("Unauthorized access", 403));
+//   // if property belongs to logged-in user
+//   const property = await Property.findOne({
+//     _id: propertyId,
+//     partnerId: req.user._id,
+//   });
+//   if (!property) return next(new CustomError("Unauthorized access", 403));
 
-  const query = { propertyId };
+//   const query = { propertyId };
 
-  if (status) query.status = status;
-  if (paymentStatus) query.paymentStatus = paymentStatus;
+//   if (status) query.status = status;
+//   if (paymentStatus) query.paymentStatus = paymentStatus;
 
-  if (fromDate || toDate) {
-    query.checkInDate = {};
-    if (fromDate) query.checkInDate.$gte = new Date(fromDate);
-    if (toDate) query.checkInDate.$lte = new Date(toDate);
-  }
+//   if (fromDate || toDate) {
+//     query.checkInDate = {};
+//     if (fromDate) query.checkInDate.$gte = new Date(fromDate);
+//     if (toDate) query.checkInDate.$lte = new Date(toDate);
+//   }
 
-  const skip = (Number(page) - 1) * Number(limit);
+//   const skip = (Number(page) - 1) * Number(limit);
 
-  const [bookings, total] = await Promise.all([
-    Booking.find(query)
-      .populate("userId", "name email phone")
-      .populate("rooms.roomId", "name typeOfRoom")
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit)),
+//   const [bookings, total] = await Promise.all([
+//     Booking.find(query)
+//       .populate("userId", "name email phone")
+//       .populate("rooms.roomId", "name typeOfRoom")
+//       .sort({ createdAt: -1 })
+//       .skip(skip)
+//       .limit(Number(limit)),
 
-    Booking.countDocuments(query),
-  ]);
+//     Booking.countDocuments(query),
+//   ]);
 
-  successResponse(res, 200, "Property bookings fetched", {
-    bookings,
-    pagination: {
-      total,
-      page: Number(page),
-      limit: Number(limit),
-      totalPages: Math.ceil(total / limit),
-    },
-  });
-});
+//   successResponse(res, 200, "Property bookings fetched", {
+//     bookings,
+//     pagination: {
+//       total,
+//       page: Number(page),
+//       limit: Number(limit),
+//       totalPages: Math.ceil(total / limit),
+//     },
+//   });
+// });
 
 export const getBooking = asyncHandler(async (req, res, next) => {
   const {
@@ -1370,7 +1377,7 @@ export const getBooking = asyncHandler(async (req, res, next) => {
     propertyId,
     fromDate,
     toDate,
-    dateType = "checkin",
+    dateType = "checkin",  //booking -
     sortBy = "createdAt",
     order = "desc",
   } = req.query;
@@ -1444,3 +1451,5 @@ export const getBooking = asyncHandler(async (req, res, next) => {
     bookings,
   });
 });
+
+
