@@ -68,7 +68,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bathroomFeatures,
     roomFacilities,
     mediaAndTechnology,
-    
   } = req.body;
 
   const property = await Property.findOne(ownershipFilter);
@@ -207,42 +206,46 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
- let servicesAndExtras = {};
-   if(req.body?.servicesAndExtras){
-    
-     try{
-         servicesAndExtras = JSON.parse(re.body?.servicesAndExtras);
-     }catch(error){
-          return next(
-            new CustomError("Invalid format for servicesAndExtras,", 400)
-          );
-     }
-     if (servicesAndExtras && (typeof servicesAndExtras !== 'object' || Array.isArray(servicesAndExtras))) {
-    return res.status(400).json({ message: "servicesAndExtras must be an object" });
-  }
-
-  // 2. Iterate through each dynamic key (e.g., "WiFi", "Laundry")
-  const serviceKeys = Object.keys(servicesAndExtras || {});
-  
-  for (const service of serviceKeys) {
-    const data = servicesAndExtras[service];
-
-    // Validate 'available' field (must be a boolean)
-    if (typeof data.available !== 'boolean') {
-      return res.status(400).json({ 
-        message: `Field 'available' for service '${service}' must be true or false.` 
-      });
+  let servicesAndExtras = {};
+  if (req.body?.servicesAndExtras) {
+    try {
+      servicesAndExtras = JSON.parse(req.body?.servicesAndExtras);
+    } catch (error) {
+      return next(
+        new CustomError("Invalid format for servicesAndExtras,", 400)
+      );
+    }
+    if (
+      servicesAndExtras &&
+      (typeof servicesAndExtras !== "object" ||
+        Array.isArray(servicesAndExtras))
+    ) {
+      return res
+        .status(400)
+        .json({ message: "servicesAndExtras must be an object" });
     }
 
-    // Validate 'fee' field (must be a number and >= 0)
-    if (typeof data.fee !== 'number' || data.fee < 0) {
-      return res.status(400).json({ 
-        message: `Field 'fee' for service '${service}' must be a positive number.` 
-      });
+    // 2. Iterate through each dynamic key (e.g., "WiFi", "Laundry")
+    const serviceKeys = Object.keys(servicesAndExtras || {});
+
+    for (const service of serviceKeys) {
+      const data = servicesAndExtras[service];
+
+      // Validate 'available' field (must be a boolean)
+      if (typeof data.available !== "boolean") {
+        return res.status(400).json({
+          message: `Field 'available' for service '${service}' must be true or false.`,
+        });
+      }
+
+      // Validate 'fee' field (must be a number and >= 0)
+      if (typeof data.fee !== "number" || data.fee < 0) {
+        return res.status(400).json({
+          message: `Field 'fee' for service '${service}' must be a positive number.`,
+        });
+      }
     }
   }
-
-   }
 
   let uploadedImages = [];
   let uploadedVideos = [];
@@ -266,22 +269,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
       "rooms/videos"
     );
   }
-
-      if (type) {
-        const isPresent = await Room.findOne({
-          propertyId,
-          typeOfRoom: type.toLowerCase(),
-        });
-        if (isPresent) {
-          return next(
-            new CustomError(
-              "rooms with this type is allready present please update them",
-              400
-            )
-          );
-        }
-      }
-
 
   const baseRoomData = {
     propertyId,
@@ -323,8 +310,6 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     mediaAndTechnology,
     numberOfRooms,
   };
-
- 
 
   const createdRooms = await Room.create(baseRoomData);
 
@@ -416,7 +401,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     bathroomFeatures,
     roomFacilities,
     mediaAndTechnology,
-    numberOfRooms
+    numberOfRooms,
   } = req.body;
 
   // =================================================================
@@ -524,7 +509,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
   if (req.body?.servicesAndExtras) {
     try {
-      servicesAndExtras = JSON.parse(re.body?.servicesAndExtras);
+      servicesAndExtras = JSON.parse(req.body?.servicesAndExtras);
     } catch (error) {
       return next(
         new CustomError("Invalid format for servicesAndExtras,", 400)
@@ -560,9 +545,9 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
         });
       }
     }
-     room.servicesAndExtras = servicesAndExtras;
+    room.servicesAndExtras = servicesAndExtras;
   }
-    
+
   if (req.files?.images) {
     const errMsg = validateFileSize(req.files.images, "image");
     if (errMsg) return next(new CustomError(errMsg, 400));
@@ -585,65 +570,52 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     room.videos.push(...newVideos);
   }
 
-   if(type){
-         const isPresent = await Room.findOne({
-           propertyId:property._id,
-           typeOfRoom: type.toLowerCase()
-         });
-         if(isPresent){
-           return next(
-             new CustomError(
-               "rooms with this type is allready present please update them",
-               400
-             )
-           );
-         }
-   }
-    if (req.body?.imagesToDelete) {
-      let imagesToDelete = [];
+  if (req.body?.imagesToDelete) {
+    let imagesToDelete = [];
 
-      try {
-        imagesToDelete = JSON.parse(req.body.imagesToDelete);
-      } catch (err) {
-        return next(new CustomError("Invalid imagesToDelete format", 400));
-      }
-
-      const publicIdsToDelete = imagesToDelete.map((image) => image.public_id);
-
-      // Remove images from property (once)
-      room.images = room.images.filter(
-        (img) => !publicIdsToDelete.includes(img.public_id)
-      );
-
-      // Delete from Cloudinary (sequential & safe)
-      for (const publicId of publicIdsToDelete) {
-        await deleteFileFromCloudinary(publicId, "image");
-      }
+    try {
+      imagesToDelete = JSON.parse(req.body.imagesToDelete);
+    } catch (err) {
+      return next(new CustomError("Invalid imagesToDelete format", 400));
     }
 
-    if (req.body?.videosToDelete) {
-      let videosToDelete = [];
+    const publicIdsToDelete = imagesToDelete.map((image) => image.public_id);
 
-      try {
-        videosToDelete = JSON.parse(req.body.videosToDelete);
-      } catch (err) {
-        return next(new CustomError("Invalid videosToDelete format", 400));
-      }
+    // Remove images from property (once)
+    room.images = room.images.filter(
+      (img) => !publicIdsToDelete.includes(img.public_id)
+    );
 
-      const publicIdsToDelete = videosToDelete.map((video) => video.public_id);
+    // Delete from Cloudinary (sequential & safe)
+    for (const publicId of publicIdsToDelete) {
+      await deleteFileFromCloudinary(publicId, "image");
+    }
+  }
 
-      // Remove videos from property (once)
-      room.videos = room.videos.filter(
-        (video) => !publicIdsToDelete.includes(video.public_id)
-      );
+  if (req.body?.videosToDelete) {
+    let videosToDelete = [];
 
-      // Delete from Cloudinary (sequential & safe)
-      for (const publicId of publicIdsToDelete) {
-        await deleteFileFromCloudinary(publicId, "video");
-      }
+    try {
+      videosToDelete = JSON.parse(req.body.videosToDelete);
+    } catch (err) {
+      return next(new CustomError("Invalid videosToDelete format", 400));
     }
 
-  if (numberOfRooms && Number(numberOfRooms)>=1) room.numberOfRooms = Number(numberOfRooms);
+    const publicIdsToDelete = videosToDelete.map((video) => video.public_id);
+
+    // Remove videos from property (once)
+    room.videos = room.videos.filter(
+      (video) => !publicIdsToDelete.includes(video.public_id)
+    );
+
+    // Delete from Cloudinary (sequential & safe)
+    for (const publicId of publicIdsToDelete) {
+      await deleteFileFromCloudinary(publicId, "video");
+    }
+  }
+
+  if (numberOfRooms && Number(numberOfRooms) >= 1)
+    room.numberOfRooms = Number(numberOfRooms);
   if (name) room.name = name.trim().toLowerCase();
   if (capacity) room.capacity = capacity;
   if (pricePerNight) room.pricePerNight = pricePerNight;
@@ -684,7 +656,6 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
   return successResponse(res, 200, "Room updated successfully", room);
 });
-
 
 // ... (rest of the file remains unchanged: updateRoomsInBulk, getTypesOfRoomsInProperty, etc.)
 export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
@@ -762,7 +733,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     bathroomFeatures,
     roomFacilities,
     mediaAndTechnology,
-    numberOfRooms
+    numberOfRooms,
   } = req.body;
 
   if (!types || !Array.isArray(types) || types.length === 0) {
@@ -850,7 +821,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   }
 
   const updateFields = {};
-  if(numberOfRooms && Number(numberOfRooms)>=1) updateFields.numberOfRooms = Number(numberOfRooms);
+  if (numberOfRooms && Number(numberOfRooms) >= 1)
+    updateFields.numberOfRooms = Number(numberOfRooms);
   if (pricePerNight !== undefined)
     updateFields.pricePerNight = Number(pricePerNight);
   if (discount !== undefined) updateFields.discount = Number(discount);
@@ -1064,7 +1036,7 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
     deletedRooms: deleteResult.deletedCount,
   });
 });
- 
+
 //delete room by id ->single type  deleted
 export const deleteRoom = asyncHandler(async (req, res, next) => {
   const { roomId } = req.params;
@@ -1130,9 +1102,7 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Property not found", 404));
   }
 
-  const rooms = await Room.find({
-    propertyId,
-  });
+  const rooms = await Room.find({ propertyId });
 
   if (!rooms || rooms.length === 0) {
     return successResponse(res, 200, "No rooms yet for this property", {});
@@ -1141,13 +1111,15 @@ export const getRoomsByPropertyId = asyncHandler(async (req, res, next) => {
   const typesOfRooms = {};
 
   for (let room of rooms) {
-    // if (!typesOfRooms[room.type]) {
-    //   typesOfRooms[room.type] = "";
-    // }
-    typesOfRooms[room.type]=room;
+    const category = room.typeOfRoom;
+
+    if (!typesOfRooms[category]) {
+      typesOfRooms[category] = [];
+    }
+    typesOfRooms[category].push(room);
   }
 
-  return successResponse(res, 200, "Rooms fetched Successfully ", typesOfRooms);
+  return successResponse(res, 200, "Rooms fetched Successfully", typesOfRooms);
 });
 
 // export const setRoomsImagesandVideosInBulk = asyncHandler(

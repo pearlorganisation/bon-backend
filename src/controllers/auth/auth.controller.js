@@ -15,6 +15,7 @@ import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.mod
 import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
 export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password, role } = req?.body;
+
   const Roles = ["CUSTOMER", "PARTNER"];
 
   if (
@@ -113,6 +114,8 @@ export const register = asyncHandler(async (req, res, next) => {
 export const login = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
 
+  console.log("login user ", email, password);
+
   if (!email || !password) {
     throw new CustomError("Email and password are required", 400);
   }
@@ -133,6 +136,8 @@ export const login = asyncHandler(async (req, res, next) => {
 
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
+
+  console.log("refresh token ", refreshToken);
 
   user.refresh_token = refreshToken;
   await user.save({ validateBeforeSave: false });
@@ -277,10 +282,8 @@ export const logout = asyncHandler(async (req, res, next) => {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
   }
 
-
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
-
 
   if (req.user.role == "SUB_ADMIN") {
     const now = new Date();
@@ -298,8 +301,6 @@ export const logout = asyncHandler(async (req, res, next) => {
       session.save();
     }
   }
-
-
 
   return successResponse(res, 200, "Logged out successfully");
 });
@@ -468,4 +469,3 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
 };
-

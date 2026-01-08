@@ -49,7 +49,7 @@ const bookingSchema = new mongoose.Schema(
     // Total number of guests (sum across all rooms, validated against capacities)
     numberOfGuests: {
       adults: { type: Number },
-      childern: [{ age: Number }],
+      children: [{ age: Number }],
     },
     // Total price (sum of all room subtotals + taxes/fees)
     totalPrice: {
@@ -66,22 +66,27 @@ const bookingSchema = new mongoose.Schema(
       platformFee: { type: Number },
       childrenCharge: { type: Number },
     },
-    // Payment information
-    paymentMethod: {
-      type: String,
-    },
     payment: {
-      razorpayOrderId: { type: String ,default: null },
+      razorpayOrderId: { type: String, default: null },
       razorpayPaymentId: { type: String },
       amount: { type: Number },
       currency: { type: String, default: "INR" },
+      paymentMethod: { type: String },
     },
     paymentStatus: {
       type: String,
-      enum: ["pending", "paid", "refunded", "failed"],
+      enum: [
+        "pending",
+        "paid",
+        "failed",
+        "refund_pending",
+        "refunded",
+        "refund_failed",
+        "no_refund",
+      ],
       default: "pending",
     },
-   
+
     // Booking status for lifecycle management
     status: {
       type: String,
@@ -91,11 +96,12 @@ const bookingSchema = new mongoose.Schema(
     // Cancellation details if applicable
     cancellation: {
       cancelledBy: {
-        type: String,
-        enum: ["user", "partner"],
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Auth",
       },
       cancellationDate: { type: Date },
       refundAmount: { type: Number, default: 0 },
+      razorpayRefundId: {type:String},
       reason: { type: String },
     },
     // Guest details (for multiple guests or additional info)
@@ -128,13 +134,6 @@ bookingSchema.index({ status: 1 });
 bookingSchema.index({ confirmationCode: 1 });
 
 // Virtual for calculating number of nights
-bookingSchema.virtual("numberOfNights").get(function () {
-  if (this.checkInDate && this.checkOutDate) {
-    const diffTime = Math.abs(this.checkOutDate - this.checkInDate);
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); // Days between dates
-  }
-  return 0;
-});
 
 bookingSchema.pre("save", function (next) {
   if (this.checkOutDate <= this.checkInDate) {

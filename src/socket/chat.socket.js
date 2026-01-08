@@ -2,8 +2,6 @@ import Conversation from "../models/Chat/Conversation.model.js";
 import Message from "../models/Chat/Message.model.js";
 // import sendFirebaseNotification from "../utils/firebase.js"; // optional
 
-
-
 const registerChatHandlers = (io, socket) => {
   /**
    * Join conversation room
@@ -11,6 +9,8 @@ const registerChatHandlers = (io, socket) => {
 
   socket.on("join_conversation", async ({ conversationId }) => {
     if (!conversationId) return;
+
+    console.log("join conversation ");
 
     socket.join(conversationId);
   });
@@ -23,23 +23,24 @@ const registerChatHandlers = (io, socket) => {
     try {
       const { conversationId, message } = data;
 
+      console.log("data ", data);
+
       if (!conversationId || !message) return;
 
       const conversation = await Conversation.findById(conversationId);
       if (!conversation) return;
 
-
       // After fetching conversation
       if (!conversation.partnerId && socket.user.role === "PARTNER") {
         conversation.partnerId = socket.user.id;
       }
-      
 
+      console.log("conversaton ", conversation);
 
       // Authorization check
       const userId = socket.user.id.toString();
-      const isCustomer = conversation.customerId.toString() === userId;
-      const isPartner = conversation.partnerId.toString() === userId;
+      const isCustomer = conversation.customerId?.toString() === userId;
+      const isPartner = conversation.partnerId?.toString() === userId;
 
       if (!isCustomer && !isPartner) {
         return;
@@ -48,14 +49,13 @@ const registerChatHandlers = (io, socket) => {
       const senderRole = isCustomer ? "CUSTOMER" : "PARTNER";
 
       // Save message
-      const newMessage =  await Message.create({
+      const newMessage = await Message.create({
         conversationId,
         senderId: socket.user.id,
         senderRole,
         message,
         seenBy: [], // nobody has seen it yet
       });
-      
 
       // Update conversation metadata
       conversation.lastMessage = message;
@@ -66,11 +66,11 @@ const registerChatHandlers = (io, socket) => {
       } else {
         conversation.unreadCountCustomer += 1;
       }
-
+      console.log("created conversation ", conversation);
       await conversation.save();
 
       // Emit message to conversation room
-      io.to(conversationId).emit("receive_message", {
+      socket.to(conversationId).emit("receive_message", {
         _id: newMessage._id,
         conversationId,
         senderId: socket.user.id,
@@ -89,6 +89,7 @@ const registerChatHandlers = (io, socket) => {
   /**
    * Mark messages as read
    */
+
 
 
   socket.on("message_seen", async ({ conversationId }) => {
@@ -133,9 +134,6 @@ const registerChatHandlers = (io, socket) => {
       console.error("message_seen error:", error);
     }
   });
-
-
-
 };
 
 export default registerChatHandlers;

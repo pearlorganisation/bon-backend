@@ -4,7 +4,6 @@ import {
   createProperty,
   getPartnerProperties,
   getPartnerPropertyByID,
-  
   getAllProperties,
   changePropertyStatus,
   getPublicPropertyById,
@@ -21,11 +20,17 @@ import {
   deleteRoomsByTypes,
   deleteRoom,
   getRoomDetailsById,
-
-  
 } from "../../controllers/partner/room.controller.js";
-import {partner_KYC,verify_property_GSTIN, getPartnerKYC} from "../../controllers/partner/parnter.controller.js"
-import { authorizeRoles, protect, optionalProtect } from "../../middleware/auth/auth.middleware.js";
+import {
+  partner_KYC,
+  verify_property_GSTIN,
+  getPartnerKYC,
+} from "../../controllers/partner/parnter.controller.js";
+import {
+  authorizeRoles,
+  protect,
+  optionalProtect,
+} from "../../middleware/auth/auth.middleware.js";
 import multer from "multer";
 
 const router = express.Router();
@@ -36,19 +41,12 @@ const upload = multer({ storage });
 const uploadFields = upload.fields([
   { name: "images", maxCount: 10 },
   { name: "videos", maxCount: 5 },
-  {name:"propertyDocument", maxCount:1}
+  { name: "propertyDocument", maxCount: 1 },
 ]);
-
-
 
 //---------- property routes ----------------
 
-router.post(
-  "/verify-pan",
-  protect,
-  authorizeRoles("PARTNER"),
-  partner_KYC
-);
+router.post("/verify-pan", protect, authorizeRoles("PARTNER"), partner_KYC);
 
 router.post(
   "/verify-gstin",
@@ -61,14 +59,9 @@ router.get(
   "/verify-gstin",
   protect,
   authorizeRoles("PARTNER", "ADMIN"),
-  
+
   getPartnerKYC
 );
-
-
-
-
-
 
 //---------- property routes ----------------
 
@@ -87,11 +80,10 @@ router.get(
 );
 router.get(
   "/get-property-by-id/:propertyId",
-optionalProtect,
+  optionalProtect,
   getPublicPropertyById
 );
 router.get("/get-all-properties", getAllProperties);
-
 
 router.put(
   "/change-property-status/:propertyId",
@@ -99,45 +91,34 @@ router.put(
   changePropertyStatus
 );
 
-
 router.patch(
   "/properties/:propertyId/request-approval",
   protect,
-   authorizeRoles("PARTNER","SUB_ADMIN"),
+  authorizeRoles("PARTNER", "SUB_ADMIN"),
   requestPropertyApproval
 );
 
-
-
-
-
-
-
-
 //------admin--------//
-
 
 router.get(
   "/get-property-by-id/:propertyId",
-optionalProtect,
+  optionalProtect,
   getPublicPropertyById
 );
-
 
 router.get(
   "/admin/properties/approval-requests",
   protect,
-   authorizeRoles("ADMIN"),
+  authorizeRoles("ADMIN"),
   getPropertyApprovalRequests
 );
 
 router.patch(
   "/admin/properties/:propertyId/approve",
   protect,
-   authorizeRoles("ADMIN"),
+  authorizeRoles("ADMIN"),
   approveRejectProperty
 );
-
 
 //---------- Rooms routes ----------------
 
@@ -161,15 +142,8 @@ router.get(
 );
 router.delete("/delete-rooms", protect, deleteRoomsByTypes);
 router.delete("/delete-single-room/:roomId", protect, deleteRoom);
-
-
+//df
 
 router.get("/RoomDetails/:roomId", getRoomDetailsById);
-
-
-
-
-
-
 
 export default router;

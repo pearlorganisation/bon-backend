@@ -17,7 +17,6 @@ const conversationSchema = new mongoose.Schema(
     partnerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auth",
-      required: true,
     },
 
     lastMessage: {
