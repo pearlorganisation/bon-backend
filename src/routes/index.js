@@ -14,6 +14,7 @@ import subAdminRoute from "./subAdmin/subAdmin.route.js"
 import adminRoute from  "./admin/admin.routes.js"
 import ContactRouter from "../routes/contactus.routes.js"
 import BlogRouter from "../routes/blog.route.js"
+import PlatformSettingRouter from "./platformSetting.route.js"
 const router = express.Router();
 
 
@@ -31,5 +32,6 @@ router.use("/admin",adminRoute);
 router.use("/", UserRouter);
 router.use("/contact", ContactRouter);
 router.use("/blog", BlogRouter)
+router.use("/platform-setting", PlatformSettingRouter)
 
 export default router;
