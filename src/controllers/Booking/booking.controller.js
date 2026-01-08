@@ -385,6 +385,7 @@ import crypto from "crypto";
 //avaliblity check logic
 //Uses strict inequalities (< and >) → allows same-day check-out/check-in (most common hotel policy)
 
+const round = (num) => Math.round(num * 100) / 100;
 const isRoomAvailable = async ({
   roomId,
   checkInDate,
@@ -636,18 +637,11 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
   // 6️ Taxes & platform fee
   const platformFee = 100;
-  const taxes =
-    (basePrice - discountAmount + platformFee + extraFees + childrenCharge) *
-    0.12;
+  const subTotal = basePrice - discountAmount + extraFees + childrenCharge;
+  const taxes = subTotal * 0.12;
   console.log(extraFees);
-  // 7️ Final price
-  const totalPrice =
-    basePrice -
-    discountAmount +
-    taxes +
-    platformFee +
-    extraFees +
-    childrenCharge;
+
+  const totalPrice = subTotal + taxes + platformFee;
 
   // 8️ Create booking
   const booking = await Booking.create({
@@ -659,16 +653,15 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     numberOfGuests,
     primaryGuestDetails,
     specialRequests,
-
     priceBreakdown: {
-      basePrice,
-      discountAmount,
-      taxes,
-      extraServicesFee: extraFees,
+      basePrice: round(basePrice),
+      discountAmount: round(discountAmount),
+      extraServicesFee: round(extraFees),
+      childrenCharge: round(childrenCharge),
+      taxes: round(taxes),
       platformFee,
-      childrenCharge,
     },
-    totalPrice,
+    totalPrice: round(totalPrice),
     status: "pending",
     paymentStatus: "pending",
     // expiresAt: Date.now() + 10 * 60 * 1000,
@@ -700,8 +693,10 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Booking not found", 404));
   }
 
-  if (booking.status !== "pending") {
-    return next(new CustomError("Only pending bookings can be updated", 400));
+  if (!["pending", "expired"].includes(booking.status)) {
+    return next(
+      new CustomError("Only pending and expired bookings can be updated", 400)
+    );
   }
 
   // 2️ Validate dates
@@ -835,20 +830,13 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
   if (overflow > 0 && childConfig) {
     childrenCharge = childConfig.charge * overflow;
   }
-
-  // 6️ Taxes & final price
+  // 6️ Taxes & platform fee
   const platformFee = 100;
-  const taxes =
-    (basePrice - discountAmount + platformFee + extraFees + childrenCharge) *
-    0.12;
+  const subTotal = basePrice - discountAmount + extraFees + childrenCharge;
+  const taxes = subTotal * 0.12;
+  console.log(extraFees);
 
-  const totalPrice =
-    basePrice -
-    discountAmount +
-    taxes +
-    platformFee +
-    extraFees +
-    childrenCharge;
+  const totalPrice = subTotal + taxes + platformFee;
 
   // 7️ Update booking
   booking.rooms = roomsData;
@@ -857,17 +845,17 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
   booking.numberOfGuests = numberOfGuests;
   booking.primaryGuestDetails = primaryGuestDetails;
   booking.specialRequests = specialRequests;
-
+  booking.status = "pending";
   booking.priceBreakdown = {
-    basePrice,
-    discountAmount,
-    taxes,
-    extraServicesfee: extraFees,
+    basePrice: round(basePrice),
+    discountAmount: round(discountAmount),
+    extraServicesFee: round(extraFees),
+    childrenCharge: round(childrenCharge),
+    taxes: round(taxes),
     platformFee,
-    childrenCharge,
   };
 
-  booking.totalPrice = totalPrice;
+  booking.totalPrice = round(totalPrice);
   // booking.expiresAt = Date.now() + 10 * 60 * 1000;
 
   await booking.save();
@@ -903,7 +891,12 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Booking not found", 404));
   }
 
-  if (booking.payment?.razorpayOrderId && booking.paymentStatus== "paid" ) {
+  if (booking.status != "pending")
+    return next(
+      new CustomError("order only created for pending booking ", 400)
+    );
+
+  if (booking.payment?.razorpayOrderId && booking.paymentStatus == "paid") {
     return next(new CustomError("order allready created ", 400));
   }
 
@@ -1058,7 +1051,7 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
   //  Always respond 200 to Razorpay
   res.status(200).json({ success: true });
 });
-        
+
 export const getBookingById = asyncHandler(async (req, res, next) => {
   const { bookingId } = req.params;
 
@@ -1377,7 +1370,7 @@ export const getBooking = asyncHandler(async (req, res, next) => {
     propertyId,
     fromDate,
     toDate,
-    dateType = "checkin",  //booking -
+    dateType = "checkin", //booking -
     sortBy = "createdAt",
     order = "desc",
   } = req.query;
@@ -1451,5 +1444,3 @@ export const getBooking = asyncHandler(async (req, res, next) => {
     bookings,
   });
 });
-
-
