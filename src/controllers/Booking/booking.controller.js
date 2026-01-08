@@ -416,14 +416,14 @@ const isRoomAvailable = async ({
   const overlappingBookings = await Booking.aggregate([
     {
       $match: {
-        "rooms.roomId": roomId,
+        "rooms.roomId": new mongoose.Types.ObjectId(roomId),
         status: { $in: ["pending", "confirmed"] },
         checkInDate: { $lt: checkOut },
         checkOutDate: { $gt: checkIn },
       },
     },
     { $unwind: "$rooms" },
-    { $match: { "rooms.roomId": roomId } },
+    { $match: { "rooms.roomId": new mongoose.Types.ObjectId(roomId) } },
     {
       $group: {
         _id: null,
@@ -433,7 +433,7 @@ const isRoomAvailable = async ({
   ]);
 
   const booked = overlappingBookings[0]?.totalBooked || 0;
-
+  console.log(booked);
   // 3️ Final availability check
   if (booked + quantity > totalRooms) {
     return {
@@ -452,7 +452,7 @@ const getPaymentMethod = (paymentEntity) => {
   if (paymentEntity.method === "card") {
     return paymentEntity.card?.type === "debit" ? "debit_card" : "credit_card";
   } else {
-    return payment?.method;
+    return paymentEntity?.method;
   }
 };
 
@@ -614,7 +614,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
   let childCount = 0; // child >=childernCharge.age
   if (numberOfGuests.children?.length) {
     numberOfGuests.children.forEach((child) => {
-      if (Number(child) >= Number(childCharge.age)) {
+      if (Number(child.age) >= Number(childCharge.age)) {
         childCount++;
       }
     });
@@ -639,7 +639,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
   const taxes =
     (basePrice - discountAmount + platformFee + extraFees + childrenCharge) *
     0.12;
-
+  console.log(extraFees);
   // 7️ Final price
   const totalPrice =
     basePrice -
@@ -664,7 +664,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       basePrice,
       discountAmount,
       taxes,
-      extraServicesfee: extraFees,
+      extraServicesFee: extraFees,
       platformFee,
       childrenCharge,
     },
@@ -755,14 +755,14 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       {
         $match: {
           _id: { $ne: booking._id },
-          "rooms.roomId": item.roomId,
+          "rooms.roomId": new mongoose.Types.ObjectId(item.roomId),
           status: { $in: ["pending", "confirmed"] },
           checkInDate: { $lt: checkOut },
           checkOutDate: { $gt: checkIn },
         },
       },
       { $unwind: "$rooms" },
-      { $match: { "rooms.roomId": item.roomId } },
+      { $match: { "rooms.roomId": new mongoose.Types.ObjectId(item.roomId) } },
       {
         $group: {
           _id: null,
@@ -895,12 +895,16 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 
 export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
-  const { bookingId } = req.body;
+  const { bookingId } = req.params;
 
   const booking = await Booking.findOne({ _id: bookingId, userId });
 
   if (!booking) {
     return next(new CustomError("Booking not found", 404));
+  }
+
+  if (booking.payment?.razorpayOrderId) {
+    return next(new CustomError("Payment already initiated", 400));
   }
 
   try {
@@ -958,7 +962,7 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Missing Razorpay signature", 400));
   }
 
-  // 🔐 Verify signature (RAW body required)
+  //  Verify signature (RAW body required)
   const expectedSignature = crypto
     .createHmac("sha256", webhookSecret)
     .update(req.body)
@@ -1005,7 +1009,7 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
           paymentStatus: "paid",
           status: "confirmed",
           "payment.razorpayPaymentId": paymentId,
-          paymentMethod: getPaymentMethod(paymentEntity),
+          "payment.paymentMethod": getPaymentMethod(paymentEntity),
         },
         { new: true }
       );
@@ -1022,8 +1026,8 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
         { "payment.razorpayOrderId": orderId },
         {
           paymentStatus: "failed",
-          status: "cancelled",
-          paymentMethod: getPaymentMethod(paymentEntity),
+          "payment.paymentMethod": getPaymentMethod(paymentEntity),
+          "payment.razorpayOrderId": null,
         },
         { new: true }
       );
@@ -1065,4 +1069,180 @@ export const getBookingStatusById = asyncHandler(async (req, res, next) => {
   }
 
   successResponse(res, 200, "successfully fetch booking ", booking);
+});
+
+const calculateRefundPercentage = ({
+  cancellationPolicy = [],
+  checkInDate,
+}) => {
+  if (!cancellationPolicy.length) return 0;
+
+  const now = new Date();
+  const checkIn = new Date(checkInDate);
+
+  const diffInDays = Math.ceil((checkIn - now) / (1000 * 60 * 60 * 24));
+
+  if (diffInDays <= 0) return 0;
+
+  // Sort DESC (important)
+  const sortedPolicy = [...cancellationPolicy].sort(
+    (a, b) => b.daysBeforeCheckIn - a.daysBeforeCheckIn
+  );
+
+  for (const rule of sortedPolicy) {
+    if (diffInDays >= rule.daysBeforeCheckIn) {
+      return rule.refundPercentage;
+    }
+  }
+
+  return 0;
+};
+
+export const cancelBooking = asyncHandler(async (req, res, next) => {
+  const { bookingId } = req.params;
+  const userId = req.user._id;
+  const { reason } = req.body;
+
+  const booking = await Booking.findById(bookingId).populate(
+    "propertyId",
+    "cancellationPolicy"
+  );
+
+  if (!booking) {
+    return next(new CustomError("Booking not found", 404));
+  }
+
+  if (booking.status !== "confirmed") {
+    return next(
+      new CustomError("Only confirmed bookings can be cancelled", 400)
+    );
+  }
+  if (booking.cancellation?.razorpayRefundId) {
+    return next(new CustomError("Refund already applied", 400));
+  }
+
+  if (!reason) {
+    return next(new CustomError("Please give a valid reason", 400));
+  }
+
+  if (new Date() >= booking.checkInDate) {
+    return next(
+      new CustomError("Cancellation not allowed after check-in", 400)
+    );
+  }
+
+  const wasPaid = booking.paymentStatus === "paid";
+
+  const refundPercentage = calculateRefundPercentage({
+    cancellationPolicy: booking.propertyId.cancellationPolicy,
+    checkInDate: booking.checkInDate,
+  });
+
+  const refundAmount = (booking.totalPrice * refundPercentage) / 100;
+
+  booking.status = "cancelled";
+  booking.paymentStatus =
+    refundAmount > 0 && wasPaid ? "refund_pending" : "no_refund";
+
+  booking.cancellation = {
+    cancelledBy: userId,
+    cancellationDate: new Date(),
+    refundAmount,
+    reason,
+  };
+
+  // Save cancellation FIRST
+  await booking.save();
+
+  //  Initiate refund
+  if (refundAmount > 0 && wasPaid) {
+    try {
+      const refund = await razorpay.payments.refund(
+        booking.payment.razorpayPaymentId,
+        {
+          amount: Math.round(refundAmount * 100),
+          notes: {
+            bookingId: booking._id.toString(),
+            reason,
+          },
+        }
+      );
+
+      booking.cancellation.razorpayRefundId = refund.id;
+      await booking.save();
+    } catch (error) {
+      console.error("Refund initiation failed:", error);
+
+      booking.paymentStatus = "refund_failed";
+      await booking.save();
+      if (error?.error) {
+        return next(
+          new CustomError(
+            error?.error?.description ||
+              "Cancellation done but refund initiation failed.",
+            error.statusCode || 502
+          )
+        );
+      }
+
+      return next(
+        new CustomError(
+          "Cancellation done but refund initiation failed. Support will contact you.",
+          502
+        )
+      );
+    }
+  }
+
+  successResponse(res, 200, "Cancellation successful", {
+    refundAmount,
+    cancellationDate: booking.cancellation.cancellationDate,
+  });
+});
+
+export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
+  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  const razorpaySignature = req.headers["x-razorpay-signature"];
+
+  if (!razorpaySignature) {
+    return res.status(200).json({ success: true });
+  }
+
+  const expectedSignature = crypto
+    .createHmac("sha256", webhookSecret)
+    .update(req.body)
+    .digest("hex");
+
+  if (expectedSignature !== razorpaySignature) {
+    return res.status(200).json({ success: true });
+  }
+
+  let event;
+  try {
+    event = JSON.parse(req.body.toString());
+  } catch {
+    return res.status(200).json({ success: true });
+  }
+
+  const eventType = event.event;
+
+  if (eventType === "refund.processed") {
+    const refund = event.payload.refund.entity;
+
+    await Booking.findOneAndUpdate(
+      { "cancellation.razorpayRefundId": refund.id },
+      { paymentStatus: "refunded" }
+    );
+  }
+
+  if (eventType === "refund.failed") {
+    const refund = event.payload.refund.entity;
+
+    await Booking.findOneAndUpdate(
+      { "cancellation.razorpayRefundId": refund.id },
+      { paymentStatus: "refund_failed" }
+    );
+  }
+
+  res.status(200).json({ success: true });
 });

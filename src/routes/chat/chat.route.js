@@ -2,23 +2,31 @@ import express from "express";
 const router = express.Router();
 
 import {
+  getOrCreateConversation,
   getConversationMessages,
-  getConversationList,
-  assignPartnerToConversation,
-} from "../../controllers/chat/chat.controler.js";
+  getPartnerConversationList,
+} from "../../controllers/chat/chat.controler.js"
 
 import { protect } from "../../middleware/auth/auth.middleware.js";
 
 /**
- * Customer / Partner
- * Get or create conversation + messages
+ * 1️ Create or get conversationId (Customer)
  */
-router.get("/conversation", protect, getConversationMessages);
+router.post("/conversation", protect, getOrCreateConversation);
 
 /**
- * Partner inbox - list of conversations
+ * 2️ Get messages (Customer / Partner)
+ * conversationId REQUIRED
  */
-router.get("/conversation/list", protect, getConversationList);
+router.get("/messages", protect, getConversationMessages);
 
+/**
+ * 3️ Partner inbox - list of conversations
+ */
+router.get(
+  "/partner/conversations",
+  protect,
+  getPartnerConversationList
+);
 
 export default router;
