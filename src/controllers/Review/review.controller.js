@@ -13,8 +13,11 @@ import {
 // @desc    Create a new review
 // @route   POST /api/reviews/:propertyId/:roomId
 export const createReview = asyncHandler(async (req, res, next) => {
+
   const { propertyId, roomId } = req.params;
+
   const userId = req.user._id;
+  
   const { rating, comment } = req.body;
 
   // 1. Check if Property and Room exist
