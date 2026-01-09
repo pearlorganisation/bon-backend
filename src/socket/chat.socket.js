@@ -1,6 +1,7 @@
 import Conversation from "../models/Chat/Conversation.model.js";
 import Message from "../models/Chat/Message.model.js";
-// import sendFirebaseNotification from "../utils/firebase.js"; // optional
+import sendFirebaseNotification from "../utils/sendFirebaseNotification.js";
+import onlineUsers from "./onlineUsers.js";
 
 const registerChatHandlers = (io, socket) => {
   /**
@@ -33,6 +34,7 @@ const registerChatHandlers = (io, socket) => {
       // After fetching conversation
       if (!conversation.partnerId && socket.user.role === "PARTNER") {
         conversation.partnerId = socket.user.id;
+        await conversation.save();
       }
 
       console.log("conversaton ", conversation);
@@ -79,8 +81,28 @@ const registerChatHandlers = (io, socket) => {
         createdAt: newMessage.createdAt,
       });
 
-      // Optional: Firebase notification if receiver offline
-      // sendFirebaseNotification(...)
+      // 🔔 FIREBASE NOTIFICATION IF RECEIVER OFFLINE
+      const receiverId =
+        senderRole === "CUSTOMER"
+          ? conversation.partnerId
+          : conversation.customerId;
+
+      if (receiverId) {
+        const isReceiverOnline = onlineUsers.has(receiverId.toString());
+
+        if (!isReceiverOnline) {
+          const receiver = await User.findById(receiverId);
+
+          for (const t of receiver.fcmTokens) {
+            await sendFirebaseNotification({
+              token: t.token,
+              title: "New Message",
+              body: message,
+              data: { conversationId },
+            });
+          }
+        }
+      }
     } catch (error) {
       console.error("send_message error:", error);
     }
@@ -89,8 +111,6 @@ const registerChatHandlers = (io, socket) => {
   /**
    * Mark messages as read
    */
-
-
 
   socket.on("message_seen", async ({ conversationId }) => {
     try {

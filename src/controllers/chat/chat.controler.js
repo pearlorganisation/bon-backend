@@ -8,7 +8,6 @@ const EDIT_LIMIT_MINUTES = 5;
 const DELETE_LIMIT_MINUTES = 5;
 
 export const getOrCreateConversation = asyncHandler(async (req, res, next) => {
-
   const customerId = req.user._id;
   const { propertyId } = req.body;
 
@@ -42,10 +41,7 @@ export const getOrCreateConversation = asyncHandler(async (req, res, next) => {
   });
 });
 
-
-
 export const getConversationMessages = asyncHandler(async (req, res, next) => {
-
   const userId = req.user._id;
   const { conversationId } = req.query;
 
@@ -78,11 +74,8 @@ export const getConversationMessages = asyncHandler(async (req, res, next) => {
   });
 });
 
-
 export const getPartnerConversationList = asyncHandler(
-  
   async (req, res, next) => {
-
     if (req.user.role !== "PARTNER") {
       return next(new CustomError("Only Partner allowed", 403));
     }
@@ -110,9 +103,7 @@ export const getPartnerConversationList = asyncHandler(
   }
 );
 
-
 export const updateMessage = async (req, res, next) => {
-
   const { messageId } = req.params;
   const { message } = req.body;
   const userId = req.user.id;
@@ -135,11 +126,6 @@ export const updateMessage = async (req, res, next) => {
     return next(new CustomError("Edit time expired for this message", 400));
   }
 
-  // Optional: prevent edit if seen
-  if (msg.seenBy.length > 0) {
-    return next(new CustomError("Cannot edit message after it is seen", 400));
-  }
-
   msg.message = message;
   await msg.save();
 
@@ -150,9 +136,7 @@ export const updateMessage = async (req, res, next) => {
   });
 };
 
-
 export const deleteMessage = async (req, res, next) => {
-
   const { messageId } = req.params;
   const userId = req.user.id;
 
