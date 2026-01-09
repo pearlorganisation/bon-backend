@@ -48,7 +48,7 @@ export const register = asyncHandler(async (req, res, next) => {
     // If user exists but NOT verified, resend OTP
     try {
       await OTP.findOneAndReplace(
-        { email, type: "REGISTER" },
+        { email, type: "REGISTER" },  
         { otp, email, type: "REGISTER" },
         { upsert: true, new: true }
       );
@@ -278,8 +278,15 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 
 export const logout = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
+  const { deviceId } = req.body;
   if (userId) {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
+    await User.findByIdAndUpdate(userId, {
+      $pull: {
+        fcmTokens: { deviceId },
+      },
+    });
+    
   }
 
   res.clearCookie("accessToken");
@@ -468,4 +475,30 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
     ...base,
     maxAge: 15 * 24 * 60 * 60 * 1000,
   });
+};
+
+export const saveFcmToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    const userId = req.user._id;
+
+    if (!token) {
+      return res.status(400).json({ message: "FCM token required" });
+    }
+
+    await Auth.findByIdAndUpdate(
+      userId,
+      {
+        $addToSet: {
+          fcmTokens: { token, deviceId },
+        },
+      },
+      { new: true }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Save FCM token error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
 };
