@@ -23,6 +23,11 @@ const contactSchema = new mongoose.Schema(
       required: true,
       trim: true,
     },
+    subject:{
+      type:String,
+      required:true,
+      trim:true
+    },
     status: {
       type: String,
       enum: ["pending", "resolved"],
