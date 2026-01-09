@@ -19,6 +19,10 @@ export const updatePlatformSettings = async (req, res) => {
       supportPhone,
       addressLine1,
       addressLine2,
+      homepageBannerText1,
+      homepageBannerText2,
+       homepageBannerSubText,
+      copyrightText,
       facebook,
       instagram,
       twitter,
@@ -33,7 +37,10 @@ export const updatePlatformSettings = async (req, res) => {
     settings.supportPhone = supportPhone;
     settings.addressLine1 = addressLine1;
     settings.addressLine2 = addressLine2;
-
+    settings.homepageBannerText1 = homepageBannerText1;
+    settings.homepageBannerText2 = homepageBannerText2;
+    settings.homepageBannerSubText =  homepageBannerSubText;
+    settings.copyrightText = copyrightText;
     settings.socialLinks = {
       facebook,
       instagram,
