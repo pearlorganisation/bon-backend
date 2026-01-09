@@ -10,7 +10,8 @@ import {
   forgotPassword,
   resetPassword,
   create_sub_admin,
-  delete_user
+  delete_user,
+  saveFcmToken
 } from "../../controllers/auth/auth.controller.js";
 import { protect, authorizeRoles } from "../../middleware/auth/auth.middleware.js";
 
@@ -24,6 +25,7 @@ router.post("/logout", protect, logout);
 router.post("/refresh-token", refreshToken);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
+router.post("/save-fcm-token",protect,saveFcmToken)
 router.post("/create-sub-admin", protect,authorizeRoles("ADMIN"),create_sub_admin);
 router.post("/delete-user",protect,authorizeRoles("ADMIN"), delete_user);
 router.get("/test", protect,authorizeRoles("ADMIN"), (req, res) => {
