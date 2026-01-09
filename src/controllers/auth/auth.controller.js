@@ -15,6 +15,7 @@ import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.mod
 import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
 export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password, role } = req?.body;
+
   const Roles = ["CUSTOMER", "PARTNER"];
 
   if (
@@ -47,7 +48,7 @@ export const register = asyncHandler(async (req, res, next) => {
     // If user exists but NOT verified, resend OTP
     try {
       await OTP.findOneAndReplace(
-        { email, type: "REGISTER" },
+        { email, type: "REGISTER" },  
         { otp, email, type: "REGISTER" },
         { upsert: true, new: true }
       );
@@ -113,6 +114,8 @@ export const register = asyncHandler(async (req, res, next) => {
 export const login = asyncHandler(async (req, res, next) => {
   const { email, password } = req.body;
 
+  console.log("login user ", email, password);
+
   if (!email || !password) {
     throw new CustomError("Email and password are required", 400);
   }
@@ -133,6 +136,8 @@ export const login = asyncHandler(async (req, res, next) => {
 
   const accessToken = user.generateAccessToken();
   const refreshToken = user.generateRefreshToken();
+
+  console.log("refresh token ", refreshToken);
 
   user.refresh_token = refreshToken;
   await user.save({ validateBeforeSave: false });
@@ -273,14 +278,19 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 
 export const logout = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
+  const { deviceId } = req.body;
   if (userId) {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
+    await User.findByIdAndUpdate(userId, {
+      $pull: {
+        fcmTokens: { deviceId },
+      },
+    });
+    
   }
-
 
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
-
 
   if (req.user.role == "SUB_ADMIN") {
     const now = new Date();
@@ -298,8 +308,6 @@ export const logout = asyncHandler(async (req, res, next) => {
       session.save();
     }
   }
-
-
 
   return successResponse(res, 200, "Logged out successfully");
 });
@@ -469,3 +477,28 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
   });
 };
 
+export const saveFcmToken = async (req, res) => {
+  try {
+    const { token } = req.body;
+    const userId = req.user._id;
+
+    if (!token) {
+      return res.status(400).json({ message: "FCM token required" });
+    }
+
+    await Auth.findByIdAndUpdate(
+      userId,
+      {
+        $addToSet: {
+          fcmTokens: { token, deviceId },
+        },
+      },
+      { new: true }
+    );
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Save FCM token error:", error);
+    res.status(500).json({ message: "Server error" });
+  }
+};
