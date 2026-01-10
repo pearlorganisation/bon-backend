@@ -1,5 +1,17 @@
 import mongoose from "mongoose";
 
+const attachmentSchema = new mongoose.Schema({
+  url: {
+    type: String,
+    required: true,
+  },
+  type: {
+    type: String,
+    enum: ["image", "file"],
+    required: true,
+  },
+});
+
 const messageSchema = new mongoose.Schema(
   {
     conversationId: {
@@ -20,25 +32,32 @@ const messageSchema = new mongoose.Schema(
       required: true,
     },
 
-    messageType: {
+    text: {
       type: String,
-      enum: ["text", "image", "file"],
-      default: "text",
+      trim: true,
     },
 
-    message: {
-      type: String,
-      required: true,
+    attachments: {
+      type: [attachmentSchema],
+      default: [],
     },
+
     seenBy: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Auth",
       },
     ],
-    
   },
   { timestamps: true }
 );
+
+// Prevent empty messages
+messageSchema.pre("save", function (next) {
+  if (!this.text && this.attachments.length === 0) {
+    return next(new Error("Message must have text or attachment"));
+  }
+  next();
+});
 
 export default mongoose.model("Message", messageSchema);

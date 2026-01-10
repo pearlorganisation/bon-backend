@@ -22,31 +22,31 @@ const registerChatHandlers = (io, socket) => {
 
   socket.on("send_message", async (data) => {
     try {
-      const { conversationId, message } = data;
+      const { conversationId, text, attachments = [] } = data;
 
-      console.log("data ", data);
+      if (!conversationId) return;
+      if (!text && attachments.length === 0) return;
 
-      if (!conversationId || !message) return;
+      // Validate attachments
+      for (const a of attachments) {
+        if (!["image", "file"].includes(a.type)) return;
+        if (!a.url) return;
+      }
 
       const conversation = await Conversation.findById(conversationId);
       if (!conversation) return;
 
-      // After fetching conversation
+      // Assign partner if missing
       if (!conversation.partnerId && socket.user.role === "PARTNER") {
         conversation.partnerId = socket.user.id;
         await conversation.save();
       }
 
-      console.log("conversaton ", conversation);
-
-      // Authorization check
+      // Authorization
       const userId = socket.user.id.toString();
       const isCustomer = conversation.customerId?.toString() === userId;
       const isPartner = conversation.partnerId?.toString() === userId;
-
-      if (!isCustomer && !isPartner) {
-        return;
-      }
+      if (!isCustomer && !isPartner) return;
 
       const senderRole = isCustomer ? "CUSTOMER" : "PARTNER";
 
@@ -55,12 +55,19 @@ const registerChatHandlers = (io, socket) => {
         conversationId,
         senderId: socket.user.id,
         senderRole,
-        message,
-        seenBy: [], // nobody has seen it yet
+        text,
+        attachments,
+        seenBy: [],
       });
 
-      // Update conversation metadata
-      conversation.lastMessage = message;
+      // Last message preview
+      let lastMessagePreview = text;
+      if (!text && attachments.length) {
+        lastMessagePreview =
+          attachments[0].type === "image" ? "📷 Image" : "📎 File";
+      }
+
+      conversation.lastMessage = lastMessagePreview;
       conversation.lastMessageAt = new Date();
 
       if (senderRole === "CUSTOMER") {
@@ -68,39 +75,42 @@ const registerChatHandlers = (io, socket) => {
       } else {
         conversation.unreadCountCustomer += 1;
       }
-      console.log("created conversation ", conversation);
+
       await conversation.save();
 
-      // Emit message to conversation room
-      socket.to(conversationId).emit("receive_message", {
-        _id: newMessage._id,
-        conversationId,
-        senderId: socket.user.id,
-        senderRole,
-        message,
-        createdAt: newMessage.createdAt,
+      // Emit message
+      socket.to(conversationId).emit("receive_message", newMessage);
+
+      // When sender receives "message_delivered"
+      socket.to("message_delivered", ({ messageId }) => {
+        // mark the specific message as delivered (double gray tick)
+        updateMessageTick(messageId, "delivered");
       });
 
-      // 🔔 FIREBASE NOTIFICATION IF RECEIVER OFFLINE
+      // 🔔 Firebase notification (receiver offline)
       const receiverId =
         senderRole === "CUSTOMER"
           ? conversation.partnerId
           : conversation.customerId;
 
-      if (receiverId) {
-        const isReceiverOnline = onlineUsers.has(receiverId.toString());
+      if (receiverId && !onlineUsers.has(receiverId.toString())) {
+        const receiver = await User.findById(receiverId);
 
-        if (!isReceiverOnline) {
-          const receiver = await User.findById(receiverId);
+        let notificationBody = text?.substring(0, 40);
+        if (!text && attachments.length) {
+          notificationBody =
+            attachments[0].type === "image"
+              ? "📷 Image received"
+              : "📎 File received";
+        }
 
-          for (const t of receiver.fcmTokens) {
-            await sendFirebaseNotification({
-              token: t.token,
-              title: "New Message",
-              body: message,
-              data: { conversationId },
-            });
-          }
+        for (const t of receiver.fcmTokens) {
+          await sendFirebaseNotification({
+            token: t.token,
+            title: "New Message",
+            body: notificationBody,
+            data: { conversationId },
+          });
         }
       }
     } catch (error) {
