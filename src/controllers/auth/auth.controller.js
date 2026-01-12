@@ -48,7 +48,7 @@ export const register = asyncHandler(async (req, res, next) => {
     // If user exists but NOT verified, resend OTP
     try {
       await OTP.findOneAndReplace(
-        { email, type: "REGISTER" },  
+        { email, type: "REGISTER" },
         { otp, email, type: "REGISTER" },
         { upsert: true, new: true }
       );
@@ -278,15 +278,16 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 
 export const logout = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
-  const { deviceId } = req.body;
+  const { deviceId } = req.body || {};
+
   if (userId) {
-    await Auth.findByIdAndUpdate(userId, { refresh_token: null });
-    await User.findByIdAndUpdate(userId, {
+    // Combine these into one call for better performance
+    await Auth.findByIdAndUpdate(userId, {
+      refresh_token: null,
       $pull: {
         fcmTokens: { deviceId },
       },
     });
-    
   }
 
   res.clearCookie("accessToken");
@@ -301,11 +302,9 @@ export const logout = asyncHandler(async (req, res, next) => {
       date: today,
     });
 
-    console.log("sessin ", session);
-
     if (session) {
       session.LogoutAt = now;
-      session.save();
+      await session.save(); // Added await here as save() is asynchronous
     }
   }
 
@@ -479,7 +478,7 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
 
 export const saveFcmToken = async (req, res) => {
   try {
-    const { token } = req.body;
+    const { token, deviceId } = req.body;
     const userId = req.user._id;
 
     if (!token) {
