@@ -114,8 +114,8 @@ export const updateAllUsers = asyncHandler(async (req, res, next) => {
     "gender",
     "dateOfBirth",
     "phoneNumber",
-    "role", // Admin can also update role
-    "isVerified", // Admin can verify user
+    "role", 
+    "isVerified", 
   ];
 
   updatableFields.forEach((field) => {
