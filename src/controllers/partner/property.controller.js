@@ -643,3 +643,5 @@ export const approveRejectProperty = asyncHandler(async (req, res, next) => {
 
   successResponse(res, 200, `Property ${action} successfully`, property);
 });
+
+
