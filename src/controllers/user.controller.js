@@ -2,6 +2,11 @@ import successResponse from "../utils/error/successResponse.js";
 import CustomError from "../utils/error/customError.js";
 import asyncHandler from "../middleware/asyncHandler.js";
 import Auth from "../models/auth/auth.model.js";
+import Property from "../models/Listing/property.model.js";
+import Room from "../models/Listing/room.model.js";
+import RoomInventory from "../models/Listing/roomInventory.model.js";
+import {getDatesBetween,isRoomBlocked,normalizeDate} from "../controllers/Booking/booking.controller.js"
+
 import {
   deleteFileFromCloudinary,
   uploadFileToCloudinary,
@@ -167,8 +172,6 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     location,
     checkIn,
     checkOut,
-    adults = 1,
-    children = 0,
     rooms = 1,
     propertyType,
   } = req.query;
@@ -178,16 +181,14 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
       new CustomError("Location, check-in and check-out are required", 400)
     );
   }
-
   const checkInDate = normalizeDate(checkIn);
   const checkOutDate = normalizeDate(checkOut);
-
   if (checkInDate >= checkOutDate) {
     return next(new CustomError("Invalid date range", 400));
   }
 
   const dates = getDatesBetween(checkInDate, checkOutDate);
-
+ console.log("dates",dates);
   // 1️ Find properties
   const propertyQuery = {
     status: "active",
@@ -246,13 +247,12 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
       const booked =
         inventoryMap[room._id.toString()]?.[date.toISOString()] || 0;
       maxBooked = Math.max(maxBooked, booked);
+      console.log(maxBooked, date.toISOString());
     }
 
     const availableRooms = room.numberOfRooms - maxBooked;
+   /// console.log(availableRooms);
     if (availableRooms < rooms) continue;
-
-    const totalAdultCapacity = room.capacity * rooms;
-    if (totalAdultCapacity < adults) continue;
 
     if (!propertyRoomMap[room.propertyId]) {
       propertyRoomMap[room.propertyId] = [];
@@ -260,9 +260,9 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
     propertyRoomMap[room.propertyId].push({
       ...room,
-      availableRooms
+      availableRooms,
     });
-  }
+  }        
 
   // 6️ Final response
   const result = properties

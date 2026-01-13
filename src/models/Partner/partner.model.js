@@ -9,14 +9,12 @@ const partnerSchema = new mongoose.Schema(
       unique: true,
     },
 
-    businessLicense: String,
-    address: String,
     bankDetails: {
       accountNumber: String,
       ifscCode: String,
       bankName: String,
     },
-
+    
 
     panDetails :{
       panNumber: String,
@@ -35,7 +33,7 @@ const partnerSchema = new mongoose.Schema(
       },
     ],
 
-    isVerified: { type: Boolean, default: false },
+    isVerified: { type: Boolean, default: false },//for partner pan verification
   },
   { timestamps: true }
 );
