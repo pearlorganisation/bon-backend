@@ -27,21 +27,31 @@ const registerChatHandlers = (io, socket) => {
    */
   socket.on("send_message", async (data) => {
     try {
-      const { conversationId, message } = data;
-      if (!conversationId || !message) return;
+      const { conversationId, text, attachments = [] } = data;
+
+      if (!conversationId) return;
+      if (!text && attachments.length === 0) return;
+
+      // Validate attachments
+      if (attachments.length > 0) {
+        for (const a of attachments) {
+          if (!["image", "file"].includes(a.type)) return;
+          if (!a.url) return;
+        }
+      }
 
       const conversation = await Conversation.findById(conversationId);
       if (!conversation) return;
 
-      // Auto-assign partner if not present
+      // Assign partner if missing
       if (!conversation.partnerId && socket.user.role === "PARTNER") {
         conversation.partnerId = socket.user.id;
       }
 
+      // Authorization
       const userId = socket.user.id.toString();
       const isCustomer = conversation.customerId?.toString() === userId;
       const isPartner = conversation.partnerId?.toString() === userId;
-
       if (!isCustomer && !isPartner) return;
 
       const senderRole = isCustomer ? "CUSTOMER" : "PARTNER";
@@ -51,62 +61,67 @@ const registerChatHandlers = (io, socket) => {
         conversationId,
         senderId: socket.user.id,
         senderRole,
-        message,
-        seenBy: [socket.user.id], // Sender has obviously seen it
+        text,
+        attachments,
+        seenBy: [],
       });
 
-      // Update conversation metadata
-      conversation.lastMessage = message;
-      conversation.lastMessageAt = new Date();
       if (senderRole === "CUSTOMER") {
         conversation.unreadCountPartner += 1;
       } else {
         conversation.unreadCountCustomer += 1;
       }
+
+      socket.to(conversationId).emit("receive_message", newMessage);
+
       await conversation.save();
 
-      const messagePayload = {
-        _id: newMessage._id,
-        conversationId,
-        senderId: socket.user.id,
-        senderRole,
-        message,
-        createdAt: newMessage.createdAt,
-      };
+      // Last message preview
+      let lastMessagePreview = text;
+      if (!text && attachments.length) {
+        lastMessagePreview =
+          attachments[0].type === "image" ? "📷 Image" : "📎 File";
+      }
 
-      // 2. EMIT TO CONVERSATION ROOM (For the active chat window)
-      io.to(conversationId).emit("receive_message", messagePayload);
+      conversation.lastMessage = lastMessagePreview;
+      conversation.lastMessageAt = new Date();
 
-      // 3. EMIT TO RECEIVER'S PRIVATE ROOM (For the Dashboard/Chat List update)
-      const receiverId = isCustomer
-        ? conversation.partnerId
-        : conversation.customerId;
+      // 🔔 Firebase notification (receiver offline)
+      const receiverId =
+        senderRole === "CUSTOMER"
+          ? conversation.partnerId
+          : conversation.customerId;
 
-      if (receiverId) {
-        // This event name 'update_chat_list' should be listened to on your Sidebar/Dashboard
-        io.to(receiverId.toString()).emit("update_chat_list", {
-          ...messagePayload,
-          unreadCount:
-            senderRole === "CUSTOMER"
-              ? conversation.unreadCountPartner
-              : conversation.unreadCountCustomer,
-        });
+      if (receiverId && !onlineUsers.has(receiverId.toString())) {
+        const receiver = await User.findById(receiverId);
 
-        // 🔔 FIREBASE NOTIFICATION IF RECEIVER OFFLINE
-        const isReceiverOnline = onlineUsers.has(receiverId.toString());
-        if (!isReceiverOnline) {
-          const receiver = await User.findById(receiverId);
-          if (receiver?.fcmTokens) {
-            for (const t of receiver.fcmTokens) {
-              await sendFirebaseNotification({
-                token: t.token,
-                title: "New Message",
-                body: message,
-                data: { conversationId: conversationId.toString() },
-              });
-            }
+        let notificationBody = text?.substring(0, 40);
+
+        if (!text && attachments.length) {
+          const imageCount = attachments.filter(
+            (a) => a.type === "image"
+          ).length;
+          const fileCount = attachments.filter((a) => a.type === "file").length;
+
+          if (imageCount && fileCount) {
+            notificationBody = `📎 ${attachments.length} attachments received`;
+          } else if (imageCount > 1) {
+            notificationBody = `📷 ${imageCount} images received`;
+          } else if (imageCount === 1) {
+            notificationBody = "📷 Image received";
+          } else if (fileCount > 1) {
+            notificationBody = `📄 ${fileCount} files received`;
+          } else if (fileCount === 1) {
+            notificationBody = "📄 File received";
           }
         }
+
+        await sendFirebaseNotification({
+          token: receiver.fcmToken,
+          title: "New Message",
+          body: notificationBody,
+          data: { conversationId },
+        });
       }
     } catch (error) {
       console.error("send_message error:", error);
