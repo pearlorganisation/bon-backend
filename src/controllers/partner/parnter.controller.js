@@ -1,3 +1,5 @@
+
+
 import asyncHandler from "../../middleware/asyncHandler.js";
 import CustomError from "../../utils/error/customError.js";
 import Property from "../../models/Listing/property.model.js";
@@ -252,8 +254,6 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
     });
   }
 });
-
-const verifyProperyManually = asyncHandler(async (req, res, next) => {});
 
 
 

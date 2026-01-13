@@ -14,6 +14,7 @@ import subAdminRoute from "./subAdmin/subAdmin.route.js"
 import adminRoute from  "./admin/admin.routes.js"
 import ContactRouter from "../routes/contactus.routes.js"
 import BlogRouter from "../routes/blog.route.js"
+import chatRoute from "../routes/chat/chat.route.js"
 import PlatformSettingRouter from "./platformSetting.route.js"
 const router = express.Router();
 
@@ -29,9 +30,10 @@ router.use("/supportCall", SuportCallRouter);
 router.use("/supportTickets",SupportTicket);
 router.use("/subAdmin",subAdminRoute);
 router.use("/admin",adminRoute);
-router.use("/", UserRouter);
 router.use("/contact", ContactRouter);
 router.use("/blog", BlogRouter)
+router.use("/", UserRouter);
+router.use("/chat",chatRoute)
 router.use("/platform-setting", PlatformSettingRouter)
 
 export default router;
