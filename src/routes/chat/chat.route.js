@@ -4,6 +4,7 @@ import {
   getOrCreateConversation,
   getConversationMessages,
   getPartnerConversationList,
+  getCustomerConversationList,
 } from "../../controllers/chat/chat.controler.js";
 
 import { protect } from "../../middleware/auth/auth.middleware.js";
