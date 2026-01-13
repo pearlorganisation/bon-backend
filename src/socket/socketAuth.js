@@ -5,7 +5,6 @@ import cookie from "cookie";
 import Auth from "../models/auth/auth.model.js";
 
 const socketAuth = async (socket, next) => {
-  
   try {
 
     //  Parse cookies from handshake

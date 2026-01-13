@@ -49,6 +49,7 @@ export const register = asyncHandler(async (req, res, next) => {
     try {
       await OTP.findOneAndReplace(
         { email, type: "REGISTER" },
+        { email, type: "REGISTER" },
         { otp, email, type: "REGISTER" },
         { upsert: true, new: true }
       );
@@ -278,15 +279,11 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 
 export const logout = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
-  const { deviceId } = req.body || {};
 
   if (userId) {
-    await Auth.findByIdAndUpdate(userId, { refresh_token: null });
-    await User.findByIdAndUpdate(userId, {
-      $pull: {
-        fcmTokens: { deviceId },
-      },
-    });
+    // Combine these into one call for better performance
+    await Auth.findByIdAndUpdate(userId, {refresh_token: null,});
+    await Auth.findByIdAndUpdate(userId, {fcmToken: null,});
     
   }
   res.clearCookie("accessToken");
@@ -296,8 +293,7 @@ export const logout = asyncHandler(async (req, res, next) => {
     const now = new Date();
     const today = dayjs().format("YYYY-MM-DD");
 
-    let session = await Sub_Admin_Session.findOne({
-      userId,
+    let session = await Sub_Admin_Session.findOne({userId,
       date: today,
     });
 
@@ -475,10 +471,9 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
   });
 };
 
-
 export const saveFcmToken = async (req, res) => {
   try {
-    const { token, deviceId } = req.body;
+    const { token, } = req.body;
     const userId = req.user._id;
 
     if (!token) {
@@ -489,7 +484,7 @@ export const saveFcmToken = async (req, res) => {
     await Auth.findByIdAndUpdate(
       userId,
       {
-        fcmToken: token,          // overwrite old token
+        fcmToken: token, // overwrite old token
       },
       { new: true }
     );

@@ -28,15 +28,13 @@ const initSocket = (server) => {
     );
 
     // onlineUsers: Map<userId, socketId>
-    if (onlineUsers.has(userId)) {
-      // Replace previous socket with the new one
-      onlineUsers.set(userId, socket.id);
-    } else {
-      // First time login
-      onlineUsers.set(userId, socket.id);
+    if (!onlineUsers.has(userId)) {
+      onlineUsers.set(userId, new Set());
     }
+    onlineUsers.get(userId).add(socket.id);
 
-    console.log("Online users map:", onlineUsers);
+    console.log(`Socket connected: ${socket.id}, User: ${userId}`);
+    console.log("Online users map count:", onlineUsers.size);
 
     // 2️⃣ Notify counterparts and get their current status
     const notifyCounterparts = async () => {
@@ -75,14 +73,16 @@ const initSocket = (server) => {
 
     // 4️⃣ Handle disconnect
     socket.on("disconnect", async () => {
-      const sockets = onlineUsers.get(userId);
-      if (sockets) {
-        sockets.delete(socket.id);
+      const userSockets = onlineUsers.get(userId);
 
-        if (sockets.size === 0) {
+      if (userSockets) {
+        // Remove only this specific socket ID
+        userSockets.delete(socket.id);
+
+        // Only if ALL tabs/devices are closed, mark user as offline
+        if (userSockets.size === 0) {
           onlineUsers.delete(userId);
 
-          // Notify only counterparts that this user went offline
           const conversations =
             role === "CUSTOMER"
               ? await ConversationModel.find({ customerId: userId }).lean()

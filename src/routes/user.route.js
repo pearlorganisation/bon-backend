@@ -8,6 +8,7 @@ import {
   getUserProfileById,
   deleteAllUsers,
   updateAllUsers,
+  searchProperties
 } from "../controllers/user.controller.js";
 
 const storage = multer.memoryStorage(); // or diskStorage
@@ -29,5 +30,7 @@ router.put(
 router.delete("/users/:id", protect, isAdmin, deleteAllUsers);
 
 router.get("/profile/:userId", protect, getUserProfileById);
+
+router.get("/search",searchProperties);
 
 export default router;
