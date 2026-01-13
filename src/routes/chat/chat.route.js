@@ -5,7 +5,8 @@ import {
   getOrCreateConversation,
   getConversationMessages,
   getPartnerConversationList,
-} from "../../controllers/chat/chat.controler.js"
+  getCustomerConversationList,
+} from "../../controllers/chat/chat.controler.js";
 
 import { protect } from "../../middleware/auth/auth.middleware.js";
 
@@ -20,13 +21,11 @@ router.post("/conversation", protect, getOrCreateConversation);
  */
 router.get("/messages", protect, getConversationMessages);
 
+router.get("/conversations", protect, getCustomerConversationList);
+
 /**
  * 3️ Partner inbox - list of conversations
  */
-router.get(
-  "/partner/conversations",
-  protect,
-  getPartnerConversationList
-);
+router.get("/partner/conversations", protect, getPartnerConversationList);
 
 export default router;
