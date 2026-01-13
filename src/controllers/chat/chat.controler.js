@@ -3,6 +3,7 @@ import CustomError from "../../utils/error/customError.js";
 import Conversation from "../../models/Chat/Conversation.model.js";
 import Message from "../../models/Chat/Message.model.js";
 import propertyModel from "../../models/Listing/property.model.js";
+import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
 
 const EDIT_LIMIT_MINUTES = 5;
 const DELETE_LIMIT_MINUTES = 5;
@@ -136,30 +137,59 @@ export const updateMessage = async (req, res, next) => {
   });
 };
 
-export const deleteMessage = async (req, res, next) => {
-  const { messageId } = req.params;
-  const userId = req.user.id;
+export const deleteMessageAttachment = async (req, res, next) => {
 
-  const msg = await Message.findById(messageId);
+  try {
+    const { messageId, publicId, resource_type } = req.body;
+    const userId = req.user.id;
 
-  if (!msg) {
-    return next(new CustomError("Message not found", 404));
+    if (!messageId) {
+      return next(new CustomError("Message is required", 400));
+    }
+
+    // 1️⃣ Find message
+    const message = await Message.findById(messageId);
+
+    if (!message) {
+      return next(new CustomError("Message not found", 404));
+    }
+
+    // 2️ Authorization check (only sender can delete)
+    if (message.senderId.toString() !== userId) {
+      return next(
+        new CustomError("Not authorized to delete this message", 403)
+      );
+    }
+
+    if (diffMinutes > DELETE_LIMIT_MINUTES) {
+      return next(new CustomError("Delete time expired for this message", 400));
+    }
+
+    if (publicId && resource_type) {
+      await deleteFileFromCloudinary(
+        publicId,
+        resource_type === "image" ? "image" : "raw"
+      );
+
+      //  Remove attachment from message document
+      message.attachments = message.attachments.filter(
+        (a) => a.public_id !== publicId
+      );
+
+      if (!message.text && message.attachments.length === 0) {
+        await message.deleteOne();
+
+        return res.status(200).json({
+          success: true,
+          message: "Attachment deleted and message removed",
+        });
+      }
+
+    }
+    
+    message.deleteOne();
+  } catch (error) {
+    console.error("Delete attachment error:", error);
+    res.status(500).json({ message: "Server error" });
   }
-
-  if (msg.senderId.toString() !== userId) {
-    return next(new CustomError("Not authorized to delete this message", 403));
-  }
-
-  const diffMinutes = (Date.now() - msg.createdAt.getTime()) / (1000 * 60);
-
-  if (diffMinutes > DELETE_LIMIT_MINUTES) {
-    return next(new CustomError("Delete time expired for this message", 400));
-  }
-
-  await msg.deleteOne();
-
-  res.status(200).json({
-    success: true,
-    message: "Message deleted successfully",
-  });
 };

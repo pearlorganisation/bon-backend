@@ -54,7 +54,6 @@ const registerChatHandlers = (io, socket) => {
       const isPartner = conversation.partnerId?.toString() === userId;
 
       if (!isCustomer && !isPartner) return;
-      if (!isCustomer && !isPartner) return;
 
       const senderRole = isCustomer ? "CUSTOMER" : "PARTNER";
 
