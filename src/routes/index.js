@@ -28,8 +28,7 @@ router.use("/supportCall", SuportCallRouter);
 router.use("/supportTickets",SupportTicket);
 router.use("/subAdmin",subAdminRoute);
 router.use("/admin",adminRoute);
-router.use("/", UserRouter);
 router.use("/contact", ContactRouter);
 router.use("/blog", BlogRouter)
-
+router.use("/", UserRouter);
 export default router;

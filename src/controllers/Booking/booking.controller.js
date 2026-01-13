@@ -160,7 +160,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     } = req.body;
 
     const userId = req.user._id;
-
+  
     // 1️ Basic validation
     if (!propertyId) throw new CustomError("Property ID is required", 400);
     if (!Array.isArray(rooms) || rooms.length === 0)
@@ -186,7 +186,6 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     // 2️ Validate dates
     const checkIn = normalizeDate(checkInDate);
     const checkOut = normalizeDate(checkOutDate);
-
     if (isNaN(checkIn) || isNaN(checkOut))
       throw new CustomError("Invalid date format", 400);
 
@@ -213,14 +212,14 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     const roomsData = [];
 
     const dates = getDatesBetween(checkIn, checkOut);
-
+  console.log(dates,"dates");
     // 4️ Loop rooms
     for (const item of rooms) {
       if (!item.roomId) throw new CustomError("Room ID is required", 400);
       if (!item.quantity || item.quantity < 1)
         throw new CustomError("Room quantity must be at least 1", 400);
 
-      const room = await Room.findById(item.roomId).session(session);
+      const room = await Room.findOne({_id: item.roomId,propertyId}).session(session);
       if (!room) throw new CustomError("Room not found", 404);
 
       // ❌ Blocked date check
