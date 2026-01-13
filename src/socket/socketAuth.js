@@ -16,7 +16,6 @@ const socketAuth = async (socket, next) => {
     //  Get access token
     const token =
       cookies.accessToken || // 👈 cookie-based auth (BEST)
-      cookies.accessToken || // 👈 cookie-based auth (BEST)
       socket.handshake.auth?.token ||
       socket.handshake.headers?.authorization?.split(" ")[1];
 
