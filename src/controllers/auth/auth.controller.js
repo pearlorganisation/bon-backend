@@ -278,10 +278,16 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 
 export const logout = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
-  const { deviceId } = req.body;
+  const { deviceId } = req.body || {};
+
   if (userId) {
     await Auth.findByIdAndUpdate(userId, { refresh_token: null });
-    await Auth.findByIdAndUpdate(userId, { fcmTokens: null });
+    await User.findByIdAndUpdate(userId, {
+      $pull: {
+        fcmTokens: { deviceId },
+      },
+    });
+    
   }
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
@@ -295,11 +301,9 @@ export const logout = asyncHandler(async (req, res, next) => {
       date: today,
     });
 
-    console.log("sessin ", session);
-
     if (session) {
       session.LogoutAt = now;
-      session.save();
+      await session.save(); // Added await here as save() is asynchronous
     }
   }
 
@@ -474,7 +478,7 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
 
 export const saveFcmToken = async (req, res) => {
   try {
-    const { token } = req.body;
+    const { token, deviceId } = req.body;
     const userId = req.user._id;
 
     if (!token) {

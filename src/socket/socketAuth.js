@@ -1,6 +1,8 @@
 import jwt from "jsonwebtoken";
 import cookie from "cookie";
 import Auth from "../models/auth/auth.model.js";
+import cookie from "cookie";
+import Auth from "../models/auth/auth.model.js";
 
 const socketAuth = async (socket, next) => {
   
@@ -13,6 +15,7 @@ const socketAuth = async (socket, next) => {
 
     //  Get access token
     const token =
+      cookies.accessToken || // 👈 cookie-based auth (BEST)
       cookies.accessToken || // 👈 cookie-based auth (BEST)
       socket.handshake.auth?.token ||
       socket.handshake.headers?.authorization?.split(" ")[1];
