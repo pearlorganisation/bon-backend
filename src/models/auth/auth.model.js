@@ -66,22 +66,10 @@ const auth_schema = new mongoose.Schema(
       public_id: { type: String },
     },
     refresh_token: { type: String },
-    fcmTokens: [
-      {
-        token: {
-          type: String,
-          required: true,
-        },
-        deviceId: {
-          type: String,
-          required: true,
-        },
-        lastUsedAt: {
-          type: Date,
-          default: Date.now,
-        },
-      },
-    ],
+    fcmToken: {
+      type: String,
+      required: false,
+    },
   },
   { timestamps: true }
 );

@@ -84,7 +84,7 @@ export const getPartnerConversationList = asyncHandler(
 
     const conversations = await Conversation.find({ partnerId })
       .populate("customerId", "name email")
-      .populate("propertyId", "title")
+      .populate("propertyId", "name")
       .sort({ updatedAt: -1 })
       .lean();
 
