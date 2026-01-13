@@ -6,8 +6,8 @@ import {
   uploadFileToCloudinary,
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
+// import Property from "../../models/Listing/"
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
-
 
 // ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
@@ -236,7 +236,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
       }
     }
 
-    property.policies =policies;
+    property.policies = policies;
   }
 
   if (req.body?.imagesToDelete) {

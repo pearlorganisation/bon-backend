@@ -5,12 +5,20 @@ const attachmentSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+
+  public_id: {
+    type: String,
+    required: true, // ✅ needed to delete from Cloudinary
+  },
+
   type: {
     type: String,
     enum: ["image", "file"],
     required: true,
   },
 });
+
+
 
 const messageSchema = new mongoose.Schema(
   {

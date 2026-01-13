@@ -27,9 +27,15 @@ const initSocket = (server) => {
       `Socket connected: ${socket.id}, User: ${userId}, Role: ${role}`
     );
 
-    // 1️⃣ Track online users
-    if (!onlineUsers.has(userId)) onlineUsers.set(userId, new Set());
-    onlineUsers.get(userId).add(socket.id);
+    // onlineUsers: Map<userId, socketId>
+    if (onlineUsers.has(userId)) {
+      // Replace previous socket with the new one
+      onlineUsers.set(userId, socket.id);
+    } else {
+      // First time login
+      onlineUsers.set(userId, socket.id);
+    }
+
     console.log("Online users map:", onlineUsers);
 
     // 2️⃣ Notify counterparts and get their current status

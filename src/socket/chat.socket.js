@@ -28,9 +28,11 @@ const registerChatHandlers = (io, socket) => {
       if (!text && attachments.length === 0) return;
 
       // Validate attachments
-      for (const a of attachments) {
-        if (!["image", "file"].includes(a.type)) return;
-        if (!a.url) return;
+      if (attachments.length > 0) {
+        for (const a of attachments) {
+          if (!["image", "file"].includes(a.type)) return;
+          if (!a.url) return;
+        }
       }
 
       const conversation = await Conversation.findById(conversationId);
@@ -60,6 +62,16 @@ const registerChatHandlers = (io, socket) => {
         seenBy: [],
       });
 
+      if (senderRole === "CUSTOMER") {
+        conversation.unreadCountPartner += 1;
+      } else {
+        conversation.unreadCountCustomer += 1;
+      }
+
+      socket.to(conversationId).emit("receive_message", newMessage);
+
+      await conversation.save();
+
       // Last message preview
       let lastMessagePreview = text;
       if (!text && attachments.length) {
@@ -70,22 +82,7 @@ const registerChatHandlers = (io, socket) => {
       conversation.lastMessage = lastMessagePreview;
       conversation.lastMessageAt = new Date();
 
-      if (senderRole === "CUSTOMER") {
-        conversation.unreadCountPartner += 1;
-      } else {
-        conversation.unreadCountCustomer += 1;
-      }
-
-      await conversation.save();
-
-      // Emit message
-      socket.to(conversationId).emit("receive_message", newMessage);
-
-      // When sender receives "message_delivered"
-      socket.to("message_delivered", ({ messageId }) => {
-        // mark the specific message as delivered (double gray tick)
-        updateMessageTick(messageId, "delivered");
-      });
+     
 
       // 🔔 Firebase notification (receiver offline)
       const receiverId =
@@ -97,21 +94,32 @@ const registerChatHandlers = (io, socket) => {
         const receiver = await User.findById(receiverId);
 
         let notificationBody = text?.substring(0, 40);
+
         if (!text && attachments.length) {
-          notificationBody =
-            attachments[0].type === "image"
-              ? "📷 Image received"
-              : "📎 File received";
+          const imageCount = attachments.filter(
+            (a) => a.type === "image"
+          ).length;
+          const fileCount = attachments.filter((a) => a.type === "file").length;
+
+          if (imageCount && fileCount) {
+            notificationBody = `📎 ${attachments.length} attachments received`;
+          } else if (imageCount > 1) {
+            notificationBody = `📷 ${imageCount} images received`;
+          } else if (imageCount === 1) {
+            notificationBody = "📷 Image received";
+          } else if (fileCount > 1) {
+            notificationBody = `📄 ${fileCount} files received`;
+          } else if (fileCount === 1) {
+            notificationBody = "📄 File received";
+          }
         }
 
-        for (const t of receiver.fcmTokens) {
-          await sendFirebaseNotification({
-            token: t.token,
-            title: "New Message",
-            body: notificationBody,
-            data: { conversationId },
-          });
-        }
+        await sendFirebaseNotification({
+          token: receiver.fcmToken,
+          title: "New Message",
+          body: notificationBody,
+          data: { conversationId },
+        });
       }
     } catch (error) {
       console.error("send_message error:", error);
