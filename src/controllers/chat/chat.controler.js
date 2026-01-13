@@ -164,3 +164,28 @@ export const deleteMessage = async (req, res, next) => {
     message: "Message deleted successfully",
   });
 };
+
+export const getCustomerConversationList = asyncHandler(
+  async (req, res, next) => {
+    const customerId = req.user._id;
+
+    const conversations = await Conversation.find({ customerId })
+      .populate("partnerId", "name email profileImage")
+      .populate("propertyId", "name images title")
+      .sort({ updatedAt: -1 })
+      .lean();
+
+    res.status(200).json({
+      success: true,
+      count: conversations.length,
+      conversations: conversations.map((c) => ({
+        conversationId: c._id,
+        partner: c.partnerId,
+        property: c.propertyId,
+        lastMessage: c.lastMessage,
+        lastMessageAt: c.lastMessageAt,
+        unreadCount: c.unreadCountCustomer,
+      })),
+    });
+  }
+);
