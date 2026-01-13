@@ -107,7 +107,7 @@ export const getPartnerConversationList = asyncHandler(
 export const updateMessage = async (req, res, next) => {
   const { messageId } = req.params;
   const { message } = req.body;
-  const userId = req.user.id;
+  const userId = req.user._id;
 
   const msg = await Message.findById(messageId);
 
@@ -141,29 +141,33 @@ export const deleteMessageAttachment = async (req, res, next) => {
 
   try {
     const { messageId, publicId, resource_type } = req.body;
-    const userId = req.user.id;
+    const userId = req.user._id;
 
     if (!messageId) {
       return next(new CustomError("Message is required", 400));
     }
 
-    // 1️⃣ Find message
+    //  Find message
     const message = await Message.findById(messageId);
 
     if (!message) {
       return next(new CustomError("Message not found", 404));
     }
 
-    // 2️ Authorization check (only sender can delete)
+    //  Authorization check (only sender can delete)
     if (message.senderId.toString() !== userId) {
       return next(
         new CustomError("Not authorized to delete this message", 403)
       );
     }
 
+    const diffMinutes = (Date.now() - message.createdAt.getTime()) / (1000 * 60);
+
     if (diffMinutes > DELETE_LIMIT_MINUTES) {
       return next(new CustomError("Delete time expired for this message", 400));
     }
+
+    await message.deleteOne();
 
     if (publicId && resource_type) {
       await deleteFileFromCloudinary(
@@ -184,10 +188,8 @@ export const deleteMessageAttachment = async (req, res, next) => {
           message: "Attachment deleted and message removed",
         });
       }
-
     }
-    
-    message.deleteOne();
+
   } catch (error) {
     console.error("Delete attachment error:", error);
     res.status(500).json({ message: "Server error" });
