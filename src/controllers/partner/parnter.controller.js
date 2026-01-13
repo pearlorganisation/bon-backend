@@ -253,8 +253,6 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
   }
 });
 
-const verifyProperyManually = asyncHandler(async (req, res, next) => {});
-
 
 
 export const getAllPartners = async (req, res) => {

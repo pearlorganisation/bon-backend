@@ -87,8 +87,6 @@ const registerChatHandlers = (io, socket) => {
       conversation.lastMessage = lastMessagePreview;
       conversation.lastMessageAt = new Date();
 
-     
-
       // 🔔 Firebase notification (receiver offline)
       const receiverId =
         senderRole === "CUSTOMER"

@@ -7,7 +7,6 @@ import {
   deleteMessageAttachment,
   updateMessage
 } from "../../controllers/chat/chat.controler.js";
-import MessageModel from "../../models/Chat/Message.model.js";
 
 import { protect } from "../../middleware/auth/auth.middleware.js";
 
@@ -75,6 +74,8 @@ router.post("/conversation", protect, getOrCreateConversation);
  * conversationId REQUIRED
  */
 router.get("/messages", protect, getConversationMessages);
+
+router.get("/conversations", protect, getCustomerConversationList);
 
 /**
  * 3️ Partner inbox - list of conversations
