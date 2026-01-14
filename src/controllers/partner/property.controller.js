@@ -171,7 +171,6 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     "pincode",
     "checkIn",
     "checkOut",
-    "status",
     "propertyType",
   ];
 
