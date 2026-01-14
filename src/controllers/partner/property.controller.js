@@ -7,6 +7,7 @@ import {
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
 import Partner from "../../models/Partner/partner.model.js";
+import Auth from "../../models/auth/auth.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
 // ✅ Create a new property
@@ -788,3 +789,14 @@ export const approveRejectProperty = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, `Property ${action} successfully`, property);
 });
 
+
+export const assignPropertyToPartner =asyncHandler(async (req,res,next)=>{
+       
+  const {propertyId,partnerEmail} =req.body;
+
+    if(!propertyId || !partnerEmail){
+     return next( new CustomError("propertyId and Partnere Email is required")); 
+    }
+      
+     const  isPartner  = await Auth.findOne({email: partnerEmail,role:"PARTNER"});
+});
