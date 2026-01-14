@@ -5,7 +5,8 @@ import {
   getConversationMessages,
   getPartnerConversationList,
   deleteMessageAttachment,
-  updateMessage
+  updateMessage,
+  getCustomerConversationList,
 } from "../../controllers/chat/chat.controler.js";
 
 import { protect } from "../../middleware/auth/auth.middleware.js";
@@ -25,7 +26,6 @@ const upload = multer({
     fileSize: 5 * 1024 * 1024, // ⬅️ 5 MB per file (recommended)
   },
 });
-
 
 router.post(
   "/update-file",
@@ -63,7 +63,6 @@ router.post(
   }
 );
 
-
 /**
  * 1️ Create or get conversationId (Customer)
  */
@@ -82,8 +81,8 @@ router.get("/conversations", protect, getCustomerConversationList);
  */
 router.get("/partner/conversations", protect, getPartnerConversationList);
 
-router.delete("/delete/msg",protect,deleteMessageAttachment)
+router.delete("/delete/msg", protect, deleteMessageAttachment);
 
-router.patch("/udpate/message",protect,updateMessage)
+router.patch("/udpate/message", protect, updateMessage);
 
 export default router;
