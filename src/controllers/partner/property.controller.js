@@ -7,6 +7,7 @@ import {
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
 import Partner from "../../models/Partner/partner.model.js";
+import Auth from "../../models/auth/auth.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
 // ✅ Create a new property
@@ -417,7 +418,7 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     // Partner can see only their properties
     properties = await Property.find({ partnerId: user._id });
   } else if (user.role == "SUB_ADMIN") {
-    properties = await Property.find({ subAdminId: user._id ,partnerId:null });
+    properties = await Property.find({ subAdminId: user._id, partnerId: null });
   }
 
   if (!properties.length) {
@@ -455,7 +456,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     query.partnerId = user._id;
   } else if (user.role === "SUB_ADMIN") {
     query.subAdminId = user._id;
-    query.partnerId= null
+    query.partnerId = null;
   } else {
     return next(
       new CustomError("You are not authorized to access this property", 403)
@@ -483,45 +484,41 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   );
 });
 
-
 export const getAllProperties = async (req, res) => {
   try {
+    const properties = await Property.aggregate([
+      {
+        $match: {
+          partnerId: { $ne: null },
+          verified: "approved",
+          status: "active",
+        },
+      },
 
-   const properties = await Property.aggregate([
-     {
-       $match: {
-         partnerId: { $ne: null },
-         verified: "approved",
-         status: "active",
-       },
-     },
+      {
+        $lookup: {
+          from: "partners",
+          localField: "partnerId",
+          foreignField: "userId",
+          as: "partner",
+        },
+      },
 
-     {
-       $lookup: {
-         from: "partners",
-         localField: "partnerId",
-         foreignField: "userId",
-         as: "partner",
-       },
-     },
+      {
+        $unwind: "$partner",
+      },
 
-     {
-       $unwind: "$partner",
-     },
-
-     {
-       $match: {
-         "partner.isVerified": true,
-       },
-     },
-     {
-       $project: {
-         partner: 0,
-       },
-     },
-   ]);
-
-
+      {
+        $match: {
+          "partner.isVerified": true,
+        },
+      },
+      {
+        $project: {
+          partner: 0,
+        },
+      },
+    ]);
 
     return successResponse(
       res,
@@ -593,7 +590,6 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   // 3️ Return only public-safe data
   successResponse(res, 200, "Property fetched successfully", property);
 });
-
 
 export const searchProperties = asyncHandler(async (req, res, next) => {
   const { location, checkIn, checkOut, rooms = 1, propertyType } = req.query;
@@ -714,15 +710,16 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
       _id: propertyId,
       subAdminId: userId,
     });
-  } else if(role === "PARTNER") {
-  
-     const partner = await Partner.findOne({userId});
-     if(!partner) return next(new CustomError("Partner not found", 404));
+  } else if (role === "PARTNER") {
+    const partner = await Partner.findOne({ userId });
+    if (!partner) return next(new CustomError("Partner not found", 404));
 
-     if(!partner.isVerified){
-      return next(new CustomError("Complete your KYC to verified you property", 404));
-     }
-    
+    if (!partner.isVerified) {
+      return next(
+        new CustomError("Complete your KYC to verified you property", 404)
+      );
+    }
+
     property = await Property.findOne({
       _id: propertyId,
       partnerId: userId,
@@ -734,9 +731,7 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
   }
 
   if (property.verified == "approved") {
-    return next(
-      new CustomError("Property already approved", 400)
-    );
+    return next(new CustomError("Property already approved", 400));
   }
 
   property.verified = "under_review";
@@ -753,24 +748,28 @@ export const getPropertyApprovalRequests = asyncHandler(
 
     if (role !== "ADMIN") {
       return next(
-        new CustomError("Only admin can fetch all under_ reviewed properties", 403)
+        new CustomError(
+          "Only admin can fetch all under_ reviewed properties",
+          403
+        )
       );
     }
-      
+
     const properties = await Property.find({
       verified: "under_review",
-    }).populate("partnerId", "name email").populate("subAdminId","name email");
+    })
+      .populate("partnerId", "name email")
+      .populate("subAdminId", "name email");
 
     successResponse(res, 200, "Property approval requests fetched", properties);
   }
 );
 
 export const approveRejectProperty = asyncHandler(async (req, res, next) => {
-      
   const { propertyId } = req.params;
   const { action, reason } = req.body;
 
-  if (!["approved", "rejected",].includes(action)) {
+  if (!["approved", "rejected"].includes(action)) {
     return next(new CustomError("Invalid action", 400));
   }
 
@@ -780,11 +779,74 @@ export const approveRejectProperty = asyncHandler(async (req, res, next) => {
   }
 
   property.verified = action;
-  if(reason)property.AdminNote =reason;
-
+  if (reason) property.AdminNote = reason;
 
   await property.save();
 
   successResponse(res, 200, `Property ${action} successfully`, property);
 });
 
+export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
+  const { propertyId} = req.params;
+
+  if (!propertyId ) {
+    return next(
+      new CustomError("propertyId is required", 400)
+    );
+  }
+
+  const property = await Property.findById(propertyId);
+  if (!property) {
+    return next(new CustomError("Property not found", 404));
+  }
+
+  if (property.verified !== "approved") {
+    return next(
+      new CustomError(
+        `Only approved property can be assigned. Current status: ${property.verified}`,
+        400
+      )
+    );
+  }
+
+  if (property.partnerId) {
+    return next(
+      new CustomError("Property is already assigned to a partner", 409)
+    );
+  }
+
+  const partnerAuth = await Auth.findOne({
+    email: property.PartnerEmail.toLowerCase(),
+    role: "PARTNER",
+  });
+
+  if (!partnerAuth) {
+    return next(new CustomError("Partner account not found", 404));
+  }
+
+  if (!partnerAuth.isVerified) {
+    return next(
+      new CustomError(`Partner ${partnerAuth.name} has not verified email`, 400)
+    );
+  }
+
+  const partnerKyc = await Partner.findOne({
+    userId: partnerAuth._id,
+    isVerified: true,
+  });
+
+  if (!partnerKyc) {
+    return next(
+      new CustomError(`Partner ${partnerAuth.name} has not completed KYC`, 400)
+    );
+  }
+
+  property.partnerId = partnerAuth._id;
+  await property.save();
+
+  return successResponse(
+    res,
+    200,
+    `Property (${property.name}) assigned to partner (${partnerAuth.name})`
+  );
+});
