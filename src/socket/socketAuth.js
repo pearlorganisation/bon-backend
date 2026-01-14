@@ -1,4 +1,5 @@
 import jwt from "jsonwebtoken";
+
 import cookie from "cookie";
 import Auth from "../models/auth/auth.model.js";
 

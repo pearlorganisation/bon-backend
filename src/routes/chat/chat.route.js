@@ -4,6 +4,8 @@ import {
   getOrCreateConversation,
   getConversationMessages,
   getPartnerConversationList,
+  deleteMessageAttachment,
+  updateMessage,
   getCustomerConversationList,
 } from "../../controllers/chat/chat.controler.js";
 
@@ -39,7 +41,7 @@ router.post(
         return res.status(400).json({ message: "Maximum 4 files allowed" });
       }
 
-      // ✅ Upload to Cloudinary (already supports array)
+      // Upload to Cloudinary (already supports array)
       const uploadedFiles = await uploadFileToCloudinary(
         req.files,
         "chat_files"
@@ -61,61 +63,6 @@ router.post(
   }
 );
 
-router.delete("/delete-file", protect, async (req, res) => {
-  try {
-    const { messageId, publicId, resource_type } = req.body;
-
-    if (!messageId || !publicId) {
-      return res.status(400).json({
-        message: "messageId and publicId are required",
-      });
-    }
-
-    const message = await MessageModel.findById(messageId);
-    if (!message) {
-      return res.status(404).json({ message: "Message not found" });
-    }
-
-    //  Authorization (only sender can delete)
-    if (message.senderId.toString() !== req.user.id) {
-      return res.status(403).json({ message: "Not allowed" });
-    }
-
-    // Delete from Cloudinary
-    await deleteFileFromCloudinary(
-      publicId,
-      resource_type === "image" ? "image" : "raw"
-    );
-
-    // 4️⃣ Remove attachment from DB
-    message.attachments = message.attachments.filter(
-      (a) => a.public_id !== publicId
-    );
-
-    //  If message becomes empty → delete message
-    if (!message.text && message.attachments.length === 0) {
-      await Message.findByIdAndDelete(messageId);
-
-      return res.json({
-        success: true,
-        message: "Attachment deleted and message removed",
-      });
-    }
-
-    //  Otherwise save updated message
-    await message.save();
-
-    res.json({
-      success: true,
-      message: "Attachment deleted successfully",
-      attachments: message.attachments,
-    });
-  } catch (error) {
-    console.error("Delete file error:", error);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
 /**
  * 1️ Create or get conversationId (Customer)
  */
@@ -133,5 +80,9 @@ router.get("/conversations", protect, getCustomerConversationList);
  * 3️ Partner inbox - list of conversations
  */
 router.get("/partner/conversations", protect, getPartnerConversationList);
+
+router.delete("/delete/msg", protect, deleteMessageAttachment);
+
+router.patch("/udpate/message", protect, updateMessage);
 
 export default router;
