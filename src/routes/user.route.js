@@ -8,9 +8,8 @@ import {
   getUserProfile,
   getUserProfileById,
   updateAllUsers,
-  updateUserProfile,
 } from "../controllers/user.controller.js";
-
+import { updateUserProfile } from "../controllers/user.controller.js";
 const storage = multer.memoryStorage(); // or diskStorage
 const upload = multer({ storage });
 

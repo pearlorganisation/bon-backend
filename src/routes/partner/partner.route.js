@@ -106,19 +106,6 @@ router.get(
   getPublicPropertyById
 );
 
-router.get(
-  "/admin/properties/approval-requests",
-  protect,
-  authorizeRoles("ADMIN"),
-  getPropertyApprovalRequests
-);
-
-router.patch(
-  "/admin/properties/:propertyId/approve",
-  protect,
-  authorizeRoles("ADMIN"),
-  approveRejectProperty
-);
 
 //---------- Rooms routes ----------------
 
