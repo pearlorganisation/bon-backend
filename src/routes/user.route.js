@@ -9,7 +9,7 @@ import {
   deleteAllUsers,
   updateAllUsers,
   searchProperties
-} from "../controllers/user.controller.js";
+} from "../controllers/partner/property.controller.js";
 
 const storage = multer.memoryStorage(); // or diskStorage
 const upload = multer({ storage });
