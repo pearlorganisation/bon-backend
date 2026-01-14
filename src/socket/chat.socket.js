@@ -27,26 +27,14 @@ const registerChatHandlers = (io, socket) => {
    */
   socket.on("send_message", async (data) => {
     try {
-      const { conversationId, text, attachments = [] } = data;
+      const { conversationId, text ,attachments=[] } = data;
 
       if (!conversationId) return;
-      if (!text && attachments.length === 0) return;
 
-      // Validate attachments
-      if (attachments.length > 0) {
-        for (const a of attachments) {
-          if (!["image", "file"].includes(a.type)) return;
-          if (!a.url) return;
-        }
-      }
 
       const conversation = await Conversation.findById(conversationId);
       if (!conversation) return;
 
-      // Assign partner if missing
-      if (!conversation.partnerId && socket.user.role === "PARTNER") {
-        conversation.partnerId = socket.user.id;
-      }
 
       // Authorization
       const userId = socket.user.id.toString();
@@ -79,10 +67,7 @@ const registerChatHandlers = (io, socket) => {
 
       // Last message preview
       let lastMessagePreview = text;
-      if (!text && attachments.length) {
-        lastMessagePreview =
-          attachments[0].type === "image" ? "📷 Image" : "📎 File";
-      }
+    
 
       conversation.lastMessage = lastMessagePreview;
       conversation.lastMessageAt = new Date();
@@ -98,24 +83,6 @@ const registerChatHandlers = (io, socket) => {
 
         let notificationBody = text?.substring(0, 40);
 
-        if (!text && attachments.length) {
-          const imageCount = attachments.filter(
-            (a) => a.type === "image"
-          ).length;
-          const fileCount = attachments.filter((a) => a.type === "file").length;
-
-          if (imageCount && fileCount) {
-            notificationBody = `📎 ${attachments.length} attachments received`;
-          } else if (imageCount > 1) {
-            notificationBody = `📷 ${imageCount} images received`;
-          } else if (imageCount === 1) {
-            notificationBody = "📷 Image received";
-          } else if (fileCount > 1) {
-            notificationBody = `📄 ${fileCount} files received`;
-          } else if (fileCount === 1) {
-            notificationBody = "📄 File received";
-          }
-        }
 
         await sendFirebaseNotification({
           token: receiver.fcmToken,

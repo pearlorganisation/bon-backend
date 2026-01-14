@@ -4,6 +4,9 @@ import Conversation from "../../models/Chat/Conversation.model.js";
 import Message from "../../models/Chat/Message.model.js";
 import propertyModel from "../../models/Listing/property.model.js";
 import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
+import { uploadFileToCloudinary } from "../../utils/cloudinary.js";
+import onlineUsers from "../../socket/onlineUsers.js";
+import sendFirebaseNotification from "../../utils/sendFirebaseNotification.js";
 
 const EDIT_LIMIT_MINUTES = 5;
 const DELETE_LIMIT_MINUTES = 5;
@@ -18,8 +21,8 @@ export const getOrCreateConversation = asyncHandler(async (req, res, next) => {
 
   const property = await propertyModel.findById(propertyId).select("partnerId");
 
-  if (!property) {
-    return next(new CustomError("Property not found", 404));
+  if (!property || property.partnerId == null) {
+    return next(new CustomError("Property not found or not yet listed", 404));
   }
 
   let conversation = await Conversation.findOne({
@@ -105,8 +108,11 @@ export const getPartnerConversationList = asyncHandler(
 );
 
 export const updateMessage = async (req, res, next) => {
+
   const { messageId } = req.params;
-  const { message } = req.body;
+
+  const { message, publicId, resource_type } = req.body;
+
   const userId = req.user._id;
 
   const msg = await Message.findById(messageId);
@@ -127,6 +133,27 @@ export const updateMessage = async (req, res, next) => {
     return next(new CustomError("Edit time expired for this message", 400));
   }
 
+  if (publicId && resource_type) {
+    await deleteFileFromCloudinary(
+      publicId,
+      resource_type === "image" ? "image" : "raw"
+    );
+
+    //  Remove attachment from message document
+    msg.attachments = msg.attachments.filter(
+      (a) => a.public_id !== publicId
+    );
+
+    if (!msg.text && msg.attachments.length === 0) {
+      await msg.deleteOne();
+
+      return res.status(200).json({
+        success: true,
+        message: "Attachment deleted and message removed",
+      });
+    }
+  }
+
   msg.message = message;
   await msg.save();
 
@@ -138,7 +165,6 @@ export const updateMessage = async (req, res, next) => {
 };
 
 export const deleteMessageAttachment = async (req, res, next) => {
-
   try {
     const { messageId, publicId, resource_type } = req.body;
     const userId = req.user._id;
@@ -161,7 +187,8 @@ export const deleteMessageAttachment = async (req, res, next) => {
       );
     }
 
-    const diffMinutes = (Date.now() - message.createdAt.getTime()) / (1000 * 60);
+    const diffMinutes =
+      (Date.now() - message.createdAt.getTime()) / (1000 * 60);
 
     if (diffMinutes > DELETE_LIMIT_MINUTES) {
       return next(new CustomError("Delete time expired for this message", 400));
@@ -189,7 +216,6 @@ export const deleteMessageAttachment = async (req, res, next) => {
         });
       }
     }
-
   } catch (error) {
     console.error("Delete attachment error:", error);
     res.status(500).json({ message: "Server error" });
@@ -220,3 +246,119 @@ export const getCustomerConversationList = asyncHandler(
     });
   }
 );
+
+export const sendMessageWithFiles = async (req, res, next) => {
+  try {
+    const { conversationId, text } = req.body;
+
+    const files = req.files || [];
+
+    if (!conversationId) {
+      return next(new CustomError("conversationId is required", 400));
+    }
+
+    if (!text && files.length === 0) {
+      return next(new CustomError("Message or files required", 400));
+    }
+
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return next(new CustomError("Conversation not found", 404));
+    }
+
+    const userId = req.user._id.toString();
+    const isCustomer = conversation.customerId?.toString() === userId;
+    const isPartner = conversation.partnerId?.toString() === userId;
+
+    if (!isCustomer && !isPartner) {
+      return next(new CustomError("Not authorized", 403));
+    }
+
+    const senderRole = isCustomer ? "CUSTOMER" : "PARTNER";
+
+    let attachments = [];
+    if (files.length > 0) {
+      const uploadedFiles = await uploadFileToCloudinary(files, "chat_files");
+
+      attachments = uploadedFiles.map((file) => ({
+        url: file.secure_url,
+        public_id: file.public_id,
+        type: file.resource_type === "image" ? "image" : "file",
+      }));
+    }
+
+    const message = await Message.create({
+      conversationId,
+      senderId: req.user.id,
+      senderRole,
+      text: text || "",
+      attachments,
+      seenBy: [],
+    });
+
+    if (senderRole === "CUSTOMER") {
+      conversation.unreadCountPartner += 1;
+    } else {
+      conversation.unreadCountCustomer += 1;
+    }
+
+    let lastMessagePreview = text;
+    if (!text && attachments.length) {
+      lastMessagePreview =
+        attachments[0].type === "image" ? "📷 Image" : "📎 File";
+    }
+
+    conversation.lastMessage = lastMessagePreview;
+    conversation.lastMessageAt = new Date();
+
+    await conversation.save();
+
+    // Emit socket event
+    const socketId = onlineUsers.get(userId);
+    io.to(socketId).emit("receive_message", data);
+
+    const receiverId =
+      senderRole === "CUSTOMER"
+        ? conversation.partnerId
+        : conversation.customerId;
+
+    if (receiverId && !onlineUsers.has(receiverId.toString())) {
+      const receiver = await User.findById(receiverId);
+
+      let notificationBody = text?.substring(0, 40);
+
+      if (!text && attachments.length) {
+        const imageCount = attachments.filter((a) => a.type === "image").length;
+        const fileCount = attachments.filter((a) => a.type === "file").length;
+
+        if (imageCount && fileCount) {
+          notificationBody = `📎 ${attachments.length} attachments received`;
+        } else if (imageCount > 1) {
+          notificationBody = `📷 ${imageCount} images received`;
+        } else if (imageCount === 1) {
+          notificationBody = "📷 Image received";
+        } else if (fileCount > 1) {
+          notificationBody = `📄 ${fileCount} files received`;
+        } else if (fileCount === 1) {
+          notificationBody = "📄 File received";
+        }
+      }
+
+      await sendFirebaseNotification({
+        token: receiver.fcmToken,
+        title: "New Message",
+        body: notificationBody,
+        data: { conversationId },
+      });
+    }
+
+    return res.status(201).json({
+      success: true,
+      message,
+    });
+  } catch (error) {
+    console.error("sendMessageWithFiles error:", error);
+    return res.status(500).json({ message: "Failed to send message" });
+  }
+};

@@ -282,9 +282,8 @@ export const logout = asyncHandler(async (req, res, next) => {
 
   if (userId) {
     // Combine these into one call for better performance
-    await Auth.findByIdAndUpdate(userId, {refresh_token: null,});
-    await Auth.findByIdAndUpdate(userId, {fcmToken: null,});
-    
+    await Auth.findByIdAndUpdate(userId, { refresh_token: null });
+    await Auth.findByIdAndUpdate(userId, { fcmToken: null });
   }
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
@@ -293,9 +292,7 @@ export const logout = asyncHandler(async (req, res, next) => {
     const now = new Date();
     const today = dayjs().format("YYYY-MM-DD");
 
-    let session = await Sub_Admin_Session.findOne({userId,
-      date: today,
-    });
+    let session = await Sub_Admin_Session.findOne({ userId, date: today });
 
     if (session) {
       session.LogoutAt = now;
@@ -342,6 +339,7 @@ export const refreshToken = asyncHandler(async (req, res, next) => {
 });
 
 export const forgotPassword = asyncHandler(async (req, res, next) => {
+  
   const { email } = req.body;
 
   if (!email) return next(new CustomError("Email is required", 400));
@@ -473,7 +471,7 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
 
 export const saveFcmToken = async (req, res) => {
   try {
-    const { token, } = req.body;
+    const { token } = req.body;
     const userId = req.user._id;
 
     if (!token) {

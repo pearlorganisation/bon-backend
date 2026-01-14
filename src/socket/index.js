@@ -6,7 +6,7 @@ import ConversationModel from "../models/Chat/Conversation.model.js";
 
 let io;
 
-const initSocket = (server) => {
+const initSocket = (server,app) => {
   io = new Server(server, {
     cors: {
       origin: "*", // restrict in production
@@ -15,6 +15,9 @@ const initSocket = (server) => {
   });
 
   console.log("Socket connection initialized");
+
+  // Attach io to app
+  app.set("io", io);
 
   // Socket authentication middleware
   io.use(socketAuth);
@@ -27,11 +30,7 @@ const initSocket = (server) => {
       `Socket connected: ${socket.id}, User: ${userId}, Role: ${role}`
     );
 
-    // onlineUsers: Map<userId, socketId>
-    if (!onlineUsers.has(userId)) {
-      onlineUsers.set(userId, new Set());
-    }
-    onlineUsers.get(userId).add(socket.id);
+    onlineUsers.set(userId, socket.id);
 
     console.log(`Socket connected: ${socket.id}, User: ${userId}`);
     console.log("Online users map count:", onlineUsers.size);
@@ -59,8 +58,9 @@ const initSocket = (server) => {
 
         //  2b. Notify counterpart that this user is online
         if (onlineUsers.has(counterpartId)) {
-          onlineUsers.get(counterpartId).forEach((socketId) => {
-            io.to(socketId).emit("user_status", { userId, online: true });
+          io.to(onlineUsers.get(counterpartId)).emit("user_status", {
+            userId,
+            online: true,
           });
         }
       }
@@ -73,32 +73,27 @@ const initSocket = (server) => {
 
     // 4️⃣ Handle disconnect
     socket.on("disconnect", async () => {
-      const userSockets = onlineUsers.get(userId);
+      // Remove user directly
+      onlineUsers.delete(userId);
 
-      if (userSockets) {
-        // Remove only this specific socket ID
-        userSockets.delete(socket.id);
+      console.log("User offline:", userId);
 
-        // Only if ALL tabs/devices are closed, mark user as offline
-        if (userSockets.size === 0) {
-          onlineUsers.delete(userId);
+      const conversations =
+        role === "CUSTOMER"
+          ? await ConversationModel.find({ customerId: userId }).lean()
+          : await ConversationModel.find({ partnerId: userId }).lean();
 
-          const conversations =
-            role === "CUSTOMER"
-              ? await ConversationModel.find({ customerId: userId }).lean()
-              : await ConversationModel.find({ partnerId: userId }).lean();
+      for (const conv of conversations) {
+        const counterpartId =
+          role === "CUSTOMER"
+            ? conv.partnerId?.toString()
+            : conv.customerId?.toString();
 
-          for (const conv of conversations) {
-            const counterpartId =
-              role === "CUSTOMER"
-                ? conv.partnerId?.toString()
-                : conv.customerId?.toString();
-            if (counterpartId && onlineUsers.has(counterpartId)) {
-              onlineUsers.get(counterpartId).forEach((socketId) => {
-                io.to(socketId).emit("user_status", { userId, online: false });
-              });
-            }
-          }
+        if (counterpartId && onlineUsers.has(counterpartId)) {
+          io.to(onlineUsers.get(counterpartId)).emit("user_status", {
+            userId,
+            online: false,
+          });
         }
       }
     });
