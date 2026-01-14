@@ -9,7 +9,6 @@ import Property from "../../models/Listing/property.model.js";
 import Partner from "../../models/Partner/partner.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
-
 // ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
@@ -237,7 +236,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
       }
     }
 
-    property.policies =policies;
+    property.policies = policies;
   }
 
   if (req.body?.imagesToDelete) {
