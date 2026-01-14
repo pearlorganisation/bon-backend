@@ -8,9 +8,8 @@ import {
   getUserProfileById,
   deleteAllUsers,
   updateAllUsers,
-  searchProperties
-} from "../controllers/partner/property.controller.js";
-
+} from "../controllers/user.controller.js";
+import { searchProperties} from "../controllers/partner/property.controller.js"
 const storage = multer.memoryStorage(); // or diskStorage
 const upload = multer({ storage });
 

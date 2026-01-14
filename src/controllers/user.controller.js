@@ -165,6 +165,4 @@ export const deleteAllUsers = asyncHandler(async (req, res, next) => {
 });
 
 
-//search
-
 
