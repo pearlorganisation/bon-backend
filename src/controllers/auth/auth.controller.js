@@ -279,16 +279,12 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 
 export const logout = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
-  const { deviceId } = req.body || {};
 
   if (userId) {
     // Combine these into one call for better performance
-    await Auth.findByIdAndUpdate(userId, {
-      refresh_token: null,
-      $pull: {
-        fcmTokens: { deviceId },
-      },
-    });
+    await Auth.findByIdAndUpdate(userId, {refresh_token: null,});
+    await Auth.findByIdAndUpdate(userId, {fcmToken: null,});
+    
   }
   res.clearCookie("accessToken");
   res.clearCookie("refreshToken");
@@ -297,8 +293,7 @@ export const logout = asyncHandler(async (req, res, next) => {
     const now = new Date();
     const today = dayjs().format("YYYY-MM-DD");
 
-    let session = await Sub_Admin_Session.findOne({
-      userId,
+    let session = await Sub_Admin_Session.findOne({userId,
       date: today,
     });
 
@@ -478,7 +473,7 @@ const setAuthCookies = (res, accessToken, refreshToken) => {
 
 export const saveFcmToken = async (req, res) => {
   try {
-    const { token, deviceId } = req.body;
+    const { token, } = req.body;
     const userId = req.user._id;
 
     if (!token) {
