@@ -1,12 +1,10 @@
 import jwt from "jsonwebtoken";
-import cookie from "cookie";
-import Auth from "../models/auth/auth.model.js";
+
 import cookie from "cookie";
 import Auth from "../models/auth/auth.model.js";
 
 const socketAuth = async (socket, next) => {
   try {
-
     //  Parse cookies from handshake
     const cookies = socket.handshake.headers.cookie
       ? cookie.parse(socket.handshake.headers.cookie)
