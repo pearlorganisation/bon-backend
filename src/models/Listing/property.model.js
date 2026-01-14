@@ -106,34 +106,6 @@ const propertySchema = new mongoose.Schema(
       default: 0,
     },
 
-    // propertyApproval: {
-    //   status: {
-    //     type: String,
-    //     enum: ["pending", "approved", "rejected"],
-    //     default: "pending",
-    //   },
-    //   termsAndConditions: {
-    //     type: String,
-    //     enum: ["pending", "accepted"],
-    //     default: "pending",
-    //   },
-    //   invoiceStatus: {
-    //     type: String,
-    //     enum: ["unpaid", "paid"],
-    //     default: "unpaid",
-    //   },
-    // },
-
-    paymentDetails: {
-      bankName: String,
-      accountNumber: String,
-      ifscCode: String,
-      accountHolderName: String,
-      branchName: String,
-    },
-
-    // checkIn: { type: Date }, //time
-    // checkOut: { type: Date }, //time
     childrenCharge: {
       age: Number,
       charge: { type: Number, require: true, default: 0 },
@@ -146,6 +118,7 @@ const propertySchema = new mongoose.Schema(
       enum: ["pending", "under_review", "approved", "rejected"], //admin"approved" approved
       default: "pending",
     },
+    AdminNote:{type:String},
     //     commissionPercentage: { type: Number, default: 10 },
   },
   { timestamps: true }

@@ -6,7 +6,7 @@ import {
   uploadFileToCloudinary,
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
-// import Property from "../../models/Listing/"
+import Partner from "../../models/Partner/partner.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
 // ✅ Create a new property
@@ -417,7 +417,7 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     // Partner can see only their properties
     properties = await Property.find({ partnerId: user._id });
   } else if (user.role == "SUB_ADMIN") {
-    properties = await Property.find({ subAdminId: user._id });
+    properties = await Property.find({ subAdminId: user._id ,partnerId:null });
   }
 
   if (!properties.length) {
@@ -455,6 +455,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     query.partnerId = user._id;
   } else if (user.role === "SUB_ADMIN") {
     query.subAdminId = user._id;
+    query.partnerId= null
   } else {
     return next(
       new CustomError("You are not authorized to access this property", 403)
@@ -482,9 +483,45 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   );
 });
 
+
 export const getAllProperties = async (req, res) => {
   try {
-    const properties = await Property.find();
+
+   const properties = await Property.aggregate([
+     {
+       $match: {
+         partnerId: { $ne: null },
+         verified: "approved",
+         status: "active",
+       },
+     },
+
+     {
+       $lookup: {
+         from: "partners",
+         localField: "partnerId",
+         foreignField: "userId",
+         as: "partner",
+       },
+     },
+
+     {
+       $unwind: "$partner",
+     },
+
+     {
+       $match: {
+         "partner.isVerified": true,
+       },
+     },
+     {
+       $project: {
+         partner: 0,
+       },
+     },
+   ]);
+
+
 
     return successResponse(
       res,
@@ -539,21 +576,21 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
 export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
 
-  // 1️⃣ Fetch property
+  // 1️ Fetch property
   const property = await Property.find({ _id: propertyId }).populate("Rooms"); // optional
 
   if (!property) {
     return next(new CustomError("Property not found", 404));
   }
 
-  // 2️⃣ Ensure property is public/active
+  // 2️ Ensure property is public/active
   if (property.status !== "active" && !isAdmin) {
     return next(
       new CustomError("This property is not available for public viewing", 403)
     );
   }
 
-  // 3️⃣ Return only public-safe data
+  // 3️ Return only public-safe data
   successResponse(res, 200, "Property fetched successfully", property);
 });
 
@@ -562,19 +599,27 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
 export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
   const { propertyId } = req.params;
   const role = req.user.role;
-  const partnerId = req.user._id;
+  const userId = req.user._id;
 
   let property;
 
   if (role === "SUB_ADMIN") {
     property = await Property.findOne({
       _id: propertyId,
-      subAdminId: partnerId,
+      subAdminId: userId,
     });
-  } else {
+  } else if(role === "PARTNER") {
+  
+     const partner = await Partner.findOne({userId});
+     if(!partner) return next(new CustomError("Partner not found", 404));
+
+     if(!partner.isVerified){
+      return next(new CustomError("Complete your KYC to verified you property", 404));
+     }
+    
     property = await Property.findOne({
       _id: propertyId,
-      partnerId,
+      partnerId: userId,
     });
   }
 
@@ -582,20 +627,13 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Property not found", 404));
   }
 
-  if (property.verified !== "pending") {
+  if (property.verified == "approved") {
     return next(
-      new CustomError("Property already sent for review or processed", 400)
+      new CustomError("Property already approved", 400)
     );
   }
 
-  // ✅ FIX: initialize propertyApproval if missing
-  if (!property.propertyApproval) {
-    property.propertyApproval = {};
-  }
-
   property.verified = "under_review";
-  property.propertyApproval.status = "pending";
-
   await property.save();
 
   successResponse(res, 200, "Property sent for admin approval", property);
@@ -605,19 +643,28 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
 
 export const getPropertyApprovalRequests = asyncHandler(
   async (req, res, next) => {
+    const role = req.user.role;
+
+    if (role !== "ADMIN") {
+      return next(
+        new CustomError("Only admin can fetch all under_ reviewed properties", 403)
+      );
+    }
+      
     const properties = await Property.find({
       verified: "under_review",
-    }).populate("partnerId", "name email");
+    }).populate("partnerId", "name email").populate("subAdminId","name email");
 
     successResponse(res, 200, "Property approval requests fetched", properties);
   }
 );
 
 export const approveRejectProperty = asyncHandler(async (req, res, next) => {
+      
   const { propertyId } = req.params;
   const { action, reason } = req.body;
 
-  if (!["approved", "rejected"].includes(action)) {
+  if (!["approved", "rejected",].includes(action)) {
     return next(new CustomError("Invalid action", 400));
   }
 
@@ -627,21 +674,11 @@ export const approveRejectProperty = asyncHandler(async (req, res, next) => {
   }
 
   property.verified = action;
+  if(reason)property.AdminNote =reason;
 
-  // Initialize propertyApproval if it doesn't exist
-  if (!property.propertyApproval) {
-    property.propertyApproval = {};
-  }
-
-  property.propertyApproval.status = action;
-
-  if (action === "rejected") {
-    property.propertyApproval.rejectionReason = reason || "Rejected by admin";
-  }
 
   await property.save();
 
   successResponse(res, 200, `Property ${action} successfully`, property);
 });
-
 
