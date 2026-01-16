@@ -53,7 +53,9 @@ router.get("/conversations", protect, getCustomerConversationList);
 router.get("/partner/conversations", protect, getPartnerConversationList);
 
 router.delete("/delete/msg", protect, deleteMessageAttachment);
+router.delete("/delete/msg", protect, deleteMessageAttachment);
 
+router.patch("/udpate/message", protect, updateMessage);
 router.patch("/udpate/message", protect, updateMessage);
 
 export default router;

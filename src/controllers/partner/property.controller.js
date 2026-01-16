@@ -6,7 +6,8 @@ import {
   uploadFileToCloudinary,
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
-// import Property from "../../models/Listing/"
+import Partner from "../../models/Partner/partner.model.js";
+import Auth from "../../models/auth/auth.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 
 // ✅ Create a new property
@@ -170,7 +171,6 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     "pincode",
     "checkIn",
     "checkOut",
-    "status",
     "propertyType",
   ];
 
@@ -417,7 +417,7 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     // Partner can see only their properties
     properties = await Property.find({ partnerId: user._id });
   } else if (user.role == "SUB_ADMIN") {
-    properties = await Property.find({ subAdminId: user._id });
+    properties = await Property.find({ subAdminId: user._id, partnerId: null });
   }
 
   if (!properties.length) {
@@ -455,6 +455,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     query.partnerId = user._id;
   } else if (user.role === "SUB_ADMIN") {
     query.subAdminId = user._id;
+    query.partnerId = null;
   } else {
     return next(
       new CustomError("You are not authorized to access this property", 403)
@@ -484,7 +485,39 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
 
 export const getAllProperties = async (req, res) => {
   try {
-    const properties = await Property.find();
+    const properties = await Property.aggregate([
+      {
+        $match: {
+          partnerId: { $ne: null },
+          verified: "approved",
+          status: "active",
+        },
+      },
+
+      {
+        $lookup: {
+          from: "partners",
+          localField: "partnerId",
+          foreignField: "userId",
+          as: "partner",
+        },
+      },
+
+      {
+        $unwind: "$partner",
+      },
+
+      {
+        $match: {
+          "partner.isVerified": true,
+        },
+      },
+      {
+        $project: {
+          partner: 0,
+        },
+      },
+    ]);
 
     return successResponse(
       res,
@@ -539,22 +572,127 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
 export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
 
-  // 1️⃣ Fetch property
+  // 1️ Fetch property
   const property = await Property.find({ _id: propertyId }).populate("Rooms"); // optional
 
   if (!property) {
     return next(new CustomError("Property not found", 404));
   }
 
-  // 2️⃣ Ensure property is public/active
+  // 2️ Ensure property is public/active
   if (property.status !== "active" && !isAdmin) {
     return next(
       new CustomError("This property is not available for public viewing", 403)
     );
   }
 
-  // 3️⃣ Return only public-safe data
+  // 3️ Return only public-safe data
   successResponse(res, 200, "Property fetched successfully", property);
+});
+
+export const searchProperties = asyncHandler(async (req, res, next) => {
+  const { location, checkIn, checkOut, rooms = 1, propertyType } = req.query;
+
+  if (!location || !checkIn || !checkOut) {
+    return next(
+      new CustomError("Location, check-in and check-out are required", 400)
+    );
+  }
+  const checkInDate = normalizeDate(checkIn);
+  const checkOutDate = normalizeDate(checkOut);
+  if (checkInDate >= checkOutDate) {
+    return next(new CustomError("Invalid date range", 400));
+  }
+
+  const dates = getDatesBetween(checkInDate, checkOutDate);
+  console.log("dates", dates);
+  // 1️ Find properties
+  const propertyQuery = {
+    status: "active",
+    verified: "approved",
+    $or: [
+      { city: new RegExp(location, "i") },
+      { state: new RegExp(location, "i") },
+      { country: new RegExp(location, "i") },
+    ],
+  };
+
+  if (propertyType) propertyQuery.propertyType = propertyType;
+
+  const properties = await Property.find(propertyQuery).lean();
+  if (!properties.length) {
+    return successResponse(res, 200, "No properties found", []);
+  }
+
+  const propertyIds = properties.map((p) => p._id);
+
+  // 2️ Get rooms
+  const roomsList = await Room.find({
+    propertyId: { $in: propertyIds },
+  }).lean();
+
+  if (!roomsList.length) {
+    return successResponse(res, 200, "No rooms found", []);
+  }
+
+  const roomIds = roomsList.map((r) => r._id);
+
+  // 3️ Get inventories for date range
+  const inventories = await RoomInventory.find({
+    roomId: { $in: roomIds },
+    date: { $in: dates },
+  }).lean();
+
+  // 4️ Build inventory map → roomId → date → booked
+  const inventoryMap = {};
+  for (const inv of inventories) {
+    const roomKey = inv.roomId.toString();
+    if (!inventoryMap[roomKey]) inventoryMap[roomKey] = {};
+    inventoryMap[roomKey][inv.date.toISOString()] = inv.bookedRooms;
+  }
+
+  // 5️ Filter rooms
+  const propertyRoomMap = {};
+
+  for (const room of roomsList) {
+    // ❌ Blocked dates check
+    if (isRoomBlocked(room, checkInDate, checkOutDate)) continue;
+
+    let maxBooked = 0;
+
+    for (const date of dates) {
+      const booked =
+        inventoryMap[room._id.toString()]?.[date.toISOString()] || 0;
+      maxBooked = Math.max(maxBooked, booked);
+      console.log(maxBooked, date.toISOString());
+    }
+
+    const availableRooms = room.numberOfRooms - maxBooked;
+    /// console.log(availableRooms);
+    if (availableRooms < rooms) continue;
+
+    if (!propertyRoomMap[room.propertyId]) {
+      propertyRoomMap[room.propertyId] = [];
+    }
+
+    propertyRoomMap[room.propertyId].push({
+      ...room,
+      availableRooms,
+    });
+  }
+
+  // 6️ Final response
+  const result = properties
+    .filter((p) => propertyRoomMap[p._id])
+    .map((p) => ({
+      ...p,
+      rooms: propertyRoomMap[p._id],
+    }));
+
+  successResponse(res, 200, "Search results fetched", {
+    totalProperties: result.length,
+    data: result,
+  });
 });
 
 // partner
@@ -562,19 +700,28 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
 export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
   const { propertyId } = req.params;
   const role = req.user.role;
-  const partnerId = req.user._id;
+  const userId = req.user._id;
 
   let property;
 
   if (role === "SUB_ADMIN") {
     property = await Property.findOne({
       _id: propertyId,
-      subAdminId: partnerId,
+      subAdminId: userId,
     });
-  } else {
+  } else if (role === "PARTNER") {
+    const partner = await Partner.findOne({ userId });
+    if (!partner) return next(new CustomError("Partner not found", 404));
+
+    if (!partner.isVerified) {
+      return next(
+        new CustomError("Complete your KYC to verified you property", 404)
+      );
+    }
+
     property = await Property.findOne({
       _id: propertyId,
-      partnerId,
+      partnerId: userId,
     });
   }
 
@@ -582,20 +729,11 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Property not found", 404));
   }
 
-  if (property.verified !== "pending") {
-    return next(
-      new CustomError("Property already sent for review or processed", 400)
-    );
-  }
-
-  // ✅ FIX: initialize propertyApproval if missing
-  if (!property.propertyApproval) {
-    property.propertyApproval = {};
+  if (property.verified == "approved") {
+    return next(new CustomError("Property already approved", 400));
   }
 
   property.verified = "under_review";
-  property.propertyApproval.status = "pending";
-
   await property.save();
 
   successResponse(res, 200, "Property sent for admin approval", property);
@@ -605,9 +743,22 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
 
 export const getPropertyApprovalRequests = asyncHandler(
   async (req, res, next) => {
+    const role = req.user.role;
+
+    if (role !== "ADMIN") {
+      return next(
+        new CustomError(
+          "Only admin can fetch all under_ reviewed properties",
+          403
+        )
+      );
+    }
+
     const properties = await Property.find({
       verified: "under_review",
-    }).populate("partnerId", "name email");
+    })
+      .populate("partnerId", "name email")
+      .populate("subAdminId", "name email");
 
     successResponse(res, 200, "Property approval requests fetched", properties);
   }
@@ -627,21 +778,74 @@ export const approveRejectProperty = asyncHandler(async (req, res, next) => {
   }
 
   property.verified = action;
-
-  // Initialize propertyApproval if it doesn't exist
-  if (!property.propertyApproval) {
-    property.propertyApproval = {};
-  }
-
-  property.propertyApproval.status = action;
-
-  if (action === "rejected") {
-    property.propertyApproval.rejectionReason = reason || "Rejected by admin";
-  }
+  if (reason) property.AdminNote = reason;
 
   await property.save();
 
   successResponse(res, 200, `Property ${action} successfully`, property);
 });
 
+export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
+  const { propertyId} = req.params;
 
+  if (!propertyId ) {
+    return next(
+      new CustomError("propertyId is required", 400)
+    );
+  }
+
+  const property = await Property.findById(propertyId);
+  if (!property) {
+    return next(new CustomError("Property not found", 404));
+  }
+
+  if (property.verified !== "approved") {
+    return next(
+      new CustomError(
+        `Only approved property can be assigned. Current status: ${property.verified}`,
+        400
+      )
+    );
+  }
+
+  if (property.partnerId) {
+    return next(
+      new CustomError("Property is already assigned to a partner", 409)
+    );
+  }
+
+  const partnerAuth = await Auth.findOne({
+    email: property.PartnerEmail.toLowerCase(),
+    role: "PARTNER",
+  });
+
+  if (!partnerAuth) {
+    return next(new CustomError("Partner account not found", 404));
+  }
+
+  if (!partnerAuth.isVerified) {
+    return next(
+      new CustomError(`Partner ${partnerAuth.name} has not verified email`, 400)
+    );
+  }
+
+  const partnerKyc = await Partner.findOne({
+    userId: partnerAuth._id,
+    isVerified: true,
+  });
+
+  if (!partnerKyc) {
+    return next(
+      new CustomError(`Partner ${partnerAuth.name} has not completed KYC`, 400)
+    );
+  }
+
+  property.partnerId = partnerAuth._id;
+  await property.save();
+
+  return successResponse(
+    res,
+    200,
+    `Property (${property.name}) assigned to partner (${partnerAuth.name})`
+  );
+});

@@ -5,6 +5,7 @@ import {
   cancelBooking,
   createRazorpayOrder,
   getMyBooking,
+  getBooking,
 } from "../controllers/Booking/booking.controller.js";
 
 // Middleware to check authentication and roles (Placeholder names)df
@@ -28,10 +29,12 @@ router.post(
 router.post(
   "/cancel/:bookingId",
   protect,
-  authorizeRoles("CUSTOMER"),
+  authorizeRoles("CUSTOMER", "PARTNER"),
   cancelBooking
 );
-
+//df
 router.get("/my-bookings", protect, authorizeRoles("CUSTOMER"), getMyBooking);
+
+router.get("/", protect, authorizeRoles("ADMIN", "PARTNER"), getBooking);
 
 export default router;
