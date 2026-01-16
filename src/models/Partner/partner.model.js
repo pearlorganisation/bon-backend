@@ -9,21 +9,13 @@ const partnerSchema = new mongoose.Schema(
       unique: true,
     },
 
-    bankDetails: {
-      accountNumber: String,
-      ifscCode: String,
-      bankName: String,
-    },
-    
-
-    panDetails :{
+    panDetails: {
       panNumber: String,
       fullName: String,
       panType: String, // Individual | HUF | Company
-      panStatus:String,
+      panStatus: String,
       verifiedAt: Date,
-    }
-,
+    },
     // Store GSTIN list returned from PAN-GST link API
     gstinList: [
       {
@@ -33,7 +25,19 @@ const partnerSchema = new mongoose.Schema(
       },
     ],
 
-    isVerified: { type: Boolean, default: false },//for partner pan verification
+    razorpay: {
+      contactId: String,
+      fundAccountId: String,
+    },
+    bankDetails: {
+      accountHolderName: String,
+      accountNumber: String,
+      ifscCode: String,
+      bankName: String,
+      verifiedAt: Date,
+    },
+    isPanVerified:{ type: Boolean, default: false},  //for pan verification 
+    isVerified: { type: Boolean, default: false }, //for  complete partner pan verification and  fund account
   },
   { timestamps: true }
 );
