@@ -32,7 +32,7 @@ router.post(
   authorizeRoles("CUSTOMER", "PARTNER"),
   cancelBooking
 );
-
+//df
 router.get("/my-bookings", protect, authorizeRoles("CUSTOMER"), getMyBooking);
 
 router.get("/", protect, authorizeRoles("ADMIN", "PARTNER"), getBooking);
