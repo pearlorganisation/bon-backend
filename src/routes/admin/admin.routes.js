@@ -13,8 +13,10 @@ import {
   protect,
   authorizeRoles,
 } from "../../middleware/auth/auth.middleware.js";
+import { getAllPartners } from "../../controllers/partner/parnter.controller.js";
 
 route.use(protect);
+
 
 route.get(
   "/get-subAdmin-sessions-history/:id",
@@ -43,5 +45,7 @@ route.patch(
   authorizeRoles("ADMIN"),
   assignPropertyToPartner
 );
+
+route.get("/get-all-partners",authorizeRoles("ADMIN"),getAllPartners);
 
 export default route;

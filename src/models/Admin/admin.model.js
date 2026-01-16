@@ -10,8 +10,12 @@ const AdminSchema = new mongoose.Schema(
       required: true,
       unique:true
     },
-    
-
+   
+    commission: {
+      min: { type: Number, default: 10 },
+      max: { type: Number, default: 50 },
+    },
+   
   },
   { timestamps: true }
 );
