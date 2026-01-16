@@ -25,6 +25,7 @@ import {
   partner_KYC,
   verify_property_GSTIN,
   getPartnerKYC,
+  createPartnerFundAccount,
 } from "../../controllers/partner/parnter.controller.js";
 import {
   authorizeRoles,
@@ -61,6 +62,13 @@ router.get(
   authorizeRoles("PARTNER", "ADMIN"),
 
   getPartnerKYC
+);
+
+router.post(
+  "/create-fund-account",
+  protect,
+  authorizeRoles("PARTNER"),
+  createPartnerFundAccount
 );
 
 //---------- property routes ----------------
@@ -105,7 +113,6 @@ router.get(
   optionalProtect,
   getPublicPropertyById
 );
-
 
 //---------- Rooms routes ----------------
 
