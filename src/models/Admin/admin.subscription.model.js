@@ -1,6 +1,8 @@
+import mongoose from "mongoose";
+
 const AdminSubscriptionPlanSchema = new mongoose.Schema(
   {
-    name: String,
+    name: { type: String, unique: true, trim: true, uppercase: true },
     price: Number,
     durationDays: { type: Number, default: 30 },
     isActive: { type: Boolean, default: true },
@@ -17,16 +19,7 @@ const AdminSubscriptionPlanSchema = new mongoose.Schema(
       featuredLabel: {
         type: String, // "Top Property", "Recommended"
       },
-      prioritySupport: {
-        type: Boolean,
-        default: false,
-      },
-      maxPropertiesAllowed: {
-        type: Number,
-        default: 1,
-      },
     },
-
     updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Admin",
@@ -34,3 +27,10 @@ const AdminSubscriptionPlanSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+const AdminSubscriptionPlan = mongoose.model(
+  "AdminSubscriptionPlan",
+  AdminSubscriptionPlanSchema
+);
+
+export default AdminSubscriptionPlan;

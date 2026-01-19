@@ -13,10 +13,15 @@ import {
   protect,
   authorizeRoles,
 } from "../../middleware/auth/auth.middleware.js";
-import { getAllPartners } from "../../controllers/partner/parnter.controller.js";
+import {
+  getAllPartners,
+  createSubscriptionPlan,
+  updateSubscriptionPlan,
+  upsertCommissionRange,
+  getPlatformPlans,
+} from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
-
 
 route.get(
   "/get-subAdmin-sessions-history/:id",
@@ -46,6 +51,26 @@ route.patch(
   assignPropertyToPartner
 );
 
-route.get("/get-all-partners",authorizeRoles("ADMIN"),getAllPartners);
+route.get("/get-all-partners", authorizeRoles("ADMIN"), getAllPartners);
 
+route.get(
+  "/get-patform-plans",
+  authorizeRoles("ADMIN", "PARTNER"),
+  getPlatformPlans
+);
+route.post(
+  "/change-commission-range",
+  authorizeRoles("ADMIN"),
+  upsertCommissionRange
+);
+route.post(
+  "/create-subscription-plan",
+  authorizeRoles("ADMIN"),
+  createSubscriptionPlan
+);
+route.put(
+  "/update-subscription-plan/:planId",
+  authorizeRoles("ADMIN"),
+ updateSubscriptionPlan
+);
 export default route;
