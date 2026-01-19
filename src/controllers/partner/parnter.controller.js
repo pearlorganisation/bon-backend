@@ -248,39 +248,6 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
   }
 });
 
-///admin
-export const getAllPartners = asyncHandler(async (req, res, next) => {
-  if (req.user.role != "ADMIN") {
-    return next(new CustomError("only admin is allowed ", 401));
-  }
-
-  const partners = await Auth.aggregate([
-    {
-      $match: {
-        role: "PARTNER",
-      },
-    },
-    {
-      $lookup: {
-        from: "partners",
-        localField: "_id",
-        foreignField: "userId",
-        as: "partner",
-      },
-    },
-    {
-      $unwind: "$partner",
-    },
-    {
-      $project: {
-        refresh_token: 0,
-        password: 0,
-      },
-    },
-  ]);
-
-  successResponse(res, 200, "successfully fetch partners", partners);
-});
 
 // RAZORPAY KYC FLOW START
 
