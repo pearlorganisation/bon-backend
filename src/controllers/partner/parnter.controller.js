@@ -2,12 +2,14 @@ import asyncHandler from "../../middleware/asyncHandler.js";
 import CustomError from "../../utils/error/customError.js";
 import Property from "../../models/Listing/property.model.js";
 import Partner from "../../models/Partner/partner.model.js";
+import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import successResponse from "../../utils/error/successResponse.js";
 import { razorpay } from "../../config/razorpayConfig.js";
 import axios from "axios";
 import { configDotenv } from "dotenv";
-
+import Admin from "../../models/Admin/admin.model.js";
+import AdminSubscriptionPlan from "../../models/Admin/admin.subscription.model.js";
 configDotenv();
 
 //verify  partner
@@ -248,7 +250,6 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
   }
 });
 
-
 // RAZORPAY KYC FLOW START
 
 export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
@@ -364,7 +365,7 @@ export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
       bankName: bankName || null,
       verifiedAt: new Date(),
     };
-    partner.isVerified=true;
+    partner.isVerified = true;
     await partner.save();
 
     /* -------------------- 8️ Success -------------------- */
@@ -384,4 +385,191 @@ export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
     );
   }
 });
+
+//  PARTNER PLAN
+
+
+
+export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
+  const { commissionPercentage } = req.body;
+  const partnerId = req.user._id;
+
+  if (!commissionPercentage) {
+    return next(new CustomError("commission percentage is required", 400));
+  }
+
+  // check upcoming plan
+  const upcomingPlan = await PartnerPlan.findOne({
+    partnerId,
+    planStatus: "UPCOMING",
+  });
+
+  if (upcomingPlan) {
+    return next(new CustomError("you already have an upcoming plan", 400));
+  }
+
+  // get admin commission range
+  const admin = await Admin.findOne();
+  if (!admin) {
+    return next(new CustomError("platform commission not configured", 500));
+  }
+
+  const { min, max } = admin.commission;
+
+  if (commissionPercentage < min || commissionPercentage > max) {
+    return next(
+      new CustomError("commission percentage is outside platform range", 400)
+    );
+  }
+
+  // check active plan
+  const activePlan = await PartnerPlan.findOne({
+    partnerId,
+    planStatus: "ACTIVE",
+  });
+
+  const  startDate = activePlan ? activePlan.endDate : new Date();
+   const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 30);
+
+  const plan = await PartnerPlan.create({
+    partnerId,
+    PlanType: "COMMISSION",
+    commissionPercentage,
+    planStatus: activePlan ? "UPCOMING" : "ACTIVE",
+    startDate,
+    endDate,
+  });
+
+  successResponse(res, 201, "commission plan created", plan);
+});
+
+export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
+  const { subscriptionPlanId } = req.params;
+
+  // 1. block multiple upcoming plans
+  const upcomingPlan = await PartnerPlan.findOne({
+    partnerId,
+    planStatus: "UPCOMING",
+  });
+
+  if (upcomingPlan) {
+    return next(new CustomError("you already have an upcoming plan", 400));
+  }
+
+  // 2. validate subscription plan
+  const plan = await AdminSubscriptionPlan.findById(subscriptionPlanId);
+  if (!plan) {
+    return next(new CustomError("subscription plan not found", 404));
+  }
+
+  if (!plan.isActive) {
+    return next(new CustomError("subscription plan is not active", 400));
+  }
+
+  // 3. get active plan (if any)
+  const activePlan = await PartnerPlan.findOne({
+    partnerId,
+    planStatus: "ACTIVE",
+  });
+
+  const startDate = activePlan ? activePlan.endDate : new Date();
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + plan.durationDays);
+
+  // 4. reuse or create INACTIVE (payment pending) plan
+  let inactivePlan = await PartnerPlan.findOne({
+    partnerId,
+    planStatus: "INACTIVE",
+  });
+
+  if (!inactivePlan) {
+    inactivePlan = new PartnerPlan({
+      partnerId,
+      PlanType: "SUBSCRIPTION",
+      planStatus: "INACTIVE",
+    });
+  }
+
+  inactivePlan.subscriptionPlanId = subscriptionPlanId;
+  inactivePlan.startDate = startDate;
+  inactivePlan.endDate = endDate;
+
+  inactivePlan.subscriptionPayment = inactivePlan.subscriptionPayment || {};
+
+  // 5. create razorpay order
+  try {
+    const order = await razorpay.orders.create({
+      amount: Math.round(plan.price * 100),
+      currency: "INR",
+      receipt: inactivePlan._id.toString(),
+      notes: {
+        purpose: "PARTNER_SUBSCRIPTION",
+        partnerId: partnerId.toString(),
+        subscriptionPlanId,
+      },
+      notes: {
+        purpose: "SUBSCRIPTION",
+        partnerPlanId: inactivePlan._id.toString(),
+      },
+    });
+
+    inactivePlan.subscriptionPayment.orderId = order.id;
+    await inactivePlan.save();
+
+    successResponse(res, 201, "order created", {
+      orderId: order.id,
+      amount: plan.price,
+      currency: "INR",
+    });
+  } catch (err) {
+    return next(
+      new CustomError(
+        err?.error?.description || "payment gateway error",
+        err.statusCode || 502
+      )
+    );
+  }
+});
+
+export const subscriptionWebhookController = asyncHandler(
+  async (req, res, next) => {
+    const { eventType, orderId, paymentId } = req.razorpay;
+
+    if (eventType !== "payment.captured" && eventType !== "payment.failed") {
+      return res.status(200).json({ success: true });
+    }
+
+    const plan = await PartnerPlan.findOne({
+      "subscriptionPayment.orderId": orderId,
+    });
+
+    if (!plan) {
+      return res.status(200).json({ success: true });
+    }
+
+    if (eventType === "payment.failed") {
+      return res.status(200).json({ success: true });
+    }
+
+    // payment.captured
+    if (plan.planStatus !== "INACTIVE") {
+      return res.status(200).json({ success: true });
+    }
+
+    const activePlan = await PartnerPlan.findOne({
+      partnerId: plan.partnerId,
+      planStatus: "ACTIVE",
+    });
+
+    plan.subscriptionPayment.paymentId = paymentId;
+    plan.planStatus = activePlan ? "UPCOMING" : "ACTIVE";
+
+    await plan.save();
+
+    return res.status(200).json({ success: true });
+  }
+);
+
 

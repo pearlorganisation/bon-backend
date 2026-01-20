@@ -37,11 +37,12 @@ export const getAllPartners = asyncHandler(async (req, res, next) => {
               $expr: {
                 $and: [
                   { $eq: ["$partnerId", "$$partnerId"] },
-                  { $eq: ["$isActive", true] },
+                  { $eq: ["$planStatus", "ACTIVE"] },
                 ],
               },
             },
           },
+          { $limit: 1 },
         ],
         as: "plan",
       },

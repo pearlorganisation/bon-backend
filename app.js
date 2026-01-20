@@ -7,10 +7,11 @@ import notFound from "./src/middleware/notFound.js";
 import errorHandler from "./src/middleware/errorHandler.js";
 import cookieParser from "cookie-parser";
 import initSocket from "./src/socket/index.js";
+import { razorpayRefundWebhook } from "./src/controllers/Booking/booking.controller.js";
 import {
-  razorpayWebhook,
-  razorpayRefundWebhook,
-} from "./src/controllers/Booking/booking.controller.js";
+  verifyRazorpaySignature,
+  razorpayWebhookRouter,
+} from "./src/middleware/razorpay.middleware.js";
 
 const app = express();
 
@@ -18,7 +19,13 @@ const app = express();
 app.post(
   "/api/v1/webhook/razorpay",
   express.raw({ type: "application/json" }),
-  razorpayWebhook
+  verifyRazorpaySignature,
+  razorpayWebhookRouter
+);
+app.post(
+  "/api/v1/webhook/razorpay",
+  express.raw({ type: "application/json" }),
+  razorpayRefundWebhook
 );
 
 /* Middlewares */
