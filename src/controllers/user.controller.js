@@ -53,15 +53,56 @@ export const updateUserProfile = asyncHandler(async (req, res, next) => {
 });
 
 export const getUserProfile = asyncHandler(async (req, res, next) => {
-  const user = await Auth.findById(req.user._id).select(
-    "-password -refresh_token"
-  );
+  const authId = req.user._id;
+  const role = req.user.role;
 
-  if (!user) {
-    return next(new CustomError("User not found ", 404));
+  if (!["PARTNER", "ADMIN", "SUB_ADMIN", "CUSTOMER"].includes(role)) {
+    return next(new CustomError("Invalid or missing role", 400));
   }
 
-  successResponse(res, 200, "User profile fetched successfully", user);
+  const collectionMap = {
+    PARTNER: "partners",
+    ADMIN: "admins",
+    SUB_ADMIN: "sub_admins",
+    CUSTOMER: "customers",
+  };
+
+  const collection = collectionMap[role];
+
+  const result = await Auth.aggregate([
+    { $match: { _id: authId } },
+    {
+      $lookup: {
+        from: collection,
+        localField: "_id",
+        foreignField: "userId", 
+        as: "profile",
+      },
+    },
+    { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
+    {
+      $project: {
+        password: 0,
+        refresh_token: 0,
+        __v: 0,
+        "profile.__v": 0,
+        "profile.createdAt": 0,
+        "profile.updatedAt": 0,
+      },
+    },
+  ]);
+
+  if (result.length === 0) {
+    return next(new CustomError("User not found", 404));
+  }
+
+  const user = result[0];
+
+  if (!user.profile) {
+    return next(new CustomError(`No ${role} profile found`, 404));
+  }
+
+  successResponse(res, 200, "Profile fetched successfully", user);
 });
 
 export const getAllUsers = asyncHandler(async (req, res, next) => {
