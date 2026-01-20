@@ -2,7 +2,9 @@ import asyncHandler from "../../middleware/asyncHandler.js";
 import CustomError from "../../utils/error/customError.js";
 import Property from "../../models/Listing/property.model.js";
 import Partner from "../../models/Partner/partner.model.js";
+import Auth from "../../models/auth/auth.model.js";
 import successResponse from "../../utils/error/successResponse.js";
+import { razorpay } from "../../config/razorpayConfig.js";
 import axios from "axios";
 import { configDotenv } from "dotenv";
 
@@ -53,9 +55,6 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
       ),
     ]);
 
-    
-
-
     const panData = panResponse.data;
     const gstinData = gstinResponse.data;
 
@@ -81,7 +80,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
     };
 
     partner.gstinList = gstinList;
-    partner.isVerified = true;
+    partner.isPanVerified = true;
 
     // Save the document
     await partner.save();
@@ -123,16 +122,14 @@ export const getPartnerKYC = asyncHandler(async (req, res, next) => {
     const { partnerUserId } = req.query;
 
     if (!partnerUserId) {
-      return next(
-        new CustomError("partnerUserId is required for admin", 400)
-      );
+      return next(new CustomError("partnerUserId is required for admin", 400));
     }
 
     partnerQuery.userId = partnerUserId;
   }
 
   const partner = await Partner.findOne(partnerQuery).select(
-    "panDetails gstinList isVerified"
+    "panDetails gstinList isPanVerified"
   );
 
   if (!partner) {
@@ -145,12 +142,10 @@ export const getPartnerKYC = asyncHandler(async (req, res, next) => {
     data: {
       panDetails: partner.panDetails || null,
       gstinList: partner.gstinList || [],
-      isVerified: partner.isVerified,
+      isVerified: partner.isPanVerified,
     },
   });
 });
-
-
 
 export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
@@ -177,10 +172,10 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Partner account not found", 404));
   }
 
-  if (!partner.isVerified) {
+  if (!partner.isPanVerified) {
     return next(new CustomError("First verify your PAN account", 400));
   }
-  console.log(propertyId,gstin);
+  console.log(propertyId, gstin);
   try {
     // 3️⃣ Verify GSTIN
     const response = await axios.post(
@@ -207,9 +202,9 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
     }
 
     // 4️⃣ Check if GSTIN is linked to PAN
-   const isLinkedWithPAN = partner?.gstinList?.some(
-     (g) => g.gstin?.toUpperCase() === gstinInfo.GSTIN?.toUpperCase()
-   );
+    const isLinkedWithPAN = partner?.gstinList?.some(
+      (g) => g.gstin?.toUpperCase() === gstinInfo.GSTIN?.toUpperCase()
+    );
 
     const message = isLinkedWithPAN
       ? `GSTIN is linked with partner PAN (${partner?.panDetails?.panType})`
@@ -253,18 +248,173 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
   }
 });
 
-
-
-export const getAllPartners = async (req, res) => {
-  try {
-    const partners = await Partner.find();
-
-    return successResponse(res, 200, "Partners fetched successfully", partners);
-  } catch (error) {
-    return res.status(500).json({
-      success: false,
-      statusCode: 500,
-      message: error.message,
-    });
+///admin
+export const getAllPartners = asyncHandler(async (req, res, next) => {
+  if (req.user.role != "ADMIN") {
+    return next(new CustomError("only admin is allowed ", 401));
   }
-};
+
+  const partners = await Auth.aggregate([
+    {
+      $match: {
+        role: "PARTNER",
+      },
+    },
+    {
+      $lookup: {
+        from: "partners",
+        localField: "_id",
+        foreignField: "userId",
+        as: "partner",
+      },
+    },
+    {
+      $unwind: "$partner",
+    },
+    {
+      $project: {
+        refresh_token: 0,
+        password: 0,
+      },
+    },
+  ]);
+
+  successResponse(res, 200, "successfully fetch partners", partners);
+});
+
+// RAZORPAY KYC FLOW START
+
+export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+  const { accountHolderName, accountNumber, ifscCode, bankName } = req.body;
+
+  if (!accountHolderName || !accountNumber || !ifscCode) {
+    return next(
+      new CustomError(
+        "accountHolderName, accountNumber and ifscCode are required",
+        400
+      )
+    );
+  }
+
+  if (!/^\d{9,18}$/.test(accountNumber)) {
+    return next(new CustomError("Invalid bank account number", 400));
+  }
+
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(ifscCode)) {
+    return next(new CustomError("Invalid IFSC code format", 400));
+  }
+
+  /* -------------------- 2 Get Partner -------------------- */
+  const auth = await Auth.findById(userId);
+  const partner = await Partner.findOne({ userId });
+
+  if (!auth || !partner) {
+    return next(new CustomError("Partner not found", 404));
+  }
+
+  /* -------------------- 3️ PAN Verification Rule -------------------- */
+  if (!partner.isPanVerified) {
+    return next(
+      new CustomError(
+        "Complete PAN verification before fund account setup",
+        400
+      )
+    );
+  }
+
+  /* -------------------- 4️ Prevent Duplicate -------------------- */
+  if (partner?.razorpay?.fundAccountId) {
+    return next(new CustomError("Fund account already exists", 409));
+  }
+
+  try {
+    let contactId = partner?.razorpay?.contactId;
+
+    /* -------------------- 5️ Create Contact (If Needed) -------------------- */
+    if (!contactId) {
+      let contact;
+
+      try {
+        console.log("Razorpay keys:", Object.keys(razorpay));
+        contact = await razorpay.contacts.create({
+          name: partner.panDetails?.fullName || auth.name,
+          email: auth.email,
+          contact: auth.phoneNumber || "9999999999",
+          type: "vendor",
+          reference_id: userId.toString(),
+        });
+      } catch (err) {
+        console.error("Razorpay Contact Error:", err?.error || err);
+        return next(
+          new CustomError(
+            err?.error?.description || "Failed to create Razorpay contact",
+            502
+          )
+        );
+      }
+
+      contactId = contact.id;
+
+      partner.razorpay = {
+        contactId,
+      };
+
+      await partner.save(); // persist contact early
+    }
+
+    /* -------------------- 6️ Create Fund Account -------------------- */
+    let fundAccount;
+
+    try {
+      fundAccount = await razorpay.fundAccount.create({
+        contact_id: contactId,
+        account_type: "bank_account",
+        bank_account: {
+          name: accountHolderName,
+          ifsc: ifscCode,
+          account_number: accountNumber,
+        },
+      });
+    } catch (err) {
+      console.error("Razorpay Fund Account Error:", err?.error || err);
+
+      return next(
+        new CustomError(
+          err?.error?.description || "Failed to create Razorpay fund account",
+          502
+        )
+      );
+    }
+
+    /* -------------------- 7️ Save Bank + Fund Details -------------------- */
+    partner.razorpay.fundAccountId = fundAccount.id;
+
+    partner.bankDetails = {
+      accountHolderName,
+      accountNumber,
+      ifscCode,
+      bankName: bankName || null,
+      verifiedAt: new Date(),
+    };
+    partner.isVerified=true;
+    await partner.save();
+
+    /* -------------------- 8️ Success -------------------- */
+    return successResponse(
+      res,
+      201,
+      "Razorpay fund account created successfully",
+      {
+        contactId,
+        fundAccountId: fundAccount.id,
+      }
+    );
+  } catch (error) {
+    console.error("Fund Account Setup Error:", error);
+    return next(
+      new CustomError("Unable to setup payout account, try again later", 500)
+    );
+  }
+});
+

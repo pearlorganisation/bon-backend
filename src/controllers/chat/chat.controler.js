@@ -108,7 +108,6 @@ export const getPartnerConversationList = asyncHandler(
 );
 
 export const updateMessage = async (req, res, next) => {
-
   const { messageId } = req.params;
 
   const { message, publicId, resource_type } = req.body;
@@ -140,9 +139,7 @@ export const updateMessage = async (req, res, next) => {
     );
 
     //  Remove attachment from message document
-    msg.attachments = msg.attachments.filter(
-      (a) => a.public_id !== publicId
-    );
+    msg.attachments = msg.attachments.filter((a) => a.public_id !== publicId);
 
     if (!msg.text && msg.attachments.length === 0) {
       await msg.deleteOne();
