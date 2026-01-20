@@ -674,6 +674,10 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
       amount: Math.round(booking.totalPrice * 100),
       currency: "INR",
       receipt: booking._id.toString(),
+      notes: {
+        purpose: "BOOKING",
+        bookingId: booking._id.toString(),
+      },
     };
 
     const order = await razorpay.orders.create(options);
@@ -711,46 +715,12 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
   }
 });
 
-export const razorpayWebhook = asyncHandler(async (req, res, next) => {
-  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
-
-  if (!webhookSecret) {
-    return next(new CustomError("Webhook secret not configured", 500));
-  }
-
-  const razorpaySignature = req.headers["x-razorpay-signature"];
-
-  if (!razorpaySignature) {
-    return next(new CustomError("Missing Razorpay signature", 400));
-  }
-
-  //  Verify signature (RAW body required)
-  const expectedSignature = crypto
-    .createHmac("sha256", webhookSecret)
-    .update(req.body)
-    .digest("hex");
-
-  if (expectedSignature !== razorpaySignature) {
-    return next(new CustomError("Invalid webhook signature", 400));
-  }
-
-  //  Parse event safely
-  let event;
-  try {
-    event = JSON.parse(req.body.toString());
-  } catch (err) {
-    return next(new CustomError("Invalid webhook payload", 400));
-  }
-
-  const eventType = event?.event;
-  const paymentEntity = event?.payload?.payment?.entity;
+export const bookingWebhookController = asyncHandler(async (req, res, next) => {
+  const { eventType, orderId, paymentId, paymentEntity } = req.razorpay;
 
   if (!eventType || !paymentEntity) {
     return next(new CustomError("Malformed webhook event", 400));
   }
-
-  const orderId = paymentEntity.order_id;
-  const paymentId = paymentEntity.id;
 
   if (!orderId) {
     return next(new CustomError("Order ID missing in webhook", 400));
@@ -758,7 +728,10 @@ export const razorpayWebhook = asyncHandler(async (req, res, next) => {
 
   const booking = await Booking.findOne({ "payment.razorpayOrderId": orderId });
 
-  if (booking?.paymentStatus === "paid") {
+  if (
+    booking.paymentStatus === "paid" &&
+    booking.payment.razorpayPaymentId === paymentId
+  ) {
     return res.status(200).json({ success: true });
   }
 

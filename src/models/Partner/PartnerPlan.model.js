@@ -14,22 +14,48 @@ const PartnerPlanSchema = new mongoose.Schema(
       required: true,
     },
 
-    commissionPercent: {
+    commissionPercentage: {
       type: Number,
     },
 
     subscriptionPlanId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "SubscriptionPlan",
+      ref: "AdminSubscriptionPlan",
     },
+    subscriptionPayment: {
+      orderId: { type: String },
+      paymentId: { type: String },
+    },
+
     startDate: Date,
     endDate: Date,
-    isActive: { type: Boolean, default: true },
+    planStatus: {
+      type: String,
+      enum: ["INACTIVE", "ACTIVE", "UPCOMING", "EXPIRED"],
+      required: true,
+    },
   },
   { timestamps: true }
 );
 
-PartnerPlanSchema.createIndex({ partnerId: 1, isActive: 1 });
+// Only one ACTIVE plan
+PartnerPlanSchema.index(
+  { partnerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { planStatus: "ACTIVE" },
+    name: "unique_active_plan_per_partner", // optional but recommended
+  }
+);
+
+PartnerPlanSchema.index(
+  { partnerId: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { planStatus: "UPCOMING" },
+    name: "unique_upcoming_plan_per_partner", // helps debugging
+  }
+);
 
 const PartnerPlan = mongoose.model("PartnerPlan", PartnerPlanSchema);
 
