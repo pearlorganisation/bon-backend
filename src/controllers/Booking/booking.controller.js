@@ -717,6 +717,7 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
 
 export const bookingWebhookController = asyncHandler(async (req, res, next) => {
   const { eventType, orderId, paymentId, paymentEntity } = req.razorpay;
+   console.log("payment",req.razorpay);
 
   if (!eventType || !paymentEntity) {
     return next(new CustomError("Malformed webhook event", 400));
@@ -854,11 +855,11 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
     if (req.user?.role === "PARTNER") {
       refundPercentage = 100;
     } else {
-      refundPercentage = calculateRefundPercentage({
-        cancellationPolicy: booking.propertyId.cancellationPolicy,
-        checkInDate: booking.checkInDate,
-      });
-       
+      // refundPercentage = calculateRefundPercentage({
+      //   cancellationPolicy: booking.propertyId.cancellationPolicy,
+      //   checkInDate: booking.checkInDate,
+      // });
+         refundPercentage = 100;
     }
 
     const refundAmount = (booking.totalPrice * refundPercentage) / 100;
@@ -908,7 +909,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         const refund = await razorpay.payments.refund(
           booking.payment.razorpayPaymentId,
           {
-            amount: round(refundAmount*100),
+            amount: round(refundAmount),
             notes: {
               bookingId: booking._id.toString(),
               reason,
@@ -946,7 +947,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
 export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const razorpaySignature = req.headers["x-razorpay-signature"];
-
+  console.log("refund");
   if (!razorpaySignature) {
     return res.status(200).json({ success: true });
   }
