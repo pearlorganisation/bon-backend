@@ -572,4 +572,14 @@ export const subscriptionWebhookController = asyncHandler(
   }
 );
 
+export const getMyPlans = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
+
+  const plans = await PartnerPlan.find({
+    partnerId,
+    planStatus: { $in: ["ACTIVE", "UPCOMING"] },
+  }).sort({ createdAt: 1 });
+
+  successResponse(res, 200, "successfully fetched current plans", { plans });
+});
 

@@ -23,7 +23,7 @@ app.post(
   razorpayWebhookRouter
 );
 app.post(
-  "/api/v1/webhook/razorpay",
+  "/api/v1/webhook/razorpay-refund",
   express.raw({ type: "application/json" }),
   razorpayRefundWebhook
 );
