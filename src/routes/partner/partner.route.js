@@ -86,7 +86,7 @@ router.post(
   authorizeRoles("PARTNER"),
   buyNewSubscriptionPlan
 );
-router.post("/my-plans", protect,authorizeRoles("PARTNER","ADMIN"), getMyPlans);
+router.get("/my-plans", protect,authorizeRoles("PARTNER","ADMIN"), getMyPlans);
 
 //---------- property routes ----------------
 
