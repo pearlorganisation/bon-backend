@@ -858,6 +858,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         cancellationPolicy: booking.propertyId.cancellationPolicy,
         checkInDate: booking.checkInDate,
       });
+       
     }
 
     const refundAmount = (booking.totalPrice * refundPercentage) / 100;
@@ -907,7 +908,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         const refund = await razorpay.payments.refund(
           booking.payment.razorpayPaymentId,
           {
-            amount: round(refundAmount),
+            amount: round(refundAmount*100),
             notes: {
               bookingId: booking._id.toString(),
               reason,
@@ -962,6 +963,7 @@ export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
   let event;
   try {
     event = JSON.parse(req.body.toString());
+    console.log("webhook response",event);
   } catch {
     return res.status(200).json({ success: true });
   }
