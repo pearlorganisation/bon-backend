@@ -26,6 +26,10 @@ import {
   verify_property_GSTIN,
   getPartnerKYC,
   createPartnerFundAccount,
+  buyNewCommissionPlan,
+  buyNewSubscriptionPlan,
+  subscriptionWebhookController,
+  getMyPlans,
 } from "../../controllers/partner/parnter.controller.js";
 import {
   authorizeRoles,
@@ -45,7 +49,7 @@ const uploadFields = upload.fields([
   { name: "propertyDocument", maxCount: 1 },
 ]);
 
-//---------- property routes ----------------
+//---------- parnter routes ----------------
 
 router.post("/verify-pan", protect, authorizeRoles("PARTNER"), partner_KYC);
 
@@ -60,7 +64,6 @@ router.get(
   "/verify-gstin",
   protect,
   authorizeRoles("PARTNER", "ADMIN"),
-
   getPartnerKYC
 );
 
@@ -70,6 +73,20 @@ router.post(
   authorizeRoles("PARTNER"),
   createPartnerFundAccount
 );
+
+router.post(
+  "/buy-commision-plan",
+   protect,
+  authorizeRoles("PARTNER"),
+  buyNewCommissionPlan
+);
+router.post(
+  "/buy-subscription-plan/:subscriptionPlanId",
+   protect,
+  authorizeRoles("PARTNER"),
+  buyNewSubscriptionPlan
+);
+router.post("/my-plans", protect,authorizeRoles("PARTNER","ADMIN"), getMyPlans);
 
 //---------- property routes ----------------
 
