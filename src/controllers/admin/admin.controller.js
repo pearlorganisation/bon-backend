@@ -176,6 +176,7 @@ export const updateSubscriptionPlan = asyncHandler(async (req, res, next) => {
 });
 
 export const getPlatformPlans = asyncHandler(async (req, res, next) => {
+   console.log(req.user,"check");
   const result = await Admin.aggregate([
     {
       $lookup: {

@@ -46,6 +46,7 @@ export const verifyRazorpaySignature = (req, res, next) => {
 
 export const razorpayWebhookRouter = async (req, res, next) => {
   const { purpose } = req.razorpay;
+  console.log("route->",req.razorpay);
 
   if (purpose === "BOOKING") {
     return bookingWebhookController(req, res, next);
