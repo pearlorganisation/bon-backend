@@ -909,7 +909,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         const refund = await razorpay.payments.refund(
           booking.payment.razorpayPaymentId,
           {
-            amount: round(refundAmount),
+            amount: round(refundAmount*100),
             notes: {
               bookingId: booking._id.toString(),
               reason,
@@ -970,6 +970,7 @@ export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
   }
 
   const eventType = event.event;
+  console.log(event);
 
   if (eventType === "refund.processed") {
     const refund = event.payload.refund.entity;
