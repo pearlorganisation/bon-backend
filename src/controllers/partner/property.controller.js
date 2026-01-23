@@ -6,10 +6,12 @@ import {
   uploadFileToCloudinary,
 } from "../../utils/cloudinary.js";
 import Property from "../../models/Listing/property.model.js";
+import Room from "../../models/Listing/room.model.js";
 import Partner from "../../models/Partner/partner.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
-
+import {normalizeDate,getDatesBetween,isRoomBlocked} from "../Booking/booking.controller.js";
+import RoomInventory from "../../models/Listing/roomInventory.model.js";
 // ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
@@ -607,19 +609,69 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const dates = getDatesBetween(checkInDate, checkOutDate);
   console.log("dates", dates);
   // 1️ Find properties
-  const propertyQuery = {
-    status: "active",
-    verified: "approved",
-    $or: [
-      { city: new RegExp(location, "i") },
-      { state: new RegExp(location, "i") },
-      { country: new RegExp(location, "i") },
-    ],
-  };
+  const propertyPipeline = [
+    {
+      $match: {
+        status: "active",
+        verified: "approved",
+        ...(propertyType && { propertyType }),
+        $or: [
+          { city: new RegExp(location, "i") },
+          { state: new RegExp(location, "i") },
+          { country: new RegExp(location, "i") },
+        ],
+      },
+    },
+    // 2 Join Partner
+    {
+      $lookup: {
+        from: "partners",
+        localField: "partnerId",
+        foreignField: "userId",
+        as: "partner",
+      },
+    },
+    { $unwind: "$partner" },
 
-  if (propertyType) propertyQuery.propertyType = propertyType;
+    // 3️ Only verified partners
+    {
+      $match: {
+        "partner.isVerified": true,
+      },
+    },
 
-  const properties = await Property.find(propertyQuery).lean();
+    // 4️ Join Partner Plans
+    {
+      $lookup: {
+        from: "partnerplans",
+        localField: "partner.userId",
+        foreignField: "partnerId",
+        as: "plan",
+      },
+    },
+
+    // 5️ Flatten plans
+    {
+      $unwind: "$plan",
+    },
+
+    // 6️ Keep only ACTIVE plan
+    {
+      $match: {
+        "plan.planStatus": "ACTIVE",
+      },
+    },
+
+    // 7️ Hide plan from response
+    {
+      $project: {
+        plan: 0,
+        partner: 0,
+      },
+    },
+  ];
+
+  const properties = await Property.aggregate(propertyPipeline);
   if (!properties.length) {
     return successResponse(res, 200, "No properties found", []);
   }
@@ -786,12 +838,10 @@ export const approveRejectProperty = asyncHandler(async (req, res, next) => {
 });
 
 export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
-  const { propertyId} = req.params;
+  const { propertyId } = req.params;
 
-  if (!propertyId ) {
-    return next(
-      new CustomError("propertyId is required", 400)
-    );
+  if (!propertyId) {
+    return next(new CustomError("propertyId is required", 400));
   }
 
   const property = await Property.findById(propertyId);
