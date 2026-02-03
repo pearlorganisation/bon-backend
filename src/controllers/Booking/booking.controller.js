@@ -2,6 +2,7 @@ import Booking from "../../models/Listing/booking.model.js";
 import Room from "../../models/Listing/room.model.js";
 import Property from "../../models/Listing/property.model.js";
 import RoomInventory from "../../models/Listing/roomInventory.model.js";
+import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
 import { sendEmail } from "../../utils/mail/mailer.js";
 import CustomError from "../../utils/error/customError.js";
@@ -10,6 +11,7 @@ import { check } from "express-validator";
 import successResponse from "../../utils/error/successResponse.js";
 import { razorpay } from "../../config/razorpayConfig.js";
 import crypto from "crypto";
+import { isGeneratorFunction } from "util/types";
 
 const round = (num) => Math.round(num * 100) / 100;
 // utils/dateUtils.js
@@ -157,10 +159,11 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       numberOfGuests,
       primaryGuestDetails,
       specialRequests,
+      paymentMode,
     } = req.body;
 
     const userId = req.user._id;
-  
+
     // 1️ Basic validation
     if (!propertyId) throw new CustomError("Property ID is required", 400);
     if (!Array.isArray(rooms) || rooms.length === 0)
@@ -202,6 +205,15 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     if (property.status !== "active" || property.verified !== "approved")
       throw new CustomError("Property is inactive or not verified", 400);
 
+    const partnerPlan = await PartnerPlan.findOne({
+      partnerId: property.partnerId,
+      planStatus: "ACTIVE",
+    }).session(session);
+
+    if (!partnerPlan) {
+      throw new CustomError("Property is not available for booking", 400);
+    }
+
     const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
 
     let basePrice = 0;
@@ -212,14 +224,16 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     const roomsData = [];
 
     const dates = getDatesBetween(checkIn, checkOut);
-  console.log(dates,"dates");
+    console.log(dates, "dates");
     // 4️ Loop rooms
     for (const item of rooms) {
       if (!item.roomId) throw new CustomError("Room ID is required", 400);
       if (!item.quantity || item.quantity < 1)
         throw new CustomError("Room quantity must be at least 1", 400);
 
-      const room = await Room.findOne({_id: item.roomId,propertyId}).session(session);
+      const room = await Room.findOne({ _id: item.roomId, propertyId }).session(
+        session
+      );
       if (!room) throw new CustomError("Room not found", 404);
 
       // ❌ Blocked date check
@@ -337,11 +351,8 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       childrenCharge = childConfig.charge * overflow * nights;
     }
 
-    // 6️ Taxes
-    const platformFee = 100;
-    const subTotal = basePrice - discountAmount + extraFees + childrenCharge;
-    const taxes = subTotal * 0.12;
-    const totalPrice = subTotal + taxes + platformFee;
+    // 6️
+    const totalPrice = basePrice - discountAmount + extraFees + childrenCharge;
 
     // 7️ Create booking
     const booking = await Booking.create(
@@ -360,8 +371,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
             discountAmount: round(discountAmount),
             extraServicesFee: round(extraFees),
             childrenCharge: round(childrenCharge),
-            taxes: round(taxes),
-            platformFee,
+            partnerPlanId: partnerPlan._id,
           },
           totalPrice: round(totalPrice),
           status: "pending",
@@ -381,7 +391,6 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     next(err);
   }
 });
-
 
 export const updateBooking = asyncHandler(async (req, res, next) => {
   const session = await mongoose.startSession();
@@ -440,6 +449,15 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       property.verified !== "approved"
     ) {
       throw new CustomError("Property is inactive or not verified", 400);
+    }
+
+    const partnerPlan = await PartnerPlan.findOne({
+      partnerId,
+      planStatus: "ACTIVE",
+    });
+
+    if (!partnerPlan) {
+      throw new CustomError("sorry, Property is not avilable", 400);
     }
 
     const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
@@ -594,11 +612,9 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       childrenCharge = childConfig.charge * overflow * nights;
     }
 
-    // 7️ Taxes
-    const platformFee = 100;
-    const subTotal = basePrice - discountAmount + extraFees + childrenCharge;
-    const taxes = subTotal * 0.12;
-    const totalPrice = subTotal + taxes + platformFee;
+    // 7️
+
+    const totalPrice = basePrice - discountAmount + extraFees + childrenCharge;
 
     // 8️ Update booking
     booking.rooms = roomsData;
@@ -613,8 +629,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       discountAmount: round(discountAmount),
       extraServicesFee: round(extraFees),
       childrenCharge: round(childrenCharge),
-      taxes: round(taxes),
-      platformFee,
+      partnerPlanId: partnerPlan._id,
     };
     booking.totalPrice = round(totalPrice);
 
@@ -631,6 +646,60 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
   }
 });
 
+export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+  const { bookingId } = req.params;
+
+  const result = await Booking.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(bookingId),
+      },
+    },
+    {
+      $lookup: {
+        from: "properties",
+        localField: "propertyId",
+        foreignField: "_id",
+        as: "property",
+      },
+    },
+    { $unwind: "$property" },
+    {
+      $set: {
+        paymentModes: "$property.paymentModes",
+      },
+    },
+
+    {
+      $project: {
+        property: 0,
+      },
+    },
+  ]);
+
+  if (!result.length) {
+    return next(new CustomError("Booking not found", 404));
+  }
+
+  const booking = result[0];
+
+  if (booking.status != "pending") {
+    return next(
+      new CustomError("This mode is only avilable for pending booking", 400)
+    );
+  }
+
+  if (!booking.property.paymentModes.PAY_ON_ARRIVAL) {
+    return next(new CustomError("pay on Arrival mode is not avilable", 400));
+  }
+
+  booking.paymentMode = "PAY_ON_ARRIVAL";
+  booking.status = "confirmed";
+  await booking.save();
+
+  successResponse(res, 200, "Mode applied on booking");
+});
 
 // Create Booking (pending)
 //         ↓
@@ -649,25 +718,64 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 //  └───────────────┘
 
 //payment
-
+//
 export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
   const userId = req.user?._id;
   const { bookingId } = req.params;
 
-  const booking = await Booking.findOne({ _id: bookingId, userId });
+  const result = await Booking.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(bookingId),
+      },
+    },
+    {
+      $lookup: {
+        from: "properties",
+        localField: "propertyId",
+        foreignField: "_id",
+        as: "property",
+      },
+    },
+    { $unwind: "$property" },
+    {
+      $set: {
+        paymentModes: "$property.paymentModes",
+      },
+    },
 
-  if (!booking) {
+    {
+      $project: {
+        property: 0,
+      },
+    },
+  ]);
+
+  if (!result.length) {
     return next(new CustomError("Booking not found", 404));
   }
 
-  if (booking.status != "pending")
+  let booking = result[0];
+
+  if (booking.status != "pending") {
     return next(
       new CustomError("order only created for pending booking ", 400)
     );
+  }
+
+  if (!booking.property.paymentModes.PAY_NOW) {
+    return next(
+      new CustomError("PAY NOW mode is not avilable for this property!", 400)
+    );
+  }
 
   if (booking.payment?.razorpayOrderId && booking.paymentStatus == "paid") {
-    return next(new CustomError("order allready created ", 400));
+    return next(new CustomError("payment  allready  done ", 400));
   }
+
+  booking = await Booking.findById(bookingId);
+
+  booking.paymentMode = "PAY_NOW";
 
   try {
     const options = {
@@ -717,7 +825,7 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
 
 export const bookingWebhookController = asyncHandler(async (req, res, next) => {
   const { eventType, orderId, paymentId, paymentEntity } = req.razorpay;
-   console.log("payment",req.razorpay);
+  console.log("payment", req.razorpay);
 
   if (!eventType || !paymentEntity) {
     return next(new CustomError("Malformed webhook event", 400));
@@ -839,30 +947,37 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
       throw new CustomError("Only confirmed bookings can be cancelled", 400);
     }
 
-    if (booking.cancellation?.razorpayRefundId) {
-      throw new CustomError("Refund already applied", 400);
-    }
-
     if (new Date() >= booking.checkInDate) {
       throw new CustomError("Cancellation not allowed after check-in", 400);
+    }
+
+    if (
+      booking.paymentMode == "PAY_NOW" &&
+      booking.paymentStatus === "paid" &&
+      booking.cancellation?.razorpayRefundId
+    ) {
+      throw new CustomError("Refund already applied", 400);
     }
 
     const wasPaid = booking.paymentStatus === "paid";
 
     // 1️ Calculate refund
     let refundPercentage = 0;
+    const refundAmount = 0; // for PAY_ON_ARRIVAL
 
-    if (req.user?.role === "PARTNER") {
-      refundPercentage = 100;
-    } else {
-      // refundPercentage = calculateRefundPercentage({
-      //   cancellationPolicy: booking.propertyId.cancellationPolicy,
-      //   checkInDate: booking.checkInDate,
-      // });
-         refundPercentage = 100;
+    if (booking.paymentMode == "PAY_NOW") {
+      if (req.user?.role === "PARTNER") {
+        refundPercentage = 100;
+      } else {
+        // refundPercentage = calculateRefundPercentage({
+        //   cancellationPolicy: booking.propertyId.cancellationPolicy,
+        //   checkInDate: booking.checkInDate,
+        // });
+        refundPercentage = 100;
+      }
+
+      refundAmount = (booking.totalPrice * refundPercentage) / 100;
     }
-
-    const refundAmount = (booking.totalPrice * refundPercentage) / 100;
 
     // 2️ Release inventory (CRITICAL)
     const dates = getDatesBetween(
@@ -909,7 +1024,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         const refund = await razorpay.payments.refund(
           booking.payment.razorpayPaymentId,
           {
-            amount: round(refundAmount*100),
+            amount: round(refundAmount * 100),
             notes: {
               bookingId: booking._id.toString(),
               reason,
@@ -943,7 +1058,6 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
   }
 });
 
-
 export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
   const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const razorpaySignature = req.headers["x-razorpay-signature"];
@@ -964,7 +1078,7 @@ export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
   let event;
   try {
     event = JSON.parse(req.body.toString());
-    console.log("webhook response",event);
+    console.log("webhook response", event);
   } catch {
     return res.status(200).json({ success: true });
   }
@@ -1052,7 +1166,6 @@ export const deleteBooking = asyncHandler(async (req, res, next) => {
     next(err);
   }
 });
-
 
 export const getMyBooking = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
@@ -1155,6 +1268,7 @@ export const getBooking = asyncHandler(async (req, res, next) => {
     dateType = "checkin", // booking | stay | checkin
     sortBy = "createdAt",
     order = "desc",
+    confirmationCode,
   } = req.query;
 
   const query = {};
@@ -1179,6 +1293,7 @@ export const getBooking = asyncHandler(async (req, res, next) => {
   if (status) query.status = status;
   if (paymentStatus) query.paymentStatus = paymentStatus;
   if (propertyId) query.propertyId = propertyId;
+  if (confirmationCode) query.confirmationCode = confirmationCode;
 
   // ================= DATE FILTERING =================
   if (fromDate && toDate) {
@@ -1233,3 +1348,80 @@ export const getBooking = asyncHandler(async (req, res, next) => {
   });
 });
 
+export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
+  const { bookingId, bookingStatus } = req.body;
+
+  if (!bookingId || !bookingStatus) {
+    return next(
+      new CustomError("bookingId and bookingStatus are required", 400)
+    );
+  }
+
+  if (bookingStatus != "checkOut") {
+    return next(new CustomError("Invalid booking status", 400));
+  }
+
+  /* ---------------- FETCH BOOKING WITH PROPERTY ---------------- */
+
+  const result = await Booking.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(bookingId),
+      },
+    },
+    {
+      $lookup: {
+        from: "properties",
+        localField: "propertyId",
+        foreignField: "_id",
+        as: "property",
+      },
+    },
+    { $unwind: "$property" },
+    {
+      $match: {
+        "property.partnerId": new mongoose.Types.ObjectId(partnerId),
+      },
+    },
+    {
+      $project: {
+        property: 0,
+      },
+    },
+  ]);
+
+  if (!result.length) {
+    return next(new CustomError("Booking not found", 404));
+  }
+
+  const booking = result[0];
+
+  /* ---------------- PAYMENT VALIDATION ---------------- */
+
+  if (booking.status !== "confirmed") {
+    return next(new CustomError("Booking  is not confirmed", 400));
+  }
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  const checkOutDate = new Date(booking.checkOutDate);
+
+  /* ---------------- STATUS LOGIC ---------------- */
+
+  if (today < checkOutDate) {
+    return next(new CustomError("Check-out date has not arrived yet", 400));
+  }
+
+  /* ---------------- SAVE ---------------- */
+
+  await Booking.findByIdAndUpdate(booking._id, {
+    status: bookingStatus,
+  });
+
+  successResponse(res, 200, "Booking status updated successfully", {
+    bookingId: booking._id,
+    status: booking.status,
+  });
+});

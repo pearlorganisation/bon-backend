@@ -61,11 +61,21 @@ const bookingSchema = new mongoose.Schema(
     priceBreakdown: {
       basePrice: { type: Number, default: 0 },
       discountAmount: { type: Number, default: 0 },
-      taxes: { type: Number, default: 0 },
+      // taxes: { type: Number, default: 0 },
       extraServicesFee: { type: Number, default: 0 }, // e.g., service fees, cleaning fees
-      platformFee: { type: Number },
-      childrenCharge: { type: Number },
+      partnerPlanId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PartnerPlan",
+        required: true,
+      },
     },
+    paymentMode: {
+      type: String,
+      enum: ["PAY_NOW", "PAY_ON_ARRIVAL"],
+      required: true,
+      default: "PAY_NOW",
+    },
+    //paymwnt object only  for PAY_NOW
     payment: {
       razorpayOrderId: { type: String, default: null },
       razorpayPaymentId: { type: String },
@@ -86,11 +96,10 @@ const bookingSchema = new mongoose.Schema(
       ],
       default: "pending",
     },
-
     // Booking status for lifecycle management
     status: {
       type: String,
-      enum: ["pending", "confirmed", "cancelled","expired"],
+      enum: ["pending", "confirmed", "cancelled", "expired", "checkOut"],
       default: "pending",
     },
     // Cancellation details if applicable
@@ -101,7 +110,7 @@ const bookingSchema = new mongoose.Schema(
       },
       cancellationDate: { type: Date },
       refundAmount: { type: Number, default: 0 },
-      razorpayRefundId: {type:String},
+      razorpayRefundId: { type: String },
       reason: { type: String },
     },
     // Guest details (for multiple guests or additional info)

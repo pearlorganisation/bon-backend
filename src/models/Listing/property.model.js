@@ -41,8 +41,8 @@ const propertySchema = new mongoose.Schema(
     amenities: [String],
 
     policies: {
-      checkInTime: {type: String, default: "2:00 PM"},
-      checkOutTime:  {type: String, default: "12:00 PM"},
+      checkInTime: { type: String, default: "2:00 PM" },
+      checkOutTime: { type: String, default: "12:00 PM" },
       cancellationPolicy: [
         {
           daysBeforeCheckIn: {
@@ -112,13 +112,19 @@ const propertySchema = new mongoose.Schema(
     },
     Images: [{ secure_url: String, public_id: String }],
     Videos: [{ secure_url: String, public_id: String }],
+
+    paymentModes: {
+      PAY_NOW: { type: Boolean, default: true },
+      PAY_ON_ARRIVAL: { type: Boolean, default: true },
+    },
+
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     verified: {
       type: String,
       enum: ["pending", "under_review", "approved", "rejected"], //admin"approved" approved
       default: "pending",
     },
-    AdminNote:{type:String},
+    AdminNote: { type: String },
     //     commissionPercentage: { type: Number, default: 10 },
   },
   { timestamps: true }
