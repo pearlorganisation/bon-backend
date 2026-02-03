@@ -704,7 +704,7 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
 export const getAllPropertyTypes = async (req, res) => {
   try {
-    const types = await Property.find().sort({ name: 1 });
+    const types = await Property.distinct("propertyType");
 
     return successResponse(
       res,
