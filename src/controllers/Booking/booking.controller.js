@@ -685,17 +685,20 @@ export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
   const booking = result[0];
 
   if (booking.status != "pending") {
-    return next(new CustomError("This mode is only avilable for pending booking", 400));
+    return next(
+      new CustomError("This mode is only avilable for pending booking", 400)
+    );
   }
-   
-   if (!booking.paymentModes.PAY_ON_ARRIVAL){
-      return next(new CustomError("pay on Arrival mode is not avilable", 400));
-   }
 
-     booking.payment = "PAY_ON_ARRIVAL";
-      await booking.save();
+  if (!booking.property.paymentModes.PAY_ON_ARRIVAL) {
+    return next(new CustomError("pay on Arrival mode is not avilable", 400));
+  }
 
-      successResponse(res,200,"Mode applied on booking");
+  booking.paymentMode = "PAY_ON_ARRIVAL";
+  booking.status = "confirmed";
+  await booking.save();
+
+  successResponse(res, 200, "Mode applied on booking");
 });
 
 // Create Booking (pending)
@@ -752,28 +755,27 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Booking not found", 404));
   }
 
-  let  booking = result[0];
+  let booking = result[0];
 
-  
-  if (booking.status != "pending"){
+  if (booking.status != "pending") {
     return next(
       new CustomError("order only created for pending booking ", 400)
     );
   }
 
-    if(!booking.paymentModes.PAY_NOW){
-       return next(
-         new CustomError("PAY NOW mode is not avilable for this property!", 400)
-       );
-    }
-   
-  if (booking.payment?.razorpayOrderId && booking.paymentStatus == "paid") {
-    return next(new CustomError("order allready created ", 400));
+  if (!booking.property.paymentModes.PAY_NOW) {
+    return next(
+      new CustomError("PAY NOW mode is not avilable for this property!", 400)
+    );
   }
 
-   booking = await Booking.findById(bookingId);
-     
-   booking.paymentMode = "PAY_NOW";
+  if (booking.payment?.razorpayOrderId && booking.paymentStatus == "paid") {
+    return next(new CustomError("payment  allready  done ", 400));
+  }
+
+  booking = await Booking.findById(bookingId);
+
+  booking.paymentMode = "PAY_NOW";
 
   try {
     const options = {
@@ -945,30 +947,37 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
       throw new CustomError("Only confirmed bookings can be cancelled", 400);
     }
 
-    if (booking.cancellation?.razorpayRefundId) {
-      throw new CustomError("Refund already applied", 400);
-    }
-
     if (new Date() >= booking.checkInDate) {
       throw new CustomError("Cancellation not allowed after check-in", 400);
+    }
+
+    if (
+      booking.paymentMode == "PAY_NOW" &&
+      booking.paymentStatus === "paid" &&
+      booking.cancellation?.razorpayRefundId
+    ) {
+      throw new CustomError("Refund already applied", 400);
     }
 
     const wasPaid = booking.paymentStatus === "paid";
 
     // 1️ Calculate refund
     let refundPercentage = 0;
+    const refundAmount = 0; // for PAY_ON_ARRIVAL
 
-    if (req.user?.role === "PARTNER") {
-      refundPercentage = 100;
-    } else {
-      // refundPercentage = calculateRefundPercentage({
-      //   cancellationPolicy: booking.propertyId.cancellationPolicy,
-      //   checkInDate: booking.checkInDate,
-      // });
-      refundPercentage = 100;
+    if (booking.paymentMode == "PAY_NOW") {
+      if (req.user?.role === "PARTNER") {
+        refundPercentage = 100;
+      } else {
+        // refundPercentage = calculateRefundPercentage({
+        //   cancellationPolicy: booking.propertyId.cancellationPolicy,
+        //   checkInDate: booking.checkInDate,
+        // });
+        refundPercentage = 100;
+      }
+
+      refundAmount = (booking.totalPrice * refundPercentage) / 100;
     }
-
-    const refundAmount = (booking.totalPrice * refundPercentage) / 100;
 
     // 2️ Release inventory (CRITICAL)
     const dates = getDatesBetween(
