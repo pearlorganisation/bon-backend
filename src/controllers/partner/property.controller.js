@@ -16,6 +16,7 @@ import {
   normalizeDate,
 } from "../Booking/booking.controller.js";
 import RoomInventory from "../../models/Listing/roomInventory.model.js";
+import mongoose from "mongoose";
 
 // ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
@@ -598,7 +599,7 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
 });
 
 export const searchProperties = asyncHandler(async (req, res, next) => {
-  const { location, checkIn, checkOut, rooms = 1, propertyType } = req.query;
+  const { location, checkIn, checkOut, rooms = 1, propertyType, propertyId } = req.query;
 
   if (!location || !checkIn || !checkOut) {
     return next(
@@ -620,6 +621,7 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
         status: "active",
         verified: "approved",
         ...(propertyType && { propertyType }),
+        ...(propertyId && { _id: new mongoose.Types.ObjectId(propertyId) }),
         $or: [
           { city: new RegExp(location, "i") },
           { state: new RegExp(location, "i") },
@@ -754,7 +756,7 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
 export const getAllPropertyTypes = async (req, res) => {
   try {
-    const types = await Property.find().sort({ name: 1 });
+    const types = await Property.distinct("propertyType");
 
     return successResponse(
       res,
@@ -792,16 +794,41 @@ export const getPropertyTypeWithProperties = async (req, res) => {
           as: "partner",
         },
       },
-      {
-        $unwind: "$partner",
-      },
+      { $unwind: "$partner" },
+
+      // 3️ Only verified partners
       {
         $match: {
           "partner.isVerified": true,
         },
       },
+
+      // 4️ Join Partner Plans
+      {
+        $lookup: {
+          from: "partnerplans",
+          localField: "partner.userId",
+          foreignField: "partnerId",
+          as: "plan",
+        },
+      },
+
+      // 5️ Flatten plans
+      {
+        $unwind: "$plan",
+      },
+
+      // 6️ Keep only ACTIVE plan
+      {
+        $match: {
+          "plan.planStatus": "ACTIVE",
+        },
+      },
+
+      // 7️ Hide plan from response
       {
         $project: {
+          plan: 0,
           partner: 0,
         },
       },
