@@ -10,8 +10,13 @@ import Room from "../../models/Listing/room.model.js";
 import Partner from "../../models/Partner/partner.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
-import {normalizeDate,getDatesBetween,isRoomBlocked} from "../Booking/booking.controller.js";
+import {
+  getDatesBetween,
+  isRoomBlocked,
+  normalizeDate,
+} from "../Booking/booking.controller.js";
 import RoomInventory from "../../models/Listing/roomInventory.model.js";
+
 // ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
@@ -52,14 +57,14 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   if (req.files?.images) {
     Images = await uploadFileToCloudinary(
       req.files.images,
-      "properties/images"
+      "properties/images",
     );
   }
 
   if (req.files?.videos) {
     Videos = await uploadFileToCloudinary(
       req.files.videos,
-      "properties/videos"
+      "properties/videos",
     );
   }
 
@@ -254,7 +259,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // Remove images from property (once)
     property.Images = property.Images.filter(
-      (img) => !publicIdsToDelete.includes(img.public_id)
+      (img) => !publicIdsToDelete.includes(img.public_id),
     );
 
     // Delete from Cloudinary (sequential & safe)
@@ -276,7 +281,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // Remove videos from property (once)
     property.Videos = property.Videos.filter(
-      (video) => !publicIdsToDelete.includes(video.public_id)
+      (video) => !publicIdsToDelete.includes(video.public_id),
     );
 
     // Delete from Cloudinary (sequential & safe)
@@ -304,7 +309,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     // Remove documents from property
     property.documentVerification.PropertyDocuments =
       property.documentVerification.PropertyDocuments.filter(
-        (doc) => !publicIdsToDelete.includes(doc.public_id)
+        (doc) => !publicIdsToDelete.includes(doc.public_id),
       );
 
     // Delete from Cloudinary (sequential & safe)
@@ -320,14 +325,14 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   if (req.files?.images) {
     Images = await uploadFileToCloudinary(
       req.files.images,
-      "properties/images"
+      "properties/images",
     );
   }
 
   if (req.files?.videos) {
     Videos = await uploadFileToCloudinary(
       req.files.videos,
-      "properties/videos"
+      "properties/videos",
     );
   }
 
@@ -347,19 +352,19 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // 🔍 Check duplicate document name
     const duplicateName = property.documentVerification.PropertyDocuments.some(
-      (doc) => doc.document_name === normalizedName
+      (doc) => doc.document_name === normalizedName,
     );
 
     if (duplicateName) {
       return next(
-        new CustomError("Document with this name already exists", 400)
+        new CustomError("Document with this name already exists", 400),
       );
     }
 
     //  Upload to Cloudinary
     const uploadedDocs = await uploadFileToCloudinary(
       req.files.propertyDocument,
-      "properties/documents"
+      "properties/documents",
     );
 
     // 📎 Push document
@@ -460,7 +465,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     query.partnerId = null;
   } else {
     return next(
-      new CustomError("You are not authorized to access this property", 403)
+      new CustomError("You are not authorized to access this property", 403),
     );
   }
 
@@ -473,7 +478,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
 
   if (!property) {
     return next(
-      new CustomError("Property not found or not owned by this partner", 404)
+      new CustomError("Property not found or not owned by this partner", 404),
     );
   }
 
@@ -481,7 +486,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     res,
     200,
     "successfully fetch the partner property",
-    property
+    property,
   );
 });
 
@@ -525,7 +530,7 @@ export const getAllProperties = async (req, res) => {
       res,
       200,
       "Properties fetched successfully",
-      properties
+      properties,
     );
   } catch (error) {
     return res.status(500).json({
@@ -550,7 +555,7 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
 
   if (!["active", "inactive"].includes(status)) {
     return next(
-      new CustomError("Status must be either 'active' or 'inactive'", 400)
+      new CustomError("Status must be either 'active' or 'inactive'", 400),
     );
   }
 
@@ -566,7 +571,7 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
     res,
     200,
     `Property status updated to ${status} successfully`,
-    property
+    property,
   );
 });
 
@@ -584,7 +589,7 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   // 2️ Ensure property is public/active
   if (property.status !== "active" && !isAdmin) {
     return next(
-      new CustomError("This property is not available for public viewing", 403)
+      new CustomError("This property is not available for public viewing", 403),
     );
   }
 
@@ -597,7 +602,7 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
   if (!location || !checkIn || !checkOut) {
     return next(
-      new CustomError("Location, check-in and check-out are required", 400)
+      new CustomError("Location, check-in and check-out are required", 400),
     );
   }
   const checkInDate = normalizeDate(checkIn);
@@ -767,7 +772,7 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
 
     if (!partner.isVerified) {
       return next(
-        new CustomError("Complete your KYC to verified you property", 404)
+        new CustomError("Complete your KYC to verified you property", 404),
       );
     }
 
@@ -801,8 +806,8 @@ export const getPropertyApprovalRequests = asyncHandler(
       return next(
         new CustomError(
           "Only admin can fetch all under_ reviewed properties",
-          403
-        )
+          403,
+        ),
       );
     }
 
@@ -813,7 +818,7 @@ export const getPropertyApprovalRequests = asyncHandler(
       .populate("subAdminId", "name email");
 
     successResponse(res, 200, "Property approval requests fetched", properties);
-  }
+  },
 );
 
 export const approveRejectProperty = asyncHandler(async (req, res, next) => {
@@ -853,14 +858,14 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `Only approved property can be assigned. Current status: ${property.verified}`,
-        400
-      )
+        400,
+      ),
     );
   }
 
   if (property.partnerId) {
     return next(
-      new CustomError("Property is already assigned to a partner", 409)
+      new CustomError("Property is already assigned to a partner", 409),
     );
   }
 
@@ -875,7 +880,10 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
 
   if (!partnerAuth.isVerified) {
     return next(
-      new CustomError(`Partner ${partnerAuth.name} has not verified email`, 400)
+      new CustomError(
+        `Partner ${partnerAuth.name} has not verified email`,
+        400,
+      ),
     );
   }
 
@@ -886,7 +894,7 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
 
   if (!partnerKyc) {
     return next(
-      new CustomError(`Partner ${partnerAuth.name} has not completed KYC`, 400)
+      new CustomError(`Partner ${partnerAuth.name} has not completed KYC`, 400),
     );
   }
 
@@ -896,6 +904,6 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
   return successResponse(
     res,
     200,
-    `Property (${property.name}) assigned to partner (${partnerAuth.name})`
+    `Property (${property.name}) assigned to partner (${partnerAuth.name})`,
   );
 });
