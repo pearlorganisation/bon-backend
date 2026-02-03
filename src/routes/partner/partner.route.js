@@ -10,6 +10,8 @@ import {
   requestPropertyApproval,
   getPropertyApprovalRequests,
   approveRejectProperty,
+  getAllPropertyTypes,
+  getPropertyTypeWithProperties,
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
@@ -57,36 +59,41 @@ router.post(
   "/verify-gstin",
   protect,
   authorizeRoles("PARTNER"),
-  verify_property_GSTIN
+  verify_property_GSTIN,
 );
 
 router.get(
   "/verify-gstin",
   protect,
   authorizeRoles("PARTNER", "ADMIN"),
-  getPartnerKYC
+  getPartnerKYC,
 );
 
 router.post(
   "/create-fund-account",
   protect,
   authorizeRoles("PARTNER"),
-  createPartnerFundAccount
+  createPartnerFundAccount,
 );
 
 router.post(
   "/buy-commision-plan",
-   protect,
+  protect,
   authorizeRoles("PARTNER"),
-  buyNewCommissionPlan
+  buyNewCommissionPlan,
 );
 router.post(
   "/buy-subscription-plan/:subscriptionPlanId",
-   protect,
+  protect,
   authorizeRoles("PARTNER"),
-  buyNewSubscriptionPlan
+  buyNewSubscriptionPlan,
 );
-router.get("/my-plans", protect,authorizeRoles("PARTNER","ADMIN"), getMyPlans);
+router.get(
+  "/my-plans",
+  protect,
+  authorizeRoles("PARTNER", "ADMIN"),
+  getMyPlans,
+);
 
 //---------- property routes ----------------
 
@@ -95,32 +102,36 @@ router.put(
   "/update-property/:propertyId",
   protect,
   uploadFields,
-  updateProperty
+  updateProperty,
 );
 router.get("/get-partner-properties", protect, getPartnerProperties);
 router.get(
   "/get-partner-property/:propertyId",
   protect,
-  getPartnerPropertyByID
+  getPartnerPropertyByID,
 );
 router.get(
   "/get-property-by-id/:propertyId",
   optionalProtect,
-  getPublicPropertyById
+  getPublicPropertyById,
 );
 router.get("/get-all-properties", getAllProperties);
+
+router.get("/types", getAllPropertyTypes);
+
+router.get("/types/:type", getPropertyTypeWithProperties);
 
 router.put(
   "/change-property-status/:propertyId",
   protect,
-  changePropertyStatus
+  changePropertyStatus,
 );
 
 router.patch(
   "/properties/:propertyId/request-approval",
   protect,
   authorizeRoles("PARTNER", "SUB_ADMIN"),
-  requestPropertyApproval
+  requestPropertyApproval,
 );
 
 //------admin--------//
@@ -128,7 +139,7 @@ router.patch(
 router.get(
   "/get-property-by-id/:propertyId",
   optionalProtect,
-  getPublicPropertyById
+  getPublicPropertyById,
 );
 
 //---------- Rooms routes ----------------
@@ -138,18 +149,18 @@ router.put(
   "/update-single-room/:roomId",
   protect,
   uploadFields,
-  updateRoomById
+  updateRoomById,
 );
 router.put("/update-rooms-bulk/:propertyId", protect, updateRoomsInBulk);
 router.get(
   "/get-types-of-rooms/:propertyId",
   protect,
-  getTypesOfRoomsInProperty
+  getTypesOfRoomsInProperty,
 );
 router.get(
   "/get-rooms-for-property/:propertyId",
 
-  getRoomsByPropertyId
+  getRoomsByPropertyId,
 );
 router.delete("/delete-rooms", protect, deleteRoomsByTypes);
 router.delete("/delete-single-room/:roomId", protect, deleteRoom);
