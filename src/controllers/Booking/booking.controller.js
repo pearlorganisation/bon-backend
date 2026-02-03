@@ -654,6 +654,8 @@ export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
     {
       $match: {
         _id: new mongoose.Types.ObjectId(bookingId),
+        userId:new mongoose.Types.ObjectId(userId),
+        status: "pending"
       },
     },
     {
@@ -690,7 +692,7 @@ export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
     );
   }
 
-  if (!booking.property.paymentModes.PAY_ON_ARRIVAL) {
+  if (!booking.paymentModes.PAY_ON_ARRIVAL) {
     return next(new CustomError("pay on Arrival mode is not avilable", 400));
   }
 
@@ -763,7 +765,7 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
     );
   }
 
-  if (!booking.property.paymentModes.PAY_NOW) {
+  if (!booking.paymentModes.PAY_NOW) {
     return next(
       new CustomError("PAY NOW mode is not avilable for this property!", 400)
     );

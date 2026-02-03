@@ -4,6 +4,7 @@ import {
   updateBooking,
   cancelBooking,
   createRazorpayOrder,
+  selectPayOnArrivalMode,
   getMyBooking,
   getBooking,
 } from "../controllers/Booking/booking.controller.js";
@@ -19,6 +20,12 @@ router.post(
   protect,
   authorizeRoles("CUSTOMER"),
   updateBooking
+);
+router.post(
+  "/pay-on-arrival",
+  protect,
+  authorizeRoles("CUSTOMER"),
+  selectPayOnArrivalMode
 );
 router.post(
   "/create-order/:bookingId",
