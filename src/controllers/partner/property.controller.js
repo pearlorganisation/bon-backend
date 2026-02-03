@@ -702,6 +702,76 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   });
 });
 
+export const getAllPropertyTypes = async (req, res) => {
+  try {
+    const types = await Property.find().sort({ name: 1 });
+
+    return successResponse(
+      res,
+      200,
+      "Property types fetched successfully",
+      types,
+    );
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: error.message,
+    });
+  }
+};
+
+export const getPropertyTypeWithProperties = async (req, res) => {
+  try {
+    const { type } = req.params;
+
+    const properties = await Property.aggregate([
+      {
+        $match: {
+          propertyType: type,
+          partnerId: { $ne: null },
+          verified: "approved",
+          status: "active",
+        },
+      },
+      {
+        $lookup: {
+          from: "partners",
+          localField: "partnerId",
+          foreignField: "userId",
+          as: "partner",
+        },
+      },
+      {
+        $unwind: "$partner",
+      },
+      {
+        $match: {
+          "partner.isVerified": true,
+        },
+      },
+      {
+        $project: {
+          partner: 0,
+        },
+      },
+    ]);
+
+    return successResponse(
+      res,
+      200,
+      `Properties for type: ${type}`,
+      properties,
+    );
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      statusCode: 500,
+      message: error.message,
+    });
+  }
+};
+
 // partner
 
 export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
