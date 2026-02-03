@@ -32,7 +32,6 @@ const Sub_Admin_Session_Schema = new mongoose.Schema(
       type: Date,
       required: true, //heartbeat
     },
-
     lastActivity: {
       path: {
         type: String, // "/contacts"

@@ -21,7 +21,7 @@ const expireInactivePendingBookingsCron = () => {
 
       if (!bookings.length) {
         return;
-      }
+      }  
 
       for (const booking of bookings) {
         session.startTransaction();
