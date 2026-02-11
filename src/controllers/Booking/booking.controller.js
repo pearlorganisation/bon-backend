@@ -144,6 +144,26 @@ const calculateRefundPercentage = ({
   return 0;
 };
 
+const getHotelGSTDetails = (totalAmount) => {
+  let gstRate = 0;
+
+  if (totalAmount <= 1000) {
+    gstRate = 0;
+  } else if (totalAmount <= 7500) {
+    gstRate = 5;
+  } else {
+    gstRate = 18;
+  }
+
+  const gstAmount = (totalAmount * gstRate) / 100;
+
+  return {
+    gstRate: gstRate, // in percentage
+    gstAmount: gstAmount, // in rupees
+  };
+};
+
+
 //controllers
 
 export const createBooking = asyncHandler(async (req, res, next) => {
@@ -159,7 +179,6 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       numberOfGuests,
       primaryGuestDetails,
       specialRequests,
-      paymentMode,
     } = req.body;
 
     const userId = req.user._id;
@@ -351,8 +370,11 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       childrenCharge = childConfig.charge * overflow * nights;
     }
 
-    // 6️
+    // 6️ calculate gst
     const totalPrice = basePrice - discountAmount + extraFees + childrenCharge;
+ 
+      const gstDetails = getHotelGSTDetails(totalPrice);
+      totalPrice+=gstDetails.gstAmount;
 
     // 7️ Create booking
     const booking = await Booking.create(
@@ -371,6 +393,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
             discountAmount: round(discountAmount),
             extraServicesFee: round(extraFees),
             childrenCharge: round(childrenCharge),
+            gstDetails,
             partnerPlanId: partnerPlan._id,
           },
           totalPrice: round(totalPrice),
@@ -612,9 +635,11 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       childrenCharge = childConfig.charge * overflow * nights;
     }
 
-    // 7️
-
+    // 67 calculate gst
     const totalPrice = basePrice - discountAmount + extraFees + childrenCharge;
+
+    const gstDetails = getHotelGSTDetails(totalPrice);
+    totalPrice += gstDetails.gstAmount;
 
     // 8️ Update booking
     booking.rooms = roomsData;
@@ -629,6 +654,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       discountAmount: round(discountAmount),
       extraServicesFee: round(extraFees),
       childrenCharge: round(childrenCharge),
+      gstDetails,
       partnerPlanId: partnerPlan._id,
     };
     booking.totalPrice = round(totalPrice);

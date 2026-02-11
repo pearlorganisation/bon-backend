@@ -68,6 +68,10 @@ const bookingSchema = new mongoose.Schema(
         ref: "PartnerPlan",
         required: true,
       },
+      gstDetails: {
+        gstRate: { type: Number },
+        gstAmount: { type: Number },
+      },
     },
     paymentMode: {
       type: String,
@@ -99,7 +103,14 @@ const bookingSchema = new mongoose.Schema(
     // Booking status for lifecycle management
     status: {
       type: String,
-      enum: ["pending", "confirmed", "cancelled", "expired", "checkOut"],
+      enum: [
+        "pending",
+        "confirmed",
+        "cancelled",
+        "expired",
+        "checkIn",
+        "no-show",
+      ],
       default: "pending",
     },
     // Cancellation details if applicable
