@@ -388,14 +388,21 @@ export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
 
 //  PARTNER PLAN
 
-
-
 export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
   const { commissionPercentage } = req.body;
   const partnerId = req.user._id;
 
   if (!commissionPercentage) {
     return next(new CustomError("commission percentage is required", 400));
+  }
+
+  const isValid = await Partner.findOne({
+    userId: partnerId,
+    isVerified: true,
+  });
+
+  if (!isValid) {
+    return next(new CustomError("before creating plan complete your kyc", 400));
   }
 
   // check upcoming plan
@@ -428,8 +435,8 @@ export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
     planStatus: "ACTIVE",
   });
 
-  const  startDate = activePlan ? activePlan.endDate : new Date();
-   const endDate = new Date(startDate);
+  const startDate = activePlan ? activePlan.endDate : new Date();
+  const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + 30);
 
   const plan = await PartnerPlan.create({
@@ -447,6 +454,16 @@ export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
 export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
   const { subscriptionPlanId } = req.params;
+
+  const isValid = await Partner.findOne({
+    userId: partnerId,
+    isVerified: true,
+  });
+
+  if (!isValid) {
+    return next(new CustomError("before creating plan complete your kyc", 400));
+  }
+
 
   // 1. block multiple upcoming plans
   const upcomingPlan = await PartnerPlan.findOne({
@@ -582,4 +599,3 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
 
   successResponse(res, 200, "successfully fetched current plans", { plans });
 });
-
