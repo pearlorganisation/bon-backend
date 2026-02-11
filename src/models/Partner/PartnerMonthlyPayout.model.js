@@ -10,12 +10,12 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
     },
 
     /* ---------- PAYOUT PERIOD ---------- */
-    payoutMonth: {
-      type: String,
-      required: true,
-    },
     payoutYear: {
       type: Number,
+      required: true,
+    },
+    payoutMonth: {
+      type: String,
       required: true,
     },
 
@@ -29,13 +29,6 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
         type: String,
         enum: ["pending", "paid", "failed"],
       },
-      bookings: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Booking",
-          required: true,
-        },
-      ],
     },
 
     adminWallet: {
@@ -47,14 +40,14 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
         type: String,
         enum: ["pending", "paid", "failed"],
       },
-      bookings: [
-        {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "Booking",
-          required: true,
-        },
-      ],
     },
+    bookings: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Booking",
+        required: true,
+      },
+    ],
   },
   { timestamps: true }
 );
