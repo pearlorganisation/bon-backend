@@ -852,7 +852,7 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
 });
 
 export const bookingWebhookController = asyncHandler(async (req, res, next) => {
-  const { eventType, orderId, paymentId, paymentEntity } = req.razorpay;
+  const { eventType,             orderId, paymentId, paymentEntity } = req.razorpay;
   console.log("payment", req.razorpay);
 
   if (!eventType || !paymentEntity) {
@@ -1386,9 +1386,9 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
     );
   }
 
-  if (bookingStatus != "checkOut") {
+  if (!["checkIn","no-show"].includes(bookingStatus)) {
     return next(new CustomError("Invalid booking status", 400));
-  }
+  } 
 
   /* ---------------- FETCH BOOKING WITH PROPERTY ---------------- */
 
