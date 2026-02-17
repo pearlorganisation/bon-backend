@@ -15,7 +15,7 @@ const roomSchema = new mongoose.Schema(
       default: 0,
     },
     // How many physical rooms of this exact type exist in the property
-    numberOfRooms: {      
+    numberOfRooms: {
       type: Number,
       required: true,
       min: 1,
@@ -72,7 +72,6 @@ const roomSchema = new mongoose.Schema(
     servicesAndExtras: {
       type: mongoose.Schema.Types.Mixed,
       default: {},
-    
     },
     // 2. Accessibility
     accessibility: {
@@ -162,6 +161,66 @@ const roomSchema = new mongoose.Schema(
       babySafetyGates: { type: Boolean, default: false },
       strollers: { type: Boolean, default: false },
       playground: { type: Boolean, default: false },
+    },
+
+    foodAndDrinksAmenities: {
+      inHouseRestaurant: { type: Boolean, default: false },
+      multiCuisineRestaurant: { type: Boolean, default: false },
+      pureVegetarianRestaurant: { type: Boolean, default: false },
+      onsiteCoffeeHouse: { type: Boolean, default: false },
+      snackBar: { type: Boolean, default: false },
+      rooftopDining: { type: Boolean, default: false },
+      outdoorDiningArea: { type: Boolean, default: false },
+      picnicArea: { type: Boolean, default: false },
+      liveKitchen: { type: Boolean, default: false },
+
+      breakfastAvailable: { type: Boolean, default: false },
+      complimentaryBreakfast: { type: Boolean, default: false },
+      buffetBreakfast: { type: Boolean, default: false },
+      continentalBreakfast: { type: Boolean, default: false },
+      americanBreakfast: { type: Boolean, default: false },
+      asianBreakfast: { type: Boolean, default: false },
+      vegetarianBreakfast: { type: Boolean, default: false },
+      halalBreakfast: { type: Boolean, default: false },
+      glutenFreeBreakfast: { type: Boolean, default: false },
+      fullEnglishIrishBreakfast: { type: Boolean, default: false },
+
+      bar: { type: Boolean, default: false },
+      loungeBar: { type: Boolean, default: false },
+      poolsideBar: { type: Boolean, default: false },
+      happyHours: { type: Boolean, default: false },
+      wineChampagneAvailable: { type: Boolean, default: false },
+      minibarInRooms: { type: Boolean, default: false },
+
+      teaCoffeeMakerInRoom: { type: Boolean, default: false },
+      complimentaryTeaCoffee: { type: Boolean, default: false },
+      juiceBar: { type: Boolean, default: false },
+      vendingMachineDrinks: { type: Boolean, default: false },
+      vendingMachineSnacks: { type: Boolean, default: false },
+
+      breakfastInRoom: { type: Boolean, default: false },
+      packedLunches: { type: Boolean, default: false },
+      groceryDelivery: { type: Boolean, default: false },
+      bbqFacilities: { type: Boolean, default: false },
+      candleLightDinner: { type: Boolean, default: false },
+      bonfireDining: { type: Boolean, default: false },
+
+      kidMealsAvailable: { type: Boolean, default: false },
+      kidFriendlyBuffet: { type: Boolean, default: false },
+      specialDietMealsOnRequest: { type: Boolean, default: false },
+      allergyFriendlyFood: { type: Boolean, default: false },
+      veganFood: { type: Boolean, default: false },
+      vegetarianFood: { type: Boolean, default: false },
+      halalFood: { type: Boolean, default: false },
+      jainFood: { type: Boolean, default: false },
+      glutenFreeFood: { type: Boolean, default: false },
+      babyFoodAvailable: { type: Boolean, default: false },
+      seniorCitizenMealOptions: { type: Boolean, default: false },
+
+      fruits: { type: Boolean, default: false },
+      chocolatesCookies: { type: Boolean, default: false },
+      welcomeDrink: { type: Boolean, default: false },
+      localCuisineAvailable: { type: Boolean, default: false },
     },
 
     // 12. Building Information
@@ -259,7 +318,7 @@ const roomSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 roomSchema.virtual("Bookings", {
