@@ -1,6 +1,7 @@
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
+import axios from "axios";
 import {
   deleteFileFromCloudinary,
   uploadFileToCloudinary,
@@ -58,14 +59,14 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   if (req.files?.images) {
     Images = await uploadFileToCloudinary(
       req.files.images,
-      "properties/images",
+      "properties/images"
     );
   }
 
   if (req.files?.videos) {
     Videos = await uploadFileToCloudinary(
       req.files.videos,
-      "properties/videos",
+      "properties/videos"
     );
   }
 
@@ -260,7 +261,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // Remove images from property (once)
     property.Images = property.Images.filter(
-      (img) => !publicIdsToDelete.includes(img.public_id),
+      (img) => !publicIdsToDelete.includes(img.public_id)
     );
 
     // Delete from Cloudinary (sequential & safe)
@@ -282,7 +283,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // Remove videos from property (once)
     property.Videos = property.Videos.filter(
-      (video) => !publicIdsToDelete.includes(video.public_id),
+      (video) => !publicIdsToDelete.includes(video.public_id)
     );
 
     // Delete from Cloudinary (sequential & safe)
@@ -310,7 +311,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     // Remove documents from property
     property.documentVerification.PropertyDocuments =
       property.documentVerification.PropertyDocuments.filter(
-        (doc) => !publicIdsToDelete.includes(doc.public_id),
+        (doc) => !publicIdsToDelete.includes(doc.public_id)
       );
 
     // Delete from Cloudinary (sequential & safe)
@@ -326,14 +327,14 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   if (req.files?.images) {
     Images = await uploadFileToCloudinary(
       req.files.images,
-      "properties/images",
+      "properties/images"
     );
   }
 
   if (req.files?.videos) {
     Videos = await uploadFileToCloudinary(
       req.files.videos,
-      "properties/videos",
+      "properties/videos"
     );
   }
 
@@ -353,19 +354,19 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // 🔍 Check duplicate document name
     const duplicateName = property.documentVerification.PropertyDocuments.some(
-      (doc) => doc.document_name === normalizedName,
+      (doc) => doc.document_name === normalizedName
     );
 
     if (duplicateName) {
       return next(
-        new CustomError("Document with this name already exists", 400),
+        new CustomError("Document with this name already exists", 400)
       );
     }
 
     //  Upload to Cloudinary
     const uploadedDocs = await uploadFileToCloudinary(
       req.files.propertyDocument,
-      "properties/documents",
+      "properties/documents"
     );
 
     // 📎 Push document
@@ -466,7 +467,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     query.partnerId = null;
   } else {
     return next(
-      new CustomError("You are not authorized to access this property", 403),
+      new CustomError("You are not authorized to access this property", 403)
     );
   }
 
@@ -479,7 +480,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
 
   if (!property) {
     return next(
-      new CustomError("Property not found or not owned by this partner", 404),
+      new CustomError("Property not found or not owned by this partner", 404)
     );
   }
 
@@ -487,7 +488,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     res,
     200,
     "successfully fetch the partner property",
-    property,
+    property
   );
 });
 
@@ -531,7 +532,7 @@ export const getAllProperties = async (req, res) => {
       res,
       200,
       "Properties fetched successfully",
-      properties,
+      properties
     );
   } catch (error) {
     return res.status(500).json({
@@ -556,7 +557,7 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
 
   if (!["active", "inactive"].includes(status)) {
     return next(
-      new CustomError("Status must be either 'active' or 'inactive'", 400),
+      new CustomError("Status must be either 'active' or 'inactive'", 400)
     );
   }
 
@@ -572,7 +573,7 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
     res,
     200,
     `Property status updated to ${status} successfully`,
-    property,
+    property
   );
 });
 
@@ -590,7 +591,7 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   // 2️ Ensure property is public/active
   if (property.status !== "active" && !isAdmin) {
     return next(
-      new CustomError("This property is not available for public viewing", 403),
+      new CustomError("This property is not available for public viewing", 403)
     );
   }
 
@@ -598,13 +599,138 @@ export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "Property fetched successfully", property);
 });
 
-export const searchProperties = asyncHandler(async (req, res, next) => {
-  const { location, checkIn, checkOut, rooms = 1, propertyType, propertyId } = req.query;
+export const autoCompleteSuggestion = asyncHandler(async (req, res, next) => {
+  const { text } = req.query;
 
-  if (!location || !checkIn || !checkOut) {
-    return next(
-      new CustomError("Location, check-in and check-out are required", 400),
+  if (!text || text.trim() === "") {
+    return next(new CustomError("Please provide search text", 400));
+  }
+
+  try {
+    const response = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/autocomplete/json",
+      {
+        params: {
+          input: text,
+          types: "geocode",
+          components: "country:in",
+          language: "en",
+          key: process.env.GOOGLE_MAPS_API_KEY,
+        },
+        timeout: 10000,
+      }
     );
+
+    const { status, predictions, error_message } = response.data;
+
+    
+    if (status !== "OK") {
+      return next(
+        new CustomError(error_message || `Google API Error: ${status}`, 400)
+      );
+    }
+
+    const formattedResults = (predictions || []).map((place) => ({
+      description: place.description,
+      placeId: place.place_id,
+    }));
+
+    return successResponse(res, 200, "Place suggestions fetched successfully", {
+      results: formattedResults,
+      count: formattedResults.length,
+    });
+  } catch (error) {
+    console.error("Google Places Autocomplete error:", error.message);
+
+    //  This runs only for real HTTP / network errors
+    if (error.code === "ECONNABORTED") {
+      return next(new CustomError("Request timed out", 504));
+    }
+
+    if (error.response) {
+      return next(
+        new CustomError(
+          error.response.data?.error_message || "Google API request failed",
+          error.response.status || 500
+        )
+      );
+    }
+
+    return next(new CustomError("Internal Server Error", 500));
+  }
+});
+async function getPlaceGeometry(placeId) {
+  if (!placeId || typeof placeId !== "string" || placeId.trim() === "") {
+    return {
+      status: "INVALID_REQUEST",
+      viewport: null,
+      location: null,
+      error: "placeId is required",
+    };
+  }
+
+  try {
+    const response = await axios.get(
+      "https://maps.googleapis.com/maps/api/place/details/json",
+      {
+        params: {
+          place_id: placeId,
+          key: process.env.GOOGLE_MAPS_API_KEY,
+        },
+        timeout: 10000, // 10 seconds timeout
+      }
+    );
+    console.log(response.data);
+  const { status, result, error_message } = response.data;
+    if (status !== "OK") {
+      return {
+        status,
+        viewport: null,
+        location: null,
+        error: error_message || "Google API error",
+      };
+    }
+
+    const output = { status, viewport: null, location: null };
+
+      output.location = result.geometry.location || null; // { lat: number, lng: number }
+      output.viewport = result.geometry.viewport || null; // { northeast: {lat,lng}, southwest: {lat,lng} }
+  
+    return output;
+
+  } catch (error) {
+    console.error(`Google Place Details failed for ${placeId}:`, error.message);
+
+    let apiStatus = "UNKNOWN_ERROR";
+    let errorMsg = "Failed to fetch place details";
+
+    if (error.response?.data) {
+      apiStatus = error.response?.data.status || "ERROR";
+      errorMsg = error.response?.data.error_message || errorMsg;
+    } else if (error.code === "ECONNABORTED") {
+      errorMsg = "Request timed out";
+    }
+
+    return {
+      status: apiStatus,
+      viewport: null,
+      location: null,
+      error: errorMsg,
+    };
+  }
+}
+export const searchProperties = asyncHandler(async (req, res, next) => {
+  const {
+    placeId,
+    checkIn,
+    checkOut,
+    rooms = 1,
+    propertyType,
+    propertyId,
+  } = req.query;
+
+  if (!checkIn || !checkOut) {
+    return next(new CustomError(" check-in and check-out are required", 400));
   }
   const checkInDate = normalizeDate(checkIn);
   const checkOutDate = normalizeDate(checkOut);
@@ -614,6 +740,19 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
   const dates = getDatesBetween(checkInDate, checkOutDate);
   console.log("dates", dates);
+  let response = {};
+  if (placeId) {
+    response = await getPlaceGeometry(placeId);
+    console.log("api", response);
+    if (response.status != "OK") {
+      return next(new CustomError(response.error, 400));
+    }
+    if (!response.viewport) {
+      return next(new CustomError("Invalid viewport from Google", 400));
+    }
+  }
+  const northEast = response?.viewport ? response.viewport.northeast : 0;
+  const southWest = response?.viewport ? response.viewport.southwest : 0;
   // 1️ Find properties
   const propertyPipeline = [
     {
@@ -622,11 +761,16 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
         verified: "approved",
         ...(propertyType && { propertyType }),
         ...(propertyId && { _id: new mongoose.Types.ObjectId(propertyId) }),
-        $or: [
-          { city: new RegExp(location, "i") },
-          { state: new RegExp(location, "i") },
-          { country: new RegExp(location, "i") },
-        ],
+        ...(placeId && {
+          geoLocation: {
+            $geoWithin: {
+              $box: [
+                [southWest.lng, southWest.lat], // bottom-left
+                [northEast.lng, northEast.lat], // top-right
+              ],
+            },
+          },
+        }),
       },
     },
     // 2 Join Partner
@@ -762,7 +906,7 @@ export const getAllPropertyTypes = async (req, res) => {
       res,
       200,
       "Property types fetched successfully",
-      types,
+      types
     );
   } catch (error) {
     return res.status(500).json({
@@ -838,7 +982,7 @@ export const getPropertyTypeWithProperties = async (req, res) => {
       res,
       200,
       `Properties for type: ${type}`,
-      properties,
+      properties
     );
   } catch (error) {
     return res.status(500).json({
@@ -869,7 +1013,7 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
 
     if (!partner.isVerified) {
       return next(
-        new CustomError("Complete your KYC to verified you property", 404),
+        new CustomError("Complete your KYC to verified you property", 404)
       );
     }
 
@@ -903,8 +1047,8 @@ export const getPropertyApprovalRequests = asyncHandler(
       return next(
         new CustomError(
           "Only admin can fetch all under_ reviewed properties",
-          403,
-        ),
+          403
+        )
       );
     }
 
@@ -915,7 +1059,7 @@ export const getPropertyApprovalRequests = asyncHandler(
       .populate("subAdminId", "name email");
 
     successResponse(res, 200, "Property approval requests fetched", properties);
-  },
+  }
 );
 
 export const approveRejectProperty = asyncHandler(async (req, res, next) => {
@@ -955,14 +1099,14 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `Only approved property can be assigned. Current status: ${property.verified}`,
-        400,
-      ),
+        400
+      )
     );
   }
 
   if (property.partnerId) {
     return next(
-      new CustomError("Property is already assigned to a partner", 409),
+      new CustomError("Property is already assigned to a partner", 409)
     );
   }
 
@@ -977,10 +1121,7 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
 
   if (!partnerAuth.isVerified) {
     return next(
-      new CustomError(
-        `Partner ${partnerAuth.name} has not verified email`,
-        400,
-      ),
+      new CustomError(`Partner ${partnerAuth.name} has not verified email`, 400)
     );
   }
 
@@ -991,7 +1132,7 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
 
   if (!partnerKyc) {
     return next(
-      new CustomError(`Partner ${partnerAuth.name} has not completed KYC`, 400),
+      new CustomError(`Partner ${partnerAuth.name} has not completed KYC`, 400)
     );
   }
 
@@ -1001,6 +1142,6 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
   return successResponse(
     res,
     200,
-    `Property (${property.name}) assigned to partner (${partnerAuth.name})`,
+    `Property (${property.name}) assigned to partner (${partnerAuth.name})`
   );
 });
