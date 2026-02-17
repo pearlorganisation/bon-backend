@@ -15,11 +15,25 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
       required: true,
     },
     payoutMonth: {
-      type: String,
+      type: Number, // better to use number (1-12)
       required: true,
-    },
+    },          
 
-    /* ---------- WALLET DISTRIBUTION ---------- */
+    /* ---------- BOOKINGS LIST ---------- */
+    bookings: [
+      {
+        bookingId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Booking",
+          required: true,
+        },
+        totalAmount: Number,
+        partnerAmount: Number,
+        adminCommission: Number,
+      },
+    ],
+
+
     partnerWallet: {
       payableAmount: {
         type: Number,
@@ -28,7 +42,9 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
       status: {
         type: String,
         enum: ["pending", "paid", "failed"],
+        default: "pending",
       },
+      paidAt: Date,
     },
 
     adminWallet: {
@@ -38,16 +54,10 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
       },
       status: {
         type: String,
-        enum: ["pending", "paid", "failed"],
+        enum: ["pending", "received", "failed"],
+        default: "pending",
       },
     },
-    bookings: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Booking",
-        required: true,
-      },
-    ],
   },
   { timestamps: true }
 );
@@ -58,9 +68,7 @@ PartnerMonthlyPayoutSchema.index(
   { unique: true }
 );
 
-const PartnerMonthlyPayout = mongoose.model(
+export default mongoose.model(
   "PartnerMonthlyPayout",
   PartnerMonthlyPayoutSchema
 );
-
-export default PartnerMonthlyPayout;

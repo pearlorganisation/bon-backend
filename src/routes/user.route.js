@@ -1,7 +1,10 @@
 import express from "express";
 import multer from "multer";
 import { protect, isAdmin } from "../middleware/auth/auth.middleware.js";
-import { searchProperties } from "../controllers/partner/property.controller.js";
+import {
+  searchProperties,
+  autoCompleteSuggestion,
+} from "../controllers/partner/property.controller.js";
 import {
   deleteAllUsers,
   getAllUsers,
@@ -30,6 +33,7 @@ router.delete("/users/:id", protect, isAdmin, deleteAllUsers);
 
 router.get("/profile/:userId", protect, getUserProfileById);
 
+router.get("/place-api-autocomplete", autoCompleteSuggestion);
 router.get("/search", searchProperties);
 
 export default router;
