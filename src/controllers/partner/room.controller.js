@@ -62,6 +62,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     frontDeskServices,
     commonAreas,
     kidsAndFamily,
+    foodAndDrinksAmenities,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -305,6 +306,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     frontDeskServices,
     commonAreas,
     kidsAndFamily,
+    foodAndDrinksAmenities,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -398,6 +400,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     frontDeskServices,
     commonAreas,
     kidsAndFamily,
+    foodAndDrinksAmenities,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -651,6 +654,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (frontDeskServices) room.frontDeskServices = frontDeskServices;
   if (commonAreas) room.commonAreas = commonAreas;
   if (kidsAndFamily) room.kidsAndFamily = kidsAndFamily;
+  if (foodAndDrinksAmenities)
+    room.foodAndDrinksAmenities = foodAndDrinksAmenities;
   if (buildingInfo) room.buildingInfo = buildingInfo;
   if (selfCheckIn) room.selfCheckIn = selfCheckIn;
   if (beddingAndComfort) room.beddingAndComfort = beddingAndComfort;
@@ -733,6 +738,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     frontDeskServices,
     commonAreas,
     kidsAndFamily,
+    foodAndDrinksAmenities,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -861,6 +867,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   if (frontDeskServices) updateFields.frontDeskServices = frontDeskServices;
   if (commonAreas) updateFields.commonAreas = commonAreas;
   if (kidsAndFamily) updateFields.kidsAndFamily = kidsAndFamily;
+  if (foodAndDrinksAmenities)
+    updateFields.foodAndDrinksAmenities = foodAndDrinksAmenities;
   if (buildingInfo) updateFields.buildingInfo = buildingInfo;
   if (selfCheckIn) updateFields.selfCheckIn = selfCheckIn;
   if (beddingAndComfort) updateFields.beddingAndComfort = beddingAndComfort;
