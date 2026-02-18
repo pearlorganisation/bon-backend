@@ -19,6 +19,35 @@ import {
 import RoomInventory from "../../models/Listing/roomInventory.model.js";
 import mongoose from "mongoose";
 
+
+function extractLatLngFromMapLink(mapLink) {
+  if (!mapLink) return null;
+
+  // Match @lat,lng pattern
+  const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+  const match = mapLink.match(regex);
+
+  if (match) {
+    return {
+      lat: parseFloat(match[1]),
+      lng: parseFloat(match[2]),
+    };
+  }
+
+  // Match ?q=lat,lng format
+  const queryRegex = /[?&]q=(-?\d+\.\d+),(-?\d+\.\d+)/;
+  const queryMatch = mapLink.match(queryRegex);
+
+  if (queryMatch) {
+    return {
+      lat: parseFloat(queryMatch[1]),
+      lng: parseFloat(queryMatch[2]),
+    };
+  }
+
+  return null;
+}
+
 // ✅ Create a new property
 export const createProperty = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
@@ -35,7 +64,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     city,
     state,
     country,
-    geoLocation,
+    mapLink,
     amenities,
     propertyType,
     status,
@@ -47,9 +76,11 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   if (!name || !address || !city || !state || !country) {
     return next(new CustomError("Required fields missing", 400));
   }
+  if (!mapLink) {
+    return next(new CustomError("mapLink is required", 400));
+  }
 
   // ✅ Parse JSON fields
-  if (geoLocation) geoLocation = JSON.parse(geoLocation);
   if (amenities) amenities = JSON.parse(amenities);
   if (policies) policies = JSON.parse(policies);
   // ✅ Upload images & videos
@@ -113,6 +144,21 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     }
   }
 
+   const coords = extractLatLngFromMapLink(req.body.mapLink);
+
+   if (!coords) {
+     return next(new CustomError("Invalid Google Maps link", 400));
+   }
+
+   const geoLocation = {
+     type: "Point",
+     coordinates: [
+       parseFloat(coords.lng), // longitude first
+       parseFloat(coords.lat), // latitude second
+     ],
+   };
+  
+
   const propertyData = {
     name,
     address,
@@ -122,6 +168,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     propertyType,
     status,
     amenities,
+    mapLink,
     geoLocation,
     Images,
     Videos,
@@ -190,8 +237,23 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   });
 
   // 3️⃣ Update geoLocation if provided
-  if (req.body?.geoLocation) {
-    property.geoLocation = JSON.parse(req.body.geoLocation); // { type: "Point", coordinates: [lng, lat] }
+  if (req.body?.mapLink) {
+
+     const coords = extractLatLngFromMapLink(req.body.mapLink);
+
+     if (!coords) {
+       return next(new CustomError("Invalid Google Maps link", 400));
+     }
+     property.mapLink= mapLink;
+
+     property.geoLocation = {
+       type: "Point",
+       coordinates: [
+         parseFloat(coords.lng), // longitude first
+         parseFloat(coords.lat), // latitude second
+       ],
+     };
+    
   }
   if (req.body?.amenities) {
     property.amenities = JSON.parse(req.body.amenities); // { type: "Point", coordinates: [lng, lat] }
@@ -417,39 +479,38 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
 export const getPartnerProperties = asyncHandler(async (req, res, next) => {
   const user = req.user; // from auth middleware
-  let properties;
+
+  const page = parseInt(req.query.page)||1;
+  const limit =parseInt(req.query.limit)||10;
+  const skip = (page-1)*limit; 
+
+   let query ={};
 
   if (user.role === "ADMIN") {
     // Admin can see all properties
-    properties = await Property.find();
+     Object.assign(query,{status:{ $ne: "pending"}});
   } else if (user.role === "PARTNER") {
     // Partner can see only their properties
-    properties = await Property.find({ partnerId: user._id });
+       Object.assign(query,{partnerId :user._id});
   } else if (user.role == "SUB_ADMIN") {
-    properties = await Property.find({ subAdminId: user._id, partnerId: null });
+    Object.assign(query, { subAdminId: user._id });
+  }
+  else{
+   return next(new CustomError("Unauthorized access", 403));
   }
 
-  if (!properties.length) {
-    return next(new CustomError("No properties found", 200));
-  }
+   const a =  Property.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
+   const b =   Property.countDocuments(query);
 
-  const result = {
-    properties,
-    pending: [],
-    under_review: [],
-    approved: [],
-    rejected: [],
-    active: [],
-    inactive: [],
-    numberOfProperties: properties.length,
-  };
+    const [properties,total] = await Promise.all([a,b]);
 
-  for (const prop of properties) {
-    if (result[prop.status]) result[prop.status].push(prop);
-    if (result[prop.verified]) result[prop.verified].push(prop);
-  }
 
-  successResponse(res, 200, "Successfully fetched partner properties", result);
+  successResponse(res, 200, "Successfully fetched partner properties", {
+    total,
+    page,
+    totalPages: Math.ceil(total/limit),
+    properties
+  });
 });
 
 //get Property by ID
