@@ -19,7 +19,6 @@ import {
 import RoomInventory from "../../models/Listing/roomInventory.model.js";
 import mongoose from "mongoose";
 
-
 function extractLatLngFromMapLink(mapLink) {
   if (!mapLink) return null;
 
@@ -144,20 +143,19 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     }
   }
 
-   const coords = extractLatLngFromMapLink(req.body.mapLink);
+  const coords = extractLatLngFromMapLink(req.body.mapLink);
 
-   if (!coords) {
-     return next(new CustomError("Invalid Google Maps link", 400));
-   }
+  if (!coords) {
+    return next(new CustomError("Invalid Google Maps link", 400));
+  }
 
-   const geoLocation = {
-     type: "Point",
-     coordinates: [
-       parseFloat(coords.lng), // longitude first
-       parseFloat(coords.lat), // latitude second
-     ],
-   };
-  
+  const geoLocation = {
+    type: "Point",
+    coordinates: [
+      parseFloat(coords.lng), // longitude first
+      parseFloat(coords.lat), // latitude second
+    ],
+  };
 
   const propertyData = {
     name,
@@ -238,22 +236,20 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
   // 3️⃣ Update geoLocation if provided
   if (req.body?.mapLink) {
+    const coords = extractLatLngFromMapLink(req.body.mapLink);
 
-     const coords = extractLatLngFromMapLink(req.body.mapLink);
+    if (!coords) {
+      return next(new CustomError("Invalid Google Maps link", 400));
+    }
+    property.mapLink = mapLink;
 
-     if (!coords) {
-       return next(new CustomError("Invalid Google Maps link", 400));
-     }
-     property.mapLink= mapLink;
-
-     property.geoLocation = {
-       type: "Point",
-       coordinates: [
-         parseFloat(coords.lng), // longitude first
-         parseFloat(coords.lat), // latitude second
-       ],
-     };
-    
+    property.geoLocation = {
+      type: "Point",
+      coordinates: [
+        parseFloat(coords.lng), // longitude first
+        parseFloat(coords.lat), // latitude second
+      ],
+    };
   }
   if (req.body?.amenities) {
     property.amenities = JSON.parse(req.body.amenities); // { type: "Point", coordinates: [lng, lat] }
@@ -480,36 +476,38 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 export const getPartnerProperties = asyncHandler(async (req, res, next) => {
   const user = req.user; // from auth middleware
 
-  const page = parseInt(req.query.page)||1;
-  const limit =parseInt(req.query.limit)||10;
-  const skip = (page-1)*limit; 
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || 10;
+  const skip = (page - 1) * limit;
 
-   let query ={};
+  let query = {};
 
   if (user.role === "ADMIN") {
     // Admin can see all properties
-     Object.assign(query,{status:{ $ne: "pending"}});
+    Object.assign(query, { status: { $ne: "pending" } });
   } else if (user.role === "PARTNER") {
     // Partner can see only their properties
-       Object.assign(query,{partnerId :user._id});
+    Object.assign(query, { partnerId: user._id });
   } else if (user.role == "SUB_ADMIN") {
     Object.assign(query, { subAdminId: user._id });
+  } else {
+    return next(new CustomError("Unauthorized access", 403));
   }
-  else{
-   return next(new CustomError("Unauthorized access", 403));
-  }
 
-   const a =  Property.find(query).sort({ createdAt: -1 }).skip(skip).limit(limit).lean();
-   const b =   Property.countDocuments(query);
+  const a = Property.find(query)
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit)
+    .lean();
+  const b = Property.countDocuments(query);
 
-    const [properties,total] = await Promise.all([a,b]);
-
+  const [properties, total] = await Promise.all([a, b]);
 
   successResponse(res, 200, "Successfully fetched partner properties", {
     total,
     page,
-    totalPages: Math.ceil(total/limit),
-    properties
+    totalPages: Math.ceil(total / limit),
+    properties,
   });
 });
 
@@ -638,26 +636,134 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
   );
 });
 
-// get property by id
-export const getPublicPropertyById = asyncHandler(async (req, res, next) => {
+// get property by id (Admin)
+export const getPropertyDetailsById = asyncHandler(async (req, res, next) => {
   const propertyId = req.params.propertyId;
 
-  // 1️ Fetch property
-  const property = await Property.find({ _id: propertyId }).populate("Rooms"); // optional
+  if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+    return next(new CustomError("Invalid property ID", 400));
+  }
 
-  if (!property) {
+  const property = await Property.aggregate([
+    {
+      $match: {
+        _id: new mongoose.Types.ObjectId(propertyId),
+      },
+    },
+
+    //  Partner Auth Lookup (SAFE)
+    {
+      $lookup: {
+        from: "auths",
+        localField: "partnerId",
+        foreignField: "_id",
+        as: "partnerAuth",
+      },
+    },
+    { $unwind: { path: "$partnerAuth", preserveNullAndEmptyArrays: true } },
+
+    // Partner Details Lookup (SAFE)
+    {
+      $lookup: {
+        from: "partners",
+        localField: "partnerId",
+        foreignField: "userId",
+        as: "partnerDetails",
+      },
+    },
+    { $unwind: { path: "$partnerDetails", preserveNullAndEmptyArrays: true } },
+
+    // ACTIVE Plan Lookup (SAFE even if partnerId null)
+    {
+      $lookup: {
+        from: "partnerplans",
+        let: { partnerId: "$partnerId" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$partnerId", "$$partnerId"] },
+                  { $eq: ["$planStatus", "ACTIVE"] },
+                ],
+              },
+            },
+          },
+          { $limit: 1 },
+        ],
+        as: "activePlan",
+      },
+    },
+    { $unwind: { path: "$activePlan", preserveNullAndEmptyArrays: true } },
+
+    //  SubAdmin Lookup
+    {
+      $lookup: {
+        from: "auths",
+        localField: "subAdminId",
+        foreignField: "_id",
+        as: "subAdmin",
+      },
+    },
+    { $unwind: { path: "$subAdmin", preserveNullAndEmptyArrays: true } },
+
+    //  Final Projection
+   {
+  $addFields: {
+
+    partner: {
+      $cond: {
+        if: { $ne: ["$partnerAuth._id", null] },
+        then: {
+          _id: "$partnerAuth._id",
+          name: "$partnerAuth.name",
+          email: "$partnerAuth.email",
+          isPanVerified: "$partnerDetails.isPanVerified",
+          isVerified: "$partnerDetails.isVerified",
+        },
+        else: null,
+      },
+    },
+
+    activePlan: {
+      $cond: {
+        if: { $ne: ["$activePlan._id", null] },
+        then: "$activePlan",
+        else: null,
+      },
+    },
+
+    subAdmin: {
+      $cond: {
+        if: { $ne: ["$subAdmin._id", null] },
+        then: {
+          _id: "$subAdmin._id",
+          name: "$subAdmin.name",
+          email: "$subAdmin.email",
+        },
+        else: null,
+      },
+    },
+  }
+},
+{
+  $project: {
+    partnerAuth: 0,
+    partnerDetails: 0,
+  }
+}
+  ]);
+
+  if (!property.length) {
     return next(new CustomError("Property not found", 404));
   }
 
-  // 2️ Ensure property is public/active
-  if (property.status !== "active" && !isAdmin) {
-    return next(
-      new CustomError("This property is not available for public viewing", 403)
-    );
-  }
-
-  // 3️ Return only public-safe data
-  successResponse(res, 200, "Property fetched successfully", property);
+  successResponse(
+    res,
+    200,
+    "Property detail fetched successfully",
+    property[0]
+  );
 });
 
 export const autoCompleteSuggestion = asyncHandler(async (req, res, next) => {
@@ -684,7 +790,6 @@ export const autoCompleteSuggestion = asyncHandler(async (req, res, next) => {
 
     const { status, predictions, error_message } = response.data;
 
-    
     if (status !== "OK") {
       return next(
         new CustomError(error_message || `Google API Error: ${status}`, 400)
@@ -742,7 +847,7 @@ async function getPlaceGeometry(placeId) {
       }
     );
     console.log(response.data);
-  const { status, result, error_message } = response.data;
+    const { status, result, error_message } = response.data;
     if (status !== "OK") {
       return {
         status,
@@ -754,11 +859,10 @@ async function getPlaceGeometry(placeId) {
 
     const output = { status, viewport: null, location: null };
 
-      output.location = result.geometry.location || null; // { lat: number, lng: number }
-      output.viewport = result.geometry.viewport || null; // { northeast: {lat,lng}, southwest: {lat,lng} }
-  
-    return output;
+    output.location = result.geometry.location || null; // { lat: number, lng: number }
+    output.viewport = result.geometry.viewport || null; // { northeast: {lat,lng}, southwest: {lat,lng} }
 
+    return output;
   } catch (error) {
     console.error(`Google Place Details failed for ${placeId}:`, error.message);
 
