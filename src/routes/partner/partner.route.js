@@ -6,10 +6,8 @@ import {
   getPartnerPropertyByID,
   getAllProperties,
   changePropertyStatus,
-  getPublicPropertyById,
+  getPropertyDetailsById,
   requestPropertyApproval,
-  getPropertyApprovalRequests,
-  approveRejectProperty,
   getAllPropertyTypes,
   getPropertyTypeWithProperties,
 } from "../../controllers/partner/property.controller.js";
@@ -110,11 +108,6 @@ router.get(
   protect,
   getPartnerPropertyByID,
 );
-router.get(
-  "/get-property-by-id/:propertyId",
-  optionalProtect,
-  getPublicPropertyById,
-);
 router.get("/get-all-properties", getAllProperties);
 
 router.get("/types", getAllPropertyTypes);
@@ -132,14 +125,6 @@ router.patch(
   protect,
   authorizeRoles("PARTNER", "SUB_ADMIN"),
   requestPropertyApproval,
-);
-
-//------admin--------//
-
-router.get(
-  "/get-property-by-id/:propertyId",
-  optionalProtect,
-  getPublicPropertyById,
 );
 
 //---------- Rooms routes ----------------

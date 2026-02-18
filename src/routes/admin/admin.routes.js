@@ -8,6 +8,7 @@ import {
   getPropertyApprovalRequests,
   approveRejectProperty,
   assignPropertyToPartner,
+  getPropertyDetailsById,
 } from "../../controllers/partner/property.controller.js";
 import {
   protect,
@@ -72,5 +73,11 @@ route.put(
   "/update-subscription-plan/:planId",
   authorizeRoles("ADMIN"),
  updateSubscriptionPlan
+);
+
+route.get(
+  "/get-property-by-id/:propertyId",
+  authorizeRoles("ADMIN"),
+  getPropertyDetailsById
 );
 export default route;
