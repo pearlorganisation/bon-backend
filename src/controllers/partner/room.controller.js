@@ -16,6 +16,26 @@ const parseArrayField = (field) => {
   return [field];
 };
 
+const parseNestedNumbers = (obj) => {
+  if (!obj || typeof obj !== "object") return obj;
+
+  const parsed = Array.isArray(obj) ? [] : {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === "object") {
+      parsed[key] = parseNestedNumbers(value);
+    } else {
+      // Don't convert units or strings to numbers
+      if (key === "unit" || isNaN(value) || value === "") {
+        parsed[key] = value;
+      } else {
+        parsed[key] = Number(value);
+      }
+    }
+  }
+  return parsed;
+};
+
 export const createRooms = asyncHandler(async (req, res, next) => {
   const { propertyId } = req.params;
   const { _id: userId, role } = req.user;
@@ -63,6 +83,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     commonAreas,
     kidsAndFamily,
     foodAndDrinksAmenities,
+    roomSpecifications,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -274,6 +295,11 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
+  let parsedSpecs = {};
+  if (roomSpecifications) {
+    parsedSpecs = parseNestedNumbers(roomSpecifications);
+  }
+
   const baseRoomData = {
     propertyId,
     name: name.trim(),
@@ -307,6 +333,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     commonAreas,
     kidsAndFamily,
     foodAndDrinksAmenities,
+    roomSpecifications: parsedSpecs,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -401,6 +428,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     commonAreas,
     kidsAndFamily,
     foodAndDrinksAmenities,
+    roomSpecifications,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -429,7 +457,9 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (discount) discount = Number(discount);
   if (bedCount) bedCount = Number(bedCount);
   if (bathroomCount) bathroomCount = Number(bathroomCount);
-
+  if (roomSpecifications) {
+    room.roomSpecifications = parseNestedNumbers(roomSpecifications);
+  }
   if (buildingInfo && typeof buildingInfo === "object") {
     if (buildingInfo.totalFloors)
       buildingInfo.totalFloors = Number(buildingInfo.totalFloors);
