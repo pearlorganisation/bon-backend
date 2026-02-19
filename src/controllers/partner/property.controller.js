@@ -241,12 +241,13 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
   // 3️⃣ Update geoLocation if provided
   if (req.body?.mapLink) {
-    const coords = extractLatLngFromMapLink(req.body.mapLink);
+    const { mapLink } = req.body; // Added this line to define mapLink
+    const coords = extractLatLngFromMapLink(mapLink);
 
     if (!coords) {
       return next(new CustomError("Invalid Google Maps link", 400));
     }
-    property.mapLink = mapLink;
+    property.mapLink = mapLink; // This was throwing an error before
 
     property.geoLocation = {
       type: "Point",
@@ -562,8 +563,8 @@ export const getAllProperties = async (req, res) => {
       {
         $match: {
           partnerId: { $ne: null },
-          verified: "approved",
-          status: "active",
+          // verified: "approved",
+          // status: "active",
         },
       },
 
