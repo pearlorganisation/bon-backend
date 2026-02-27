@@ -11,14 +11,18 @@ const attachmentSchema = new mongoose.Schema({
     required: true, // ✅ needed to delete from Cloudinary
   },
 
+  senderRole: {
+    type: String,
+    enum: ["CUSTOMER", "PARTNER", "ADMIN", "SUB_ADMIN"],
+    required: true,
+  },
+
   type: {
     type: String,
     enum: ["image", "file"],
     required: true,
   },
 });
-
-
 
 const messageSchema = new mongoose.Schema(
   {
@@ -36,7 +40,8 @@ const messageSchema = new mongoose.Schema(
 
     senderRole: {
       type: String,
-      enum: ["CUSTOMER", "PARTNER"],
+      // enum: ["CUSTOMER", "PARTNER"],
+      enum: ["CUSTOMER", "PARTNER", "ADMIN", "SUB_ADMIN"],
       required: true,
     },
 
@@ -57,7 +62,7 @@ const messageSchema = new mongoose.Schema(
       },
     ],
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // Prevent empty messages
