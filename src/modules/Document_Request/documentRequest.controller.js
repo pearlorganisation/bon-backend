@@ -532,7 +532,7 @@ export const requestDocumentAccess = asyncHandler(async (req, res, next) => {
     propertyId,
     requestedDocumentTypes: documentTypeIds,
     status: "pending",
-    PartnerNote: partnerNote || "",
+    partnerNote: partnerNote || "",
     requestedAt: Date.now(),
   });
 

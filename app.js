@@ -8,6 +8,7 @@ import errorHandler from "./src/middleware/errorHandler.js";
 import cookieParser from "cookie-parser";
 import initSocket from "./src/socket/index.js";
 import { razorpayRefundWebhook } from "./src/controllers/Booking/booking.controller.js";
+import { razorpayPayoutWebhook } from "./src/controllers/admin/admin.controller.js";
 import {
   verifyRazorpaySignature,
   razorpayWebhookRouter,
@@ -17,7 +18,7 @@ const app = express();
 
 /* Razorpay webhook */
 app.post(
-  "/api/v1/webhook/razorpay",
+  "/api/v1/webhook/razorpay-payment",
   express.raw({ type: "application/json" }),
   verifyRazorpaySignature,
   razorpayWebhookRouter
@@ -27,6 +28,11 @@ app.post(
   express.raw({ type: "application/json" }),
   razorpayRefundWebhook
 );
+app.post(
+  "api/v1/webhook/razorpay-payout",
+  express.raw({type:"application/json"}),
+  razorpayPayoutWebhook
+)
 
 /* Middlewares */
 app.use(express.json());

@@ -30,7 +30,9 @@ const expireDocumentAccessCron = () => {
     } catch (error) {
       console.error("[CRON ERROR] Expire document access:", error);
     }
-  });
+  },{
+  timezone: "Asia/Kolkata",
+});
 
   console.log("✅ Document access expiry cron initialized");
 };
