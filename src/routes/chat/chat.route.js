@@ -7,6 +7,9 @@ import {
   deleteMessageAttachment,
   updateMessage,
   getCustomerConversationList,
+  getOrCreateAdminConversation,
+  getAdminConversationList,
+  sendMessage,
 } from "../../controllers/chat/chat.controler.js";
 
 import { protect } from "../../middleware/auth/auth.middleware.js";
@@ -44,7 +47,7 @@ router.post(
       // Upload to Cloudinary (already supports array)
       const uploadedFiles = await uploadFileToCloudinary(
         req.files,
-        "chat_files"
+        "chat_files",
       );
 
       res.json({
@@ -60,8 +63,15 @@ router.post(
       console.error("Update file error:", error);
       res.status(500).json({ message: "Server error" });
     }
-  }
+  },
 );
+
+/**
+ * Admin/Sub-Admin Conversation Routes
+ */
+router.post("/admin/conversation", protect, getOrCreateAdminConversation);
+router.get("/admin/conversations", protect, getAdminConversationList);
+router.post("/message", protect, sendMessage);
 
 /**
  * 1️ Create or get conversationId (Customer)
