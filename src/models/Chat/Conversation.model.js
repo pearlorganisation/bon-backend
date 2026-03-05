@@ -5,7 +5,8 @@ const conversationSchema = new mongoose.Schema(
     propertyId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Property",
-      required: true,
+      // required: true,
+      required: false,
     },
 
     customerId: {
@@ -17,6 +18,11 @@ const conversationSchema = new mongoose.Schema(
     partnerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Auth",
+    },
+
+    isAdminChat: {
+      type: Boolean,
+      default: false,
     },
 
     lastMessage: {
@@ -43,12 +49,9 @@ const conversationSchema = new mongoose.Schema(
       default: "active",
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
-conversationSchema.index(
-  { propertyId: 1, customerId: 1 },
-  { unique: true }
-);
+// conversationSchema.index({ propertyId: 1, customerId: 1 }, { unique: true });
 
 export default mongoose.model("Conversation", conversationSchema);
