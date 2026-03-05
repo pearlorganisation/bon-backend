@@ -17,7 +17,7 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
     payoutMonth: {
       type: Number, // better to use number (1-12)
       required: true,
-    },          
+    },
 
     /* ---------- BOOKINGS LIST ---------- */
     bookings: [
@@ -27,24 +27,24 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
           ref: "Booking",
           required: true,
         },
-        totalAmount: Number,
-        partnerAmount: Number,
-        adminCommission: Number,
+        partnerAmount: { type: Number, default: 0 },
+        partner_gst: { type: Number, default: 0 },
+        adminAmount: { type: Number, default: 0 },
+        admin_gst: { type: Number, default: 0 },
       },
     ],
 
-
     partnerWallet: {
-      payableAmount: {
-        type: Number,
-        default: 0,
-      },
+      payableAmount: { type: Number, default: 0 },
       status: {
         type: String,
-        enum: ["pending", "paid", "failed"],
+        enum: ["pending", "processing", "paid", "failed"],
         default: "pending",
       },
+      razorpayPayoutId: String,
+      razorpayStatus: String,
       paidAt: Date,
+      razorpayStatusDetail: String,
     },
 
     adminWallet: {
@@ -52,6 +52,7 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
+      // admin_gst_amount: { type: Number, default: 0 },
       status: {
         type: String,
         enum: ["pending", "received", "failed"],

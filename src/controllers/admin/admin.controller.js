@@ -6,6 +6,8 @@ import successResponse from "../../utils/error/successResponse.js";
 import Admin from "../../models/Admin/admin.model.js";
 import AdminSubscriptionPlan from "../../models/Admin/admin.subscription.model.js";
 import { configDotenv } from "dotenv";
+import { razorpay } from "../../config/razorpayConfig.js";
+import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 
 configDotenv();
 
@@ -73,7 +75,6 @@ export const getAllPartners = asyncHandler(async (req, res, next) => {
 
   successResponse(res, 200, "successfully fetched partners", partners);
 });
-
 
 // platform  subscription and commision plan
 
@@ -176,7 +177,7 @@ export const updateSubscriptionPlan = asyncHandler(async (req, res, next) => {
 });
 
 export const getPlatformPlans = asyncHandler(async (req, res, next) => {
-   console.log(req.user,"check");
+  console.log(req.user, "check");
   const result = await Admin.aggregate([
     {
       $lookup: {
@@ -213,3 +214,184 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
 
   successResponse(res, 200, "Plans fetched successfully", platformPlans);
 });
+
+// partner payout api for monthly payouts
+
+export const releasePreviousMonthPayout = asyncHandler(
+  async (req, res, next) => {
+    const { partnerId } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+      return next(new CustomError("Invalid partnerId", 400));
+    }
+
+    /* ---------- GET PREVIOUS MONTH ---------- */
+    const now = new Date();
+    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1);
+
+    const payoutMonth = prevMonthDate.getMonth() + 1;
+    const payoutYear = prevMonthDate.getFullYear();
+
+    /* ---------- FIND PAYOUT RECORD ---------- */
+    const payout = await PartnerMonthlyPayoutModel.findOne({
+      partnerId,
+      payoutMonth,
+      payoutYear,
+    });
+
+    if (!payout) return next(new CustomError("No payout record found", 404));
+
+    if (payout.partnerWallet.status === "paid")
+      return next(new CustomError("Payout already completed", 400));
+
+    if (payout.partnerWallet.payableAmount <= 0)
+      return next(new CustomError("No payable amount", 400));
+
+    const partner = await Partner.findOne({ userId: partnerId });
+
+    if (!partner?.razorpay?.fundAccountId)
+      return next(new CustomError("Fund account not configured", 400));
+
+    /* ---------- CREATE PAYOUT ---------- */
+    let payoutResponse;
+
+    try {
+      payoutResponse = await razorpay.payouts.create({
+        account_number: process.env.RAZORPAY_ACCOUNT_NUMBER,
+        fund_account_id: partner.razorpay.fundAccountId,
+        amount: Math.round(payout.partnerWallet.payableAmount * 100),
+        currency: "INR",
+        mode: "IMPS",
+        purpose: "payout",
+        queue_if_low_balance: false,
+        reference_id: payout._id.toString(),
+        narration: `Monthly payout ${payoutMonth}-${payoutYear}`,
+      });
+    } catch (err) {
+      return next(
+        new CustomError(
+          err?.error?.description || "Failed to create payout",
+          502
+        )
+      );
+    }
+
+    /* ---------- CHECK INITIAL STATUS ---------- */
+
+    const razorpayStatus = payoutResponse.status;
+
+    payout.partnerWallet.razorpayPayoutId = payoutResponse.id;
+    payout.partnerWallet.razorpayStatus = razorpayStatus;
+    payout.partnerWallet.razorpayStatusDetail =
+      payoutResponse?.status_details?.description || "Payout failed";
+
+    if (razorpayStatus === "failed") {
+      payout.partnerWallet.status = "failed";
+      await payout.save();
+      return next(
+        new CustomError(
+          payout.partnerWallet.razorpayStatusDetail ||
+            "Payout failed instantly",
+          400
+        )
+      );
+    }
+
+    payout.partnerWallet.status = "pending";
+
+    await payout.save();
+
+    return successResponse(res, 200, "Payout initiated", {
+      payoutId: payoutResponse.id,
+      status: razorpayStatus,
+      razorpayStatusDetail: payout.partnerWallet.razorpayStatusDetail,
+    });
+  }
+);
+
+export const razorpayPayoutWebhook = async (req, res) => {
+  try {
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+
+    /* ---------- 1️ VERIFY SIGNATURE ---------- */
+
+    const signature = req.headers["x-razorpay-signature"];
+
+    const expectedSignature = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(req.body)
+      .digest("hex");
+
+    if (signature !== expectedSignature) {
+      console.error("Invalid Razorpay webhook signature");
+      return res.status(400).json({ message: "Invalid signature" });
+    }
+
+    /* ---------- 2️ PARSE EVENT ---------- */
+
+    const event = JSON.parse(req.body.toString());
+
+    const eventType = event.event;
+    const payoutEntity = event?.payload?.payout?.entity;
+
+    if (!payoutEntity) {
+      return res.status(200).json({ received: true });
+    }
+
+    const payoutId = payoutEntity.id;
+    const razorpayStatus = payoutEntity.status;
+
+    /* ---------- 3️ FIND PAYOUT IN DB ---------- */
+
+    const monthlyPayout = await PartnerMonthlyPayoutModel.findOne({
+      "partnerWallet.razorpayPayoutId": payoutId,
+    });
+
+    if (!monthlyPayout) {
+      // Not our payout — ignore safely
+      return res.status(200).json({ received: true });
+    }
+
+    /* ---------- 4️ UPDATE RAZORPAY STATUS ---------- */
+
+    monthlyPayout.partnerWallet.razorpayStatus = razorpayStatus;
+    monthlyPayout.partnerWallet.razorpayStatusDetail =
+      payoutEntity?.status_details?.description || null;
+
+    /* ---------- 5️ HANDLE EVENTS SAFELY ---------- */
+
+    switch (eventType) {
+      case "payout.processed":
+        if (monthlyPayout.partnerWallet.status !== "paid") {
+          monthlyPayout.partnerWallet.status = "paid";
+          monthlyPayout.partnerWallet.paidAt = new Date();
+        }
+        break;
+
+      case "payout.failed":
+      case "payout.reversed":
+      case "payout.rejected":
+          monthlyPayout.partnerWallet.status = "failed";
+        break;
+
+      case "payout.queued":
+      case "payout.pending":
+      case "payout.processing":
+        if (monthlyPayout.partnerWallet.status !== "paid") {
+          monthlyPayout.partnerWallet.status = "processing";
+        }
+        break;
+
+      default:
+        // Ignore unrelated events safely
+        break;
+    }
+
+    await monthlyPayout.save();
+
+    return res.status(200).json({ received: true });
+  } catch (error) {
+    console.error("Webhook Error:", error);
+    return res.status(500).json({ message: "Webhook error" });
+  }
+};

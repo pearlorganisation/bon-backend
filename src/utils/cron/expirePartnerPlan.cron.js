@@ -3,38 +3,44 @@ import PartnerPlan from "../../models/Partner/PartnerPlan.model.js"
 
  const startPartnerPlanCron = () => {
     
-  cron.schedule("5 0 * * *", async () => {
-    try {
-      const now = new Date();
+  cron.schedule(
+    "5 0 * * *",
+    async () => {
+      try {
+        const now = new Date();
 
-      /* ---------------- EXPIRE ACTIVE PLANS ---------------- */
+        /* ---------------- EXPIRE ACTIVE PLANS ---------------- */
 
-      const expiredPlans = await PartnerPlan.find({
-        planStatus: "ACTIVE",
-        endDate: { $lte: now },
-      });
+        const expiredPlans = await PartnerPlan.find({
+          planStatus: "ACTIVE",
+          endDate: { $lte: now },
+        });
 
-      for (const plan of expiredPlans) {
-        plan.planStatus = "EXPIRED";
-        await plan.save();
+        for (const plan of expiredPlans) {
+          plan.planStatus = "EXPIRED";
+          await plan.save();
 
-        /* -------- ACTIVATE UPCOMING PLAN (IF EXISTS) -------- */
+          /* -------- ACTIVATE UPCOMING PLAN (IF EXISTS) -------- */
 
-        const upcomingPlan = await PartnerPlan.findOne({
-          partnerId: plan.partnerId,
-          planStatus: "UPCOMING",
-        }).sort({ createdAt: 1 });
+          const upcomingPlan = await PartnerPlan.findOne({
+            partnerId: plan.partnerId,
+            planStatus: "UPCOMING",
+          }).sort({ createdAt: 1 });
 
-        if (!upcomingPlan) continue;
+          if (!upcomingPlan) continue;
 
-        upcomingPlan.planStatus = "ACTIVE";
+          upcomingPlan.planStatus = "ACTIVE";
 
-        await upcomingPlan.save();
+          await upcomingPlan.save();
+        }
+      } catch (err) {
+        console.error("Partner plan cron failed:", err);
       }
-    } catch (err) {
-      console.error("Partner plan cron failed:", err);
+    },
+    {
+      timezone: "Asia/Kolkata",
     }
-  });
+  );
   console.log("✅ partner plan expired  cron initialized");
 };
 

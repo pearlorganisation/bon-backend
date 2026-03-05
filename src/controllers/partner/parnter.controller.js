@@ -253,139 +253,166 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
 // RAZORPAY KYC FLOW START
 
 export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
-  const userId = req.user._id;
-  const { accountHolderName, accountNumber, ifscCode, bankName } = req.body;
-
-  if (!accountHolderName || !accountNumber || !ifscCode) {
-    return next(
-      new CustomError(
-        "accountHolderName, accountNumber and ifscCode are required",
-        400
-      )
-    );
-  }
-
-  if (!/^\d{9,18}$/.test(accountNumber)) {
-    return next(new CustomError("Invalid bank account number", 400));
-  }
-
-  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(ifscCode)) {
-    return next(new CustomError("Invalid IFSC code format", 400));
-  }
-
-  /* -------------------- 2 Get Partner -------------------- */
-  const auth = await Auth.findById(userId);
-  const partner = await Partner.findOne({ userId });
-
-  if (!auth || !partner) {
-    return next(new CustomError("Partner not found", 404));
-  }
-
-  /* -------------------- 3️ PAN Verification Rule -------------------- */
-  if (!partner.isPanVerified) {
-    return next(
-      new CustomError(
-        "Complete PAN verification before fund account setup",
-        400
-      )
-    );
-  }
-
-  /* -------------------- 4️ Prevent Duplicate -------------------- */
-  if (partner?.razorpay?.fundAccountId) {
-    return next(new CustomError("Fund account already exists", 409));
-  }
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
   try {
+    const userId = req.user._id;
+    const { accountHolderName, accountNumber, ifscCode, bankName } = req.body;
+
+    const auth = await Auth.findById(userId).session(session);
+    const partner = await Partner.findOne({ userId }).session(session);
+
+    if (!auth || !partner) {
+      throw new CustomError("Partner not found", 404);
+    }
+
+    if (partner?.razorpay?.fundAccountId) {
+      throw new CustomError("Fund account already exists", 409);
+    }
+
     let contactId = partner?.razorpay?.contactId;
 
-    /* -------------------- 5️ Create Contact (If Needed) -------------------- */
+    /* ---- External API Call (no session control) ---- */
     if (!contactId) {
-      let contact;
-
-      try {
-        console.log("Razorpay keys:", Object.keys(razorpay));
-        contact = await razorpay.contacts.create({
-          name: partner.panDetails?.fullName || auth.name,
-          email: auth.email,
-          contact: auth.phoneNumber || "9999999999",
-          type: "vendor",
-          reference_id: userId.toString(),
-        });
-      } catch (err) {
-        console.error("Razorpay Contact Error:", err?.error || err);
-        return next(
-          new CustomError(
-            err?.error?.description || "Failed to create Razorpay contact",
-            502
-          )
-        );
-      }
+      const contact = await razorpay.contacts.create({
+        name: partner.panDetails?.fullName || auth.name,
+        email: auth.email,
+        contact: auth.phoneNumber || "9999999999",
+        type: "vendor",
+        reference_id: userId.toString(),
+      });
 
       contactId = contact.id;
-
-      partner.razorpay = {
-        contactId,
-      };
-
-      await partner.save(); // persist contact early
     }
 
-    /* -------------------- 6️ Create Fund Account -------------------- */
-    let fundAccount;
+    const fundAccount = await razorpay.fundAccount.create({
+      contact_id: contactId,
+      account_type: "bank_account",
+      bank_account: {
+        name: accountHolderName,
+        ifsc: ifscCode,
+        account_number: accountNumber,
+      },
+    });
 
-    try {
-      fundAccount = await razorpay.fundAccount.create({
-        contact_id: contactId,
-        account_type: "bank_account",
-        bank_account: {
-          name: accountHolderName,
-          ifsc: ifscCode,
-          account_number: accountNumber,
-        },
-      });
-    } catch (err) {
-      console.error("Razorpay Fund Account Error:", err?.error || err);
+    /* ---- DB Update inside transaction ---- */
 
-      return next(
-        new CustomError(
-          err?.error?.description || "Failed to create Razorpay fund account",
-          502
-        )
-      );
-    }
-
-    /* -------------------- 7️ Save Bank + Fund Details -------------------- */
-    partner.razorpay.fundAccountId = fundAccount.id;
+    partner.razorpay = {
+      contactId,
+      fundAccountId: fundAccount.id,
+    };
 
     partner.bankDetails = {
       accountHolderName,
-      accountNumber,
+      accountNumber, // ideally encrypt
       ifscCode,
       bankName: bankName || null,
       verifiedAt: new Date(),
     };
-    partner.isVerified = true;
-    await partner.save();
 
-    /* -------------------- 8️ Success -------------------- */
-    return successResponse(
-      res,
-      201,
-      "Razorpay fund account created successfully",
-      {
-        contactId,
-        fundAccountId: fundAccount.id,
-      }
-    );
+    await partner.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return successResponse(res, 201, "Fund account created", {
+      contactId,
+      fundAccountId: fundAccount.id,
+    });
   } catch (error) {
-    console.error("Fund Account Setup Error:", error);
+    await session.abortTransaction();
+    session.endSession();
+
     return next(
-      new CustomError("Unable to setup payout account, try again later", 500)
+      new CustomError(
+        error?.error?.description || error.message || "Fund setup failed",
+        error.status || 500
+      )
     );
   }
 });
 
+export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const userId = req.user._id;
+    const { accountHolderName, accountNumber, ifscCode, bankName } = req.body;
+
+    if (!accountHolderName || !accountNumber || !ifscCode) {
+      throw new CustomError(
+        "accountHolderName, accountNumber and ifscCode are required",
+        400
+      );
+    }
+
+    if (!/^\d{9,18}$/.test(accountNumber)) {
+      throw new CustomError("Invalid bank account number", 400);
+    }
+
+    if (!/^[A-Z]{4}0[A-Z0-9]{6}$/i.test(ifscCode)) {
+      throw new CustomError("Invalid IFSC code format", 400);
+    }
+
+    const partner = await Partner.findOne({ userId }).session(session);
+
+    if (!partner) {
+      throw new CustomError("Partner not found", 404);
+    }
+
+    if (!partner?.razorpay?.contactId) {
+      throw new CustomError(
+        "Payout contact not found. Setup payout first.",
+        400
+      );
+    }
+
+    /* ---------- CREATE NEW FUND ACCOUNT IN RAZORPAY ---------- */
+
+    const newFundAccount = await razorpay.fundAccounts.create({
+      contact_id: partner.razorpay.contactId,
+      account_type: "bank_account",
+      bank_account: {
+        name: accountHolderName,
+        ifsc: ifscCode,
+        account_number: accountNumber,
+      },
+    });
+
+    /* ---------- SAVE NEW FUND ACCOUNT ---------- */
+
+    partner.razorpay.fundAccountId = newFundAccount.id;
+
+    partner.bankDetails = {
+      accountHolderName,
+      accountNumber, // ideally encrypt
+      ifscCode,
+      bankName: bankName || null,
+      updatedAt: new Date(),
+    };
+
+    await partner.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return successResponse(res, 200, "Bank account updated successfully", {
+      newFundAccountId: newFundAccount.id,
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+
+    return next(
+      new CustomError(
+        error?.error?.description || error.message || "Bank update failed",
+        error.status || 500
+      )
+    );
+  }
+});
 //  PARTNER PLAN
 
 export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
@@ -521,11 +548,7 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
       amount: Math.round(plan.price * 100),
       currency: "INR",
       receipt: inactivePlan._id.toString(),
-      notes: {
-        purpose: "PARTNER_SUBSCRIPTION",
-        partnerId: partnerId.toString(),
-        subscriptionPlanId,
-      },
+      
       notes: {
         purpose: "SUBSCRIPTION",
         partnerPlanId: inactivePlan._id.toString(),

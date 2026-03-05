@@ -29,6 +29,10 @@ const bookingSchema = new mongoose.Schema(
         },
         pricePerNight: { type: Number, default: 0 },
         discount: { type: Number, default: 0 },
+        room_gst: {
+          gst_rate: Number,
+          gst_amount: Number,
+        },
         extraServices: [
           {
             name: String,
@@ -51,7 +55,7 @@ const bookingSchema = new mongoose.Schema(
       adults: { type: Number },
       children: [{ age: Number }],
     },
-    // Total price (sum of all room subtotals + taxes/fees)
+    // Total price (sum of all room subtotals + taxes/fees + gst)
     totalPrice: {
       type: Number,
       required: true,
@@ -68,10 +72,7 @@ const bookingSchema = new mongoose.Schema(
         ref: "PartnerPlan",
         required: true,
       },
-      gstDetails: {
-        gstRate: { type: Number },
-        gstAmount: { type: Number },
-      },
+      gst_amount: { type: Number, default: 0 },
     },
     paymentMode: {
       type: String,
@@ -110,6 +111,7 @@ const bookingSchema = new mongoose.Schema(
         "expired",
         "checkIn",
         "no-show",
+        "auto-deduct",
       ],
       default: "pending",
     },

@@ -12,6 +12,7 @@ import successResponse from "../../utils/error/successResponse.js";
 import { razorpay } from "../../config/razorpayConfig.js";
 import crypto from "crypto";
 import { isGeneratorFunction } from "util/types";
+import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 
 const round = (num) => Math.round(num * 100) / 100;
 // utils/dateUtils.js
@@ -144,25 +145,24 @@ const calculateRefundPercentage = ({
   return 0;
 };
 
-const getHotelGSTDetails = (totalAmount) => {
+const getGST = (amount) => {
   let gstRate = 0;
 
-  if (totalAmount <= 1000) {
+  if (amount <= 1000) {
     gstRate = 0;
-  } else if (totalAmount <= 7500) {
+  } else if (amount <= 7500) {
     gstRate = 5;
   } else {
     gstRate = 18;
   }
 
-  const gstAmount = (totalAmount * gstRate) / 100;
+  const gstAmount = (amount * gstRate) / 100;
 
   return {
-    gstRate: gstRate, // in percentage
-    gstAmount: gstAmount, // in rupees
+    gstRate,
+    gstAmount,
   };
 };
-
 
 //controllers
 
@@ -240,6 +240,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     let extraFees = 0;
     let childrenCharge = 0;
     let totalCapacity = 0;
+    let total_gst = 0;
     const roomsData = [];
 
     const dates = getDatesBetween(checkIn, checkOut);
@@ -315,16 +316,28 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       const roomPrice = room.pricePerNight * item.quantity * nights;
       basePrice += roomPrice;
 
+      let effectivePrice = room.pricePerNight;
+
       if (room.discount > 0) {
         discountAmount +=
           (room.discount / 100) * room.pricePerNight * item.quantity * nights;
+
+        effectivePrice =
+          room.pricePerNight - (room.discount * room.pricePerNight) / 100;
       }
+
+      let gst = getGST(effectivePrice);
+      total_gst += gst.gstAmount * item.quantity * nights;
 
       const roomDetails = {
         roomId: item.roomId,
         quantity: item.quantity,
         pricePerNight: room.pricePerNight,
         discount: room.discount,
+        room_gst: {
+          gst_rate: gst.gstRate,
+          gst_amount: gst.gstAmount * item.quantity * nights,
+        },
         extraServices: [],
       };
 
@@ -371,10 +384,8 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     }
 
     // 6️ calculate gst
-    const totalPrice = basePrice - discountAmount + extraFees + childrenCharge;
- 
-      const gstDetails = getHotelGSTDetails(totalPrice);
-      totalPrice+=gstDetails.gstAmount;
+    let totalPrice =
+      basePrice - discountAmount + extraFees + childrenCharge + total_gst;
 
     // 7️ Create booking
     const booking = await Booking.create(
@@ -393,7 +404,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
             discountAmount: round(discountAmount),
             extraServicesFee: round(extraFees),
             childrenCharge: round(childrenCharge),
-            gstDetails,
+            gst_amount: round(total_gst),
             partnerPlanId: partnerPlan._id,
           },
           totalPrice: round(totalPrice),
@@ -432,7 +443,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       specialRequests,
     } = req.body;
 
-    // 1️ Fetch booking
+    // 1️⃣ Fetch booking
     const booking = await Booking.findOne({
       _id: bookingId,
       userId,
@@ -449,7 +460,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // 2️ Validate dates
+    // 2️⃣ Validate dates
     const checkIn = normalizeDate(checkInDate);
     const checkOut = normalizeDate(checkOutDate);
 
@@ -461,7 +472,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       throw new CustomError("Check-out date must be after check-in date", 400);
     }
 
-    // 3️ Fetch property
+    // 3️⃣ Fetch property
     const property = await Property.findById(booking.propertyId)
       .session(session)
       .select("status childrenCharge verified");
@@ -475,17 +486,17 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     }
 
     const partnerPlan = await PartnerPlan.findOne({
-      partnerId,
+      partnerId: property.partnerId,
       planStatus: "ACTIVE",
-    });
+    }).session(session);
 
     if (!partnerPlan) {
-      throw new CustomError("sorry, Property is not avilable", 400);
+      throw new CustomError("Property is not available", 400);
     }
 
     const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
 
-    // 4️ RELEASE OLD INVENTORY
+    // 4️⃣ Release OLD inventory
     const oldDates = getDatesBetween(booking.checkInDate, booking.checkOutDate);
 
     for (const oldRoom of booking.rooms) {
@@ -501,12 +512,13 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // 5️ Re-check & reserve new inventory
+    // 5️⃣ Re-check & reserve NEW inventory
     let basePrice = 0;
     let discountAmount = 0;
     let extraFees = 0;
     let childrenCharge = 0;
     let totalCapacity = 0;
+    let total_gst = 0;
     const roomsData = [];
 
     const newDates = getDatesBetween(checkIn, checkOut);
@@ -521,7 +533,6 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         throw new CustomError("Room not found", 404);
       }
 
-      // ❌ Blocked date check
       if (isRoomBlocked(room, checkIn, checkOut)) {
         throw new CustomError(
           `Room ${room.name} is blocked for selected dates`,
@@ -529,7 +540,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         );
       }
 
-      // 🔍 Date-wise availability check
+      // Availability check
       const inventories = await RoomInventory.find({
         roomId: item.roomId,
         date: { $in: newDates },
@@ -554,7 +565,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         }
       }
 
-      // 🔐 Reserve inventory
+      // Reserve inventory
       for (const date of newDates) {
         const updated = await RoomInventory.findOneAndUpdate(
           { roomId: item.roomId, date },
@@ -575,22 +586,38 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         }
       }
 
-      //  Pricing
+      // 6️⃣ Pricing
       totalCapacity += room.capacity * item.quantity;
 
       const roomPrice = room.pricePerNight * item.quantity * nights;
+
       basePrice += roomPrice;
+
+      let effectivePrice = room.pricePerNight;
 
       if (room.discount > 0) {
         discountAmount +=
           (room.discount / 100) * room.pricePerNight * item.quantity * nights;
+
+        effectivePrice =
+          room.pricePerNight - (room.discount * room.pricePerNight) / 100;
       }
+
+      // GST per room (same as createBooking)
+      const gst = getGST(effectivePrice);
+      const roomGstAmount = gst.gstAmount * item.quantity * nights;
+
+      total_gst += roomGstAmount;
 
       const roomDetails = {
         roomId: item.roomId,
         quantity: item.quantity,
         pricePerNight: room.pricePerNight,
         discount: room.discount,
+        room_gst: {
+          gst_rate: gst.gstRate,
+          gst_amount: roomGstAmount,
+        },
         extraServices: [],
       };
 
@@ -601,6 +628,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
               name: service,
               fee: room.servicesAndExtras[service].fee,
             });
+
             extraFees +=
               room.servicesAndExtras[service].fee * item.quantity * nights;
           }
@@ -610,7 +638,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       roomsData.push(roomDetails);
     }
 
-    // 6️ Children charges
+    // 7️⃣ Children charges
     const childConfig = property.childrenCharge;
     let childCount = 0;
 
@@ -635,13 +663,11 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       childrenCharge = childConfig.charge * overflow * nights;
     }
 
-    // 67 calculate gst
-    const totalPrice = basePrice - discountAmount + extraFees + childrenCharge;
+    // 8️⃣ Final total (same as createBooking)
+    const totalPrice =
+      basePrice - discountAmount + extraFees + childrenCharge + total_gst;
 
-    const gstDetails = getHotelGSTDetails(totalPrice);
-    totalPrice += gstDetails.gstAmount;
-
-    // 8️ Update booking
+    // 9️⃣ Update booking
     booking.rooms = roomsData;
     booking.checkInDate = checkIn;
     booking.checkOutDate = checkOut;
@@ -649,14 +675,16 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     booking.primaryGuestDetails = primaryGuestDetails;
     booking.specialRequests = specialRequests;
     booking.status = "pending";
+
     booking.priceBreakdown = {
       basePrice: round(basePrice),
       discountAmount: round(discountAmount),
       extraServicesFee: round(extraFees),
       childrenCharge: round(childrenCharge),
-      gstDetails,
+      gst_amount: round(total_gst),
       partnerPlanId: partnerPlan._id,
     };
+
     booking.totalPrice = round(totalPrice);
 
     await booking.save({ session });
@@ -680,8 +708,8 @@ export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
     {
       $match: {
         _id: new mongoose.Types.ObjectId(bookingId),
-        userId:new mongoose.Types.ObjectId(userId),
-        status: "pending"
+        userId: new mongoose.Types.ObjectId(userId),
+        status: "pending",
       },
     },
     {
@@ -721,10 +749,10 @@ export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
   if (!booking.paymentModes.PAY_ON_ARRIVAL) {
     return next(new CustomError("pay on Arrival mode is not avilable", 400));
   }
-
-  booking.paymentMode = "PAY_ON_ARRIVAL";
-  booking.status = "confirmed";
-  await booking.save();
+  const bookingDoc = await Booking.findById(bookingId);
+  bookingDoc.paymentMode = "PAY_ON_ARRIVAL";
+  bookingDoc.status = "confirmed";
+  await bookingDoc.save();
 
   successResponse(res, 200, "Mode applied on booking");
 });
@@ -852,7 +880,7 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
 });
 
 export const bookingWebhookController = asyncHandler(async (req, res, next) => {
-  const { eventType,             orderId, paymentId, paymentEntity } = req.razorpay;
+  const { eventType, orderId, paymentId, paymentEntity } = req.razorpay;
   console.log("payment", req.razorpay);
 
   if (!eventType || !paymentEntity) {
@@ -958,7 +986,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
     const { bookingId } = req.params;
     const userId = req.user._id;
     const { reason } = req.body;
-
+    
     if (!reason) {
       throw new CustomError("Please give a valid reason", 400);
     }
@@ -991,8 +1019,8 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
 
     // 1️ Calculate refund
     let refundPercentage = 0;
-    const refundAmount = 0; // for PAY_ON_ARRIVAL
-
+    let refundAmount = 0; // for PAY_ON_ARRIVAL
+    let retainedAmount = 0;
     if (booking.paymentMode == "PAY_NOW") {
       if (req.user?.role === "PARTNER") {
         refundPercentage = 100;
@@ -1005,28 +1033,16 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
       }
 
       refundAmount = (booking.totalPrice * refundPercentage) / 100;
+      retainedAmount = booking.totalPrice - refundAmount;
+
+      //  split payment what to do ...
+      if (retainedAmount > 0) {
+        await splitCancellationMoney(booking, retainedAmount);
+      }
     }
 
     // 2️ Release inventory (CRITICAL)
-    const dates = getDatesBetween(
-      normalizeDate(booking.checkInDate),
-      normalizeDate(booking.checkOutDate)
-    );
-
-    for (const room of booking.rooms) {
-      for (const date of dates) {
-        await RoomInventory.findOneAndUpdate(
-          {
-            roomId: room.roomId,
-            date,
-          },
-          {
-            $inc: { bookedRooms: -room.quantity },
-          },
-          { session }
-        );
-      }
-    }
+       await releaseInventory(booking);
 
     // 3️ Update booking
     booking.status = "cancelled";
@@ -1386,9 +1402,9 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
     );
   }
 
-  if (!["checkIn","no-show"].includes(bookingStatus)) {
+  if (!["checkIn", "no-show"].includes(bookingStatus)) {
     return next(new CustomError("Invalid booking status", 400));
-  } 
+  }
 
   /* ---------------- FETCH BOOKING WITH PROPERTY ---------------- */
 
@@ -1396,6 +1412,7 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
     {
       $match: {
         _id: new mongoose.Types.ObjectId(bookingId),
+        status: "confirmed",
       },
     },
     {
@@ -1411,6 +1428,17 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
       $match: {
         "property.partnerId": new mongoose.Types.ObjectId(partnerId),
       },
+    },
+    {
+      $lookup: {
+        from: "partnerplans",
+        localField: "priceBreakdown.partnerPlanId",
+        foreignField: "_id",
+        as: "partnerPlan",
+      },
+    },
+    {
+      $unwind: "$partnerPlan",
     },
     {
       $project: {
@@ -1431,25 +1459,276 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Booking  is not confirmed", 400));
   }
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
+  const checkIn = new Date(booking.checkInDate);
 
-  const checkOutDate = new Date(booking.checkOutDate);
+  // Calculate 24-hour deadline
+  const deadline = new Date(checkIn.getTime() + 24 * 60 * 60 * 1000);
 
-  /* ---------------- STATUS LOGIC ---------------- */
+  // Current time
+  const now = new Date();
 
-  if (today < checkOutDate) {
-    return next(new CustomError("Check-out date has not arrived yet", 400));
+  // Check if now is within allowed window
+  if (now < checkIn || now > deadline) {
+    return next(
+      new CustomError(
+        "Action allowed only within 24 hours of check-in date",
+        400
+      )
+    );
   }
 
   /* ---------------- SAVE ---------------- */
 
+  try {
+    if (bookingStatus == "no-show") {
+      //release inventorty logic...
+       await releaseInventory(booking);
+       
+       if(booking.paymentMode=="PAY_NOW"){
+          const response = await splitMoney(booking, partnerId);
+          if(response.error)throw response.error
+       }
+       
+        
+
+    } else {
+      //check In
+        const response = await splitMoney(booking,partnerId);
+         if (response.error) throw response.error;
+    }
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+ 
+  
   await Booking.findByIdAndUpdate(booking._id, {
     status: bookingStatus,
   });
-
+  
   successResponse(res, 200, "Booking status updated successfully", {
     bookingId: booking._id,
     status: booking.status,
   });
 });
+
+export const splitMoney = async (booking, partnerId) => {
+  try {
+    if (!booking?.partnerPlan) {
+      throw new Error("Partner plan not found");
+    }
+
+    const partnerPlan = booking.partnerPlan;
+
+    const baseAmount = booking.totalPrice - booking.priceBreakdown.gst_amount;
+
+    const roomGST = booking.priceBreakdown.gst_amount || 0;
+
+    let adminAmount = 0;
+    let adminGST = 0;
+    let partnerAmount = 0;
+    let partnerGST = roomGST;
+
+    /* ---------- PLAN CALCULATION ---------- */
+
+    if (partnerPlan.PlanType === "COMMISSION") {
+      adminAmount = (partnerPlan.commissionPercentage * baseAmount) / 100;
+
+      const { gstAmount } = getGST(adminAmount);
+      adminGST = gstAmount;
+
+     partnerAmount = baseAmount - adminAmount - adminGST;
+    } else {
+      // SUBSCRIPTION
+      partnerAmount = baseAmount;
+    }
+
+    /* ---------- FIND MONTH ---------- */
+
+    const checkIn = new Date(booking.checkInDate);
+    const payoutMonth = checkIn.getMonth() + 1;
+    const payoutYear = checkIn.getFullYear();
+
+    /* ---------- FIND OR CREATE WALLET ---------- */
+
+    let wallet = await PartnerMonthlyPayoutModel.findOne({
+      partnerId,
+      payoutMonth,
+      payoutYear,
+    });
+
+    if (!wallet) {
+      wallet = await PartnerMonthlyPayoutModel.create({
+        partnerId,
+        payoutMonth,
+        payoutYear,
+        bookings: [],
+      });
+    }
+
+    /* ---------- PREVENT DUPLICATE ENTRY ---------- */
+
+    const alreadyExists = wallet.bookings.some(
+      (b) => b.bookingId.toString() === booking._id.toString()
+    );
+
+    if (alreadyExists) {
+      throw new Error("Split already processed for this booking");
+    }
+
+    /* ---------- PUSH BOOKING ENTRY ---------- */
+
+    wallet.bookings.push({
+      bookingId: booking._id,
+      partnerAmount,
+      partner_gst: partnerGST,
+      adminAmount,
+      admin_gst: adminGST,
+    });
+
+    /* ---------- WALLET UPDATE ---------- */
+
+    if (booking.paymentMode === "PAY_NOW") {
+      // Admin collected → Admin must pay partner
+      wallet.partnerWallet.payableAmount += partnerAmount + partnerGST;
+    } else {
+      // Partner collected → Partner must pay admin
+      wallet.adminWallet.receivableAmount += adminAmount + adminGST;
+    }
+
+    await wallet.save();
+
+    return {
+      success: true,
+      error:null
+    };
+  } catch (error) {
+    console.log("Split Error:", error);
+    return {
+       success:false,
+       error
+    }
+  }
+};
+export const splitCancellationMoney = async (booking, retainedAmount) => {
+  try {
+    if (!booking?.partnerPlan) {
+      throw new Error("Partner plan not found");
+    }
+
+    const partnerPlan = booking.partnerPlan;
+
+    const totalPrice = booking.totalPrice;
+    const totalGST = booking.priceBreakdown.gst_amount || 0;
+    const totalBase = totalPrice - totalGST;
+
+    // proportion retained %
+    const retainedPercentage = retainedAmount / totalPrice;
+
+    // proportional split
+    const retainedBase = totalBase * retainedPercentage;
+    const retainedGST = totalGST * retainedPercentage;
+
+    let adminAmount = 0;
+    let adminGST = 0;
+    let partnerAmount = 0;
+    let partnerGST = retainedGST;
+
+    /* ---------- PLAN CALCULATION ---------- */
+
+    if (partnerPlan.PlanType === "COMMISSION") {
+      adminAmount = (partnerPlan.commissionPercentage * retainedBase) / 100;
+
+      const { gstAmount } = getGST(adminAmount);
+      adminGST = gstAmount;
+
+      partnerAmount = retainedBase - adminAmount - adminGST;
+    } else {
+      // SUBSCRIPTION
+      partnerAmount = retainedBase;
+    }
+
+    /* ---------- WALLET UPDATE ---------- */
+
+    const checkIn = new Date(booking.checkInDate);
+    const payoutMonth = checkIn.getMonth() + 1;
+    const payoutYear = checkIn.getFullYear();
+
+    let wallet = await PartnerMonthlyPayoutModel.findOne({
+      partnerId: booking.propertyId.partnerId,
+      payoutMonth,
+      payoutYear,
+    });
+
+    if (!wallet) {
+      wallet = await PartnerMonthlyPayoutModel.create({
+        partnerId: booking.propertyId.partnerId,
+        payoutMonth,
+        payoutYear,
+        bookings: [],
+      });
+    }
+
+    wallet.bookings.push({
+      bookingId: booking._id,
+      partnerAmount,
+      partner_gst: partnerGST,
+      adminAmount,
+      admin_gst: adminGST,
+    });
+
+    wallet.partnerWallet.payableAmount += partnerAmount + partnerGST;
+
+    await wallet.save();
+
+    return { success: true };
+  } catch (error) {
+    console.log("Cancellation Split Error:", error);
+    throw error;
+  }
+};
+
+export const releaseInventory = async (booking) => {
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const dates = getDatesBetween(
+      normalizeDate(booking.checkInDate),
+      normalizeDate(booking.checkOutDate)
+    );
+
+    for (const room of booking.rooms) {
+      for (const date of dates) {
+        const inventory = await RoomInventory.findOne({
+          roomId: room.roomId,
+          date,
+        }).session(session);
+
+        if (!inventory) continue;
+
+        if (inventory.bookedRooms < room.quantity) {
+          throw new Error(
+            `Inventory underflow for room ${room.roomId} on ${date}`
+          );
+        }
+
+        inventory.bookedRooms -= room.quantity;
+
+        await inventory.save({ session });
+      }
+    }
+
+    await session.commitTransaction();
+    session.endSession();
+
+    return { success: true };
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
+};
+
+ 
+
