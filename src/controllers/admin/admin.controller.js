@@ -217,18 +217,20 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
 
 // partner payout api for monthly payouts
 
-export const releasePreviousMonthPayout = asyncHandler(
+export const releasePartnerMonthlyPayout = asyncHandler(
   async (req, res, next) => {
-    const { partnerId } = req.params;
+    const { partnerId ,date } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(partnerId)) {
       return next(new CustomError("Invalid partnerId", 400));
     }
 
     /* ---------- GET PREVIOUS MONTH ---------- */
-    const now = new Date();
-    const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1);
-
+    const dateObj = new Date(date);
+     if (isNaN(dateObj)) {
+       return next(new CustomError("Invalid date format", 400));
+     }
+    // const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1);
     const payoutMonth = prevMonthDate.getMonth() + 1;
     const payoutYear = prevMonthDate.getFullYear();
 
@@ -371,7 +373,7 @@ export const razorpayPayoutWebhook = async (req, res) => {
       case "payout.failed":
       case "payout.reversed":
       case "payout.rejected":
-          monthlyPayout.partnerWallet.status = "failed";
+        monthlyPayout.partnerWallet.status = "failed";
         break;
 
       case "payout.queued":
@@ -395,3 +397,88 @@ export const razorpayPayoutWebhook = async (req, res) => {
     return res.status(500).json({ message: "Webhook error" });
   }
 };
+
+export const getPartnerMonthlyPayouts = asyncHandler(async (req, res, next) => {
+  const date = req.query.date;
+
+  let dateObj;
+
+  if (date) {
+    dateObj = new Date(date);
+    if (isNaN(dateObj)) {
+      return next(new CustomError("Invalid date format", 400));
+    }
+  } else {
+    dateObj = new Date();
+  }
+
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+
+  const pipeline = [
+    {
+      $match: {
+        role: "PARTNER",
+        isVerified: true,
+      },
+    },
+    {
+      $lookup: {
+        from: "partners",
+        localField: "_id",
+        foreignField: "userId",
+        as: "partner",
+      },
+    },
+    {
+      $unwind: "$partner",
+    },
+    {
+      $match: {
+        "partner.isPanVerified": true,
+        "partner.isVerified": true,
+      },
+    },
+    {
+      $lookup: {
+        from: "partnermonthlypayouts",
+        let: { partnerId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$partnerId", "$$partnerId"] },
+                  { $eq: ["$payoutYear", year] },
+                  { $eq: ["$payoutMonth", month] },
+                ],
+              },
+            },
+          },
+        ],
+        as: "partnerMonthlyPayout",
+      },
+    },
+    {
+      $unwind: {
+        path: "$partnerMonthlyPayout",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $project: {
+        password: 0,
+        refresh_token: 0,
+      },
+    },
+  ];
+
+  const partnersMonthlyPayouts = await Auth.aggregate(pipeline);
+
+  return successResponse(
+    res,
+    200,
+    `Successfully fetched partner payouts for ${month}/${year}`,
+    partnersMonthlyPayouts
+  );
+});

@@ -77,7 +77,7 @@ const bookingSchema = new mongoose.Schema(
     paymentMode: {
       type: String,
       enum: ["PAY_NOW", "PAY_ON_ARRIVAL"],
-      required: true,
+      required: true,   
       default: "PAY_NOW",
     },
     //paymwnt object only  for PAY_NOW
@@ -111,7 +111,7 @@ const bookingSchema = new mongoose.Schema(
         "expired",
         "checkIn",
         "no-show",
-        "auto-deduct",
+        "auto_settled",
       ],
       default: "pending",
     },
@@ -143,6 +143,10 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true, // allows null for pending bookings
+    },
+    invoiceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Invoice",
     },
   },
   { timestamps: true }

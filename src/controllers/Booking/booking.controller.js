@@ -319,7 +319,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       let effectivePrice = room.pricePerNight;
 
       if (room.discount > 0) {
-        discountAmount +=
+        discountAmount +=    
           (room.discount / 100) * room.pricePerNight * item.quantity * nights;
 
         effectivePrice =
@@ -333,7 +333,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
         roomId: item.roomId,
         quantity: item.quantity,
         pricePerNight: room.pricePerNight,
-        discount: room.discount,
+        discount: round((room.discount * room.pricePerNight) / 100),
         room_gst: {
           gst_rate: gst.gstRate,
           gst_amount: gst.gstAmount * item.quantity * nights,
@@ -1392,6 +1392,8 @@ export const getBooking = asyncHandler(async (req, res, next) => {
   });
 });
 
+// booking money split  logic
+
 export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
   const { bookingId, bookingStatus } = req.body;
@@ -1453,11 +1455,12 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
 
   const booking = result[0];
 
+  if (booking.status !== "confirmed") {
+    throw new CustomError("Booking already processed", 400);
+  }
+
   /* ---------------- PAYMENT VALIDATION ---------------- */
 
-  if (booking.status !== "confirmed") {
-    return next(new CustomError("Booking  is not confirmed", 400));
-  }
 
   const checkIn = new Date(booking.checkInDate);
 
@@ -1489,7 +1492,6 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
           if(response.error)throw response.error
        }
        
-        
 
     } else {
       //check In
@@ -1498,7 +1500,7 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
     }
   } catch (error) {
     console.log(error);
-    next(error);
+   return next(error);
   }
  
   
@@ -1508,7 +1510,7 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
   
   successResponse(res, 200, "Booking status updated successfully", {
     bookingId: booking._id,
-    status: booking.status,
+    status: bookingStatus,
   });
 });
 
@@ -1731,4 +1733,5 @@ export const releaseInventory = async (booking) => {
 };
 
  
+
 

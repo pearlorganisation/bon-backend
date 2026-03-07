@@ -5,6 +5,7 @@ import expireDocumentAccessCron from "./src/utils/cron/expireDocumentAccess.cron
 import sub_admin_cron from "./src/utils/cron/sub_admin_session.cron.js";
 import expireInactivePendingBookingsCron from "./src/utils/cron/expireInactivePendingBookings.cron.js";
 import startPartnerPlanCron from "./src/utils/cron/expirePartnerPlan.cron.js";
+import { autoBookingSettlementCron } from "./src/utils/cron/auto_booking_settlement.cron.js";
 dotenv.config();
 
 const PORT = process.env.PORT || 5000;
@@ -21,9 +22,10 @@ connectDB()
     process.exit(1);
   });
 
-if (process.env.ENABLE_CRON === "true") {
+if (process.env.ENABLE_CRON === true) {
   expireDocumentAccessCron();
   sub_admin_cron();
   expireInactivePendingBookingsCron();
   startPartnerPlanCron();
+  autoBookingSettlementCron()
 }
