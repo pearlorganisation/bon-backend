@@ -45,6 +45,10 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
       razorpayStatus: String,
       paidAt: Date,
       razorpayStatusDetail: String,
+      invoiceId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: "Invoice",
+          },
     },
 
     adminWallet: {
