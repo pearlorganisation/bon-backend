@@ -13,7 +13,7 @@ import AdminSubscriptionPlan from "../../models/Admin/admin.subscription.model.j
 configDotenv();
 
 //verify  partner
-
+//
 export const partner_KYC = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
   const { panNumber } = req.body;
@@ -42,7 +42,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
             "x-client-id": process.env.CASHFREE_CLIENT_ID,
             "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
           },
-        }
+        },
       ),
       axios.post(
         process.env.GSTIN_PAN_API_URL,
@@ -53,7 +53,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
             "x-client-id": process.env.CASHFREE_CLIENT_ID,
             "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
           },
-        }
+        },
       ),
     ]);
 
@@ -61,6 +61,10 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
     const gstinData = gstinResponse.data;
 
     if (!panData || panData?.valid !== true) {
+      partner.isPanVerified = false;
+      partner.panDetails = undefined;
+      partner.gstinList = [];
+      await partner.save();
       return next(new CustomError("PAN verification failed", 400));
     }
 
@@ -115,12 +119,13 @@ export const getPartnerKYC = asyncHandler(async (req, res, next) => {
   let partnerQuery = {};
 
   // PARTNER: can see only own KYC
-  if (req.user.role === "partner") {
+  if (req.user.role === "PARTNER") {
+    // Note: Changed to uppercase to match your authorizeRoles middleware
     partnerQuery.userId = req.user._id;
   }
 
   // ADMIN: can see any partner's KYC
-  if (req.user.role === "admin") {
+  if (req.user.role === "ADMIN") {
     const { partnerUserId } = req.query;
 
     if (!partnerUserId) {
@@ -131,20 +136,24 @@ export const getPartnerKYC = asyncHandler(async (req, res, next) => {
   }
 
   const partner = await Partner.findOne(partnerQuery).select(
-    "panDetails gstinList isPanVerified"
+    "panDetails gstinList isPanVerified",
   );
 
   if (!partner) {
     return next(new CustomError("Partner not found", 404));
   }
 
+  // Logic Fix: Only return data if isPanVerified is true
+  const isVerified = partner.isPanVerified === true;
+
   return res.status(200).json({
     success: true,
     message: "Partner KYC fetched successfully",
     data: {
-      panDetails: partner.panDetails || null,
-      gstinList: partner.gstinList || [],
-      isVerified: partner.isPanVerified,
+      // If not verified, return null/empty to prevent showing unverified data
+      panDetails: isVerified ? partner.panDetails || null : null,
+      gstinList: isVerified ? partner.gstinList || [] : [],
+      isVerified: isVerified,
     },
   });
 });
@@ -189,7 +198,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
           "x-client-id": process.env.CASHFREE_CLIENT_ID,
           "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
         },
-      }
+      },
     );
 
     const gstinInfo = response.data;
@@ -205,7 +214,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
 
     // 4️⃣ Check if GSTIN is linked to PAN
     const isLinkedWithPAN = partner?.gstinList?.some(
-      (g) => g.gstin?.toUpperCase() === gstinInfo.GSTIN?.toUpperCase()
+      (g) => g.gstin?.toUpperCase() === gstinInfo.GSTIN?.toUpperCase(),
     );
 
     const message = isLinkedWithPAN
@@ -251,7 +260,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
 });
 
 // RAZORPAY KYC FLOW START
-
+//
 export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
@@ -327,8 +336,8 @@ export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         error?.error?.description || error.message || "Fund setup failed",
-        error.status || 500
-      )
+        error.status || 500,
+      ),
     );
   }
 });
@@ -344,7 +353,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!accountHolderName || !accountNumber || !ifscCode) {
       throw new CustomError(
         "accountHolderName, accountNumber and ifscCode are required",
-        400
+        400,
       );
     }
 
@@ -365,7 +374,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!partner?.razorpay?.contactId) {
       throw new CustomError(
         "Payout contact not found. Setup payout first.",
-        400
+        400,
       );
     }
 
@@ -408,8 +417,8 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         error?.error?.description || error.message || "Bank update failed",
-        error.status || 500
-      )
+        error.status || 500,
+      ),
     );
   }
 });
@@ -452,7 +461,7 @@ export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
 
   if (commissionPercentage < min || commissionPercentage > max) {
     return next(
-      new CustomError("commission percentage is outside platform range", 400)
+      new CustomError("commission percentage is outside platform range", 400),
     );
   }
 
@@ -490,7 +499,6 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
   if (!isValid) {
     return next(new CustomError("before creating plan complete your kyc", 400));
   }
-
 
   // 1. block multiple upcoming plans
   const upcomingPlan = await PartnerPlan.findOne({
@@ -548,7 +556,7 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
       amount: Math.round(plan.price * 100),
       currency: "INR",
       receipt: inactivePlan._id.toString(),
-      
+
       notes: {
         purpose: "SUBSCRIPTION",
         partnerPlanId: inactivePlan._id.toString(),
@@ -567,8 +575,8 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         err?.error?.description || "payment gateway error",
-        err.statusCode || 502
-      )
+        err.statusCode || 502,
+      ),
     );
   }
 });
@@ -609,7 +617,7 @@ export const subscriptionWebhookController = asyncHandler(
     await plan.save();
 
     return res.status(200).json({ success: true });
-  }
+  },
 );
 
 export const getMyPlans = asyncHandler(async (req, res, next) => {
