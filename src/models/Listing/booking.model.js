@@ -67,6 +67,7 @@ const bookingSchema = new mongoose.Schema(
       discountAmount: { type: Number, default: 0 },
       // taxes: { type: Number, default: 0 },
       extraServicesFee: { type: Number, default: 0 }, // e.g., service fees, cleaning fees
+       childrenCharge: {type:Number,default:0},
       partnerPlanId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "PartnerPlan",

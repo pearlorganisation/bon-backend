@@ -13,6 +13,7 @@ import { razorpay } from "../../config/razorpayConfig.js";
 import crypto from "crypto";
 import { isGeneratorFunction } from "util/types";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
+import { createCustomerInvoice } from "../../utils/invoive/createInvoice.js";
 
 const round = (num) => Math.round(num * 100) / 100;
 // utils/dateUtils.js
@@ -926,6 +927,10 @@ export const bookingWebhookController = asyncHandler(async (req, res, next) => {
 
       await booking.save();
 
+    if (!booking.invoiceId) {
+          createCustomerInvoice(booking._id).catch(error=>console.log("Invoice generation failed",error));
+    }
+
       break;
     }
 
@@ -1731,6 +1736,15 @@ export const releaseInventory = async (booking) => {
     throw error;
   }
 };
+
+
+//Invoice  controllers
+
+
+
+
+
+
 
  
 
