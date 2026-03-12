@@ -69,6 +69,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     status,
     PartnerEmail,
     policies,
+    childrenCharge,
   } = req.body;
 
   // ✅ Required fields
@@ -157,6 +158,16 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     ],
   };
 
+  if (childrenCharge) {
+    if (childrenCharge.age < 2 && childrenCharge.age > 18) {
+      return next(
+        new CustomError("please enter valid age for children charges")
+      );
+    }
+    if (!childrenCharge.charge)
+      return next(new CustomError(" children charges required"));
+  }
+
   const propertyData = {
     name,
     address,
@@ -168,6 +179,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     amenities,
     mapLink,
     geoLocation,
+    childrenCharge,
     Images,
     Videos,
     policies,
@@ -312,6 +324,20 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     property.policies = policies;
   }
 
+  if (req.body?.childrenCharge) {
+    let childrenCharge =JSON.parse(req.body.childrenCharge)
+    if (childrenCharge) {
+      if (childrenCharge.age < 2 && childrenCharge.age > 18) {
+        return next(
+          new CustomError("please enter valid age for children charges")
+        );
+      }
+      if (!childrenCharge.charge)
+        return next(new CustomError(" children charges required"));
+    }
+    property.childrenCharge=childrenCharge;
+  }
+
   if (req.body?.imagesToDelete) {
     let imagesToDelete = [];
 
@@ -444,7 +470,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   property.Images.push(...Images);
   property.Videos.push(...Videos);
 
-  // 6️⃣ Save property
+  // 6️ Save property
   await property.save();
 
   successResponse(res, 200, "Property updated successfully", property);

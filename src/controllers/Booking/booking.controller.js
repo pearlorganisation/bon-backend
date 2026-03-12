@@ -969,16 +969,23 @@ export const getBookingById = asyncHandler(async (req, res, next) => {
 
   if (!bookingId) {
     return next(new CustomError("Booking ID is required", 400));
-  }
-
+  }      
+  
   const booking = await Booking.findById(bookingId)
     .populate({ path: "propertyId", select: "name policies" })
     .populate({ path: "userId", select: "name" })
-    .populate({ path: "rooms.roomId", select: "name typeOfRoom" });
+    .populate({ path: "rooms.roomId", select: "name typeOfRoom" })
+    .populate({path:"invoiceId"});
 
   if (!booking) {
     return next(new CustomError("Booking not found", 404));
   }
+  if(req.user.role === "CUSTOMER"){
+     if(booking.userId.toString()!== user._id.toString()){
+       return next(new CustomError("not allowed ", 401));
+     }
+  }
+
 
   successResponse(res, 200, "successfully fetch booking ", booking);
 });
@@ -1237,6 +1244,7 @@ export const getMyBooking = asyncHandler(async (req, res, next) => {
 
   const bookings = await Booking.find(query)
     .populate("propertyId", "name ")
+    .poplate("invoiceId")
     .sort({ createdAt: -1 })
     .skip(skip)
     .limit(Number(limit));

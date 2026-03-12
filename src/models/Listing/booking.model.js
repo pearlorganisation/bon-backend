@@ -148,6 +148,7 @@ const bookingSchema = new mongoose.Schema(
     invoiceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Invoice",
+      default:null,
     },
   },
   { timestamps: true }

@@ -115,7 +115,7 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       width: propertyWidth,
     });
     doc.text(
-      `GSTIN: ${booking.documentVerification?.GSTIN?.gstin || "N/A"}`,
+      `GSTIN: ${booking.propertyId?.documentVerification?.GSTIN?.gstin || "N/A"}`,
       50,
       doc.y + 2,
       { width: propertyWidth }
