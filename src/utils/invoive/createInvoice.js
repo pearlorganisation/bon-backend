@@ -79,5 +79,5 @@ export const createCustomerInvoice = async (bookingId) => {
     throw error;
   }
 };
-const id ='69b10b47429d8dfa3332865b';
+// const id ='69b10b47429d8dfa3332865b';
 //createCustomerInvoice(id);

@@ -27,5 +27,5 @@ if (process.env.ENABLE_CRON === true) {
   sub_admin_cron();
   expireInactivePendingBookingsCron();
   startPartnerPlanCron();
-  autoBookingSettlementCron()
+  autoBookingSettlementCron();
 }
