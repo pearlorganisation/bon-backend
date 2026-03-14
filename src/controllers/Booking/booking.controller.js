@@ -753,7 +753,22 @@ export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
   const bookingDoc = await Booking.findById(bookingId);
   bookingDoc.paymentMode = "PAY_ON_ARRIVAL";
   bookingDoc.status = "confirmed";
+
+  // Assign confirmation code ONLY once
+  if (!booking.confirmationCode) {
+    booking.confirmationCode = `BK-${booking._id
+      .toString()
+      .slice(-6)
+      .toUpperCase()}`;
+  }
   await bookingDoc.save();
+
+  if (!booking.invoiceId) {
+    createCustomerInvoice(booking._id).catch((error) =>
+      console.log("Invoice generation failed", error)
+    );
+  }
+
 
   successResponse(res, 200, "Mode applied on booking");
 });
