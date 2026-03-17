@@ -79,7 +79,7 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       enum: ["PAY_NOW", "PAY_ON_ARRIVAL"],
       required: true,   
-      default: "PAY_NOW",
+      default: null,
     },
     //paymwnt object only  for PAY_NOW
     payment: {

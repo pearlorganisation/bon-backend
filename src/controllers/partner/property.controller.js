@@ -13,7 +13,6 @@ import Auth from "../../models/auth/auth.model.js";
 import { isAdmin } from "../../middleware/auth/auth.middleware.js";
 import {
   getDatesBetween,
-  isRoomBlocked,
   normalizeDate,
 } from "../Booking/booking.controller.js";
 import RoomInventory from "../../models/Listing/roomInventory.model.js";
@@ -1056,8 +1055,6 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const propertyRoomMap = {};
 
   for (const room of roomsList) {
-    // ❌ Blocked dates check
-    if (isRoomBlocked(room, checkInDate, checkOutDate)) continue;
 
     let maxBooked = 0;
 
