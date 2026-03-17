@@ -5,7 +5,7 @@ import Auth from "../models/auth/auth.model.js";
 import Property from "../models/Listing/property.model.js";
 import Room from "../models/Listing/room.model.js";
 import RoomInventory from "../models/Listing/roomInventory.model.js";
-import {getDatesBetween,isRoomBlocked,normalizeDate} from "../controllers/Booking/booking.controller.js"
+import {getDatesBetween,normalizeDate} from "../controllers/Booking/booking.controller.js"
 
 import {
   deleteFileFromCloudinary,

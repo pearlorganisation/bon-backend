@@ -412,14 +412,14 @@ const roomSchema = new mongoose.Schema(
     //   },
     // ],
 
-    // Optional: blocked dates (maintenance, holidays)
-    blockedDates: [
-      {
-        startDate: Date,
-        endDate: Date,
-        reason: String,
-      },
-    ],
+    // // Optional: blocked dates (maintenance, holidays)
+    // blockedDates: [
+    //   {
+    //     startDate: Date,
+    //     endDate: Date,
+    //     reason: String,
+    //   },
+    // ],
   },
   { timestamps: true },
 );

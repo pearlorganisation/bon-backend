@@ -65,7 +65,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     amenities,
     bedType,
     bedCount,
-    blockedDates,
+    // blockedDates,
     dimensions,
     discount,
     bathroomType,
@@ -310,7 +310,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     amenities: parseArrayField(amenities).map((item) => item.trim()),
     bedType: bedType.toLowerCase(),
     bedCount: bedCount || 1,
-    blockedDates: blockedDates || [],
+    // blockedDates: blockedDates || [],
     dimensions,
     distanceToBathroom,
     discount: discount || 0,
@@ -411,7 +411,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     amenities,
     bedType,
     bedCount,
-    blockedDates,
+    // blockedDates,
     dimensions,
     bathroomType,
     bathroomCount,
@@ -664,7 +664,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     room.amenities = parseArrayField(amenities).map((a) => a.toLowerCase());
   if (bedType) room.bedType = bedType.toLowerCase();
   if (bedCount) room.bedCount = bedCount;
-  if (blockedDates) room.blockedDates = blockedDates;
+  // if (blockedDates) room.blockedDates = blockedDates;
   if (dimensions) room.dimensions = dimensions;
   if (bathroomType) room.bathroomType = bathroomType.toLowerCase();
   if (bathroomCount) room.bathroomCount = bathroomCount;
@@ -744,8 +744,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     types,
     pricePerNight,
     discount,
-    blockedDatesAdd,
-    blockedDatesRemove,
+    // blockedDatesAdd,
+    // blockedDatesRemove,
     amenitiesAdd,
     amenitiesRemove,
     capacity,
@@ -964,36 +964,36 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  if (blockedDatesAdd && Array.isArray(blockedDatesAdd)) {
-    await Room.updateMany(
-      { _id: { $in: roomIds } },
-      {
-        $addToSet: { blockedDates: { $each: blockedDatesAdd } },
-      },
-    );
-  }
+  // if (blockedDatesAdd && Array.isArray(blockedDatesAdd)) {
+  //   await Room.updateMany(
+  //     { _id: { $in: roomIds } },
+  //     {
+  //       $addToSet: { blockedDates: { $each: blockedDatesAdd } },
+  //     },
+  //   );
+  // }
 
-  if (blockedDatesRemove && Array.isArray(blockedDatesRemove)) {
-    await Room.updateMany(
-      { _id: { $in: roomIds } },
-      {
-        $pull: {
-          blockedDates: {
-            $or: blockedDatesRemove.map((d) => ({
-              startDate: d.startDate,
-              endDate: d.endDate,
-            })),
-          },
-        },
-      },
-    );
-  }
+  // if (blockedDatesRemove && Array.isArray(blockedDatesRemove)) {
+  //   await Room.updateMany(
+  //     { _id: { $in: roomIds } },
+  //     {
+  //       $pull: {
+  //         blockedDates: {
+  //           $or: blockedDatesRemove.map((d) => ({
+  //             startDate: d.startDate,
+  //             endDate: d.endDate,
+  //           })),
+  //         },
+  //       },
+  //     },
+  //   );
+  // }
 
   return successResponse(res, 200, "Bulk update successful", {
     updatedRooms: rooms.length,
     updatedFields: updateFields,
-    blockedDatesAdded: blockedDatesAdd || null,
-    blockedDatesRemoved: blockedDatesRemove || null,
+    // blockedDatesAdded: blockedDatesAdd || null,
+    // blockedDatesRemoved: blockedDatesRemove || null,
     amenitiesAdded: amenitiesAdd || null,
     amenitiesRemoved: amenitiesRemove || null,
     bathroomAmenitiesAdded: bathroomAmenitiesAdd || null,

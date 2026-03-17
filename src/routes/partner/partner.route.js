@@ -30,6 +30,9 @@ import {
   buyNewSubscriptionPlan,
   subscriptionWebhookController,
   getMyPlans,
+  blockRoom,
+  releaseBlock,
+  getPartnerRoomCalendar,
 } from "../../controllers/partner/parnter.controller.js";
 import {
   authorizeRoles,
@@ -152,5 +155,12 @@ router.delete("/delete-single-room/:roomId", protect, deleteRoom);
 //df
 
 router.get("/RoomDetails/:roomId", getRoomDetailsById);
+
+
+// manually block room
+
+router.post("/block-room", protect, blockRoom);
+router.post("/release-block/:id", protect, releaseBlock);
+router.get("/room-calendar", protect, getPartnerRoomCalendar);
 
 export default router;

@@ -38,16 +38,16 @@ export const getDatesBetween = (checkIn, checkOut) => {
   return dates;
 };
 
-export const isRoomBlocked = (room, checkIn, checkOut) => {
-  if (!room.blockedDates?.length) return false;
+// export const isRoomBlocked = (room, checkIn, checkOut) => {
+//   if (!room.blockedDates?.length) return false;
 
-  return room.blockedDates.some((block) => {
-    const blockStart = new Date(block.startDate);
-    const blockEnd = new Date(block.endDate);
+//   return room.blockedDates.some((block) => {
+//     const blockStart = new Date(block.startDate);
+//     const blockEnd = new Date(block.endDate);
 
-    return checkIn < blockEnd && checkOut > blockStart;
-  });
-};
+//     return checkIn < blockEnd && checkOut > blockStart;
+//   });
+// };
 
 // const isRoomAvailable = async ({
 //   roomId,
@@ -264,6 +264,13 @@ export const createBooking = asyncHandler(async (req, res, next) => {
           400,
         );
       }
+      // // ❌ Blocked date check
+      // if (isRoomBlocked(room, checkIn, checkOut)) {
+      //   throw new CustomError(
+      //     `Room ${room.name} is blocked for selected dates`,
+      //     400
+      //   );
+      // }
 
       //  Date-wise availability
       const inventories = await RoomInventory.find({
@@ -281,7 +288,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
         const key = normalizeDate(date).toISOString();
         const inv = inventoryMap.get(key);
         const booked = inv?.bookedRooms || 0;
-        const total = inv?.totalRooms || room.numberOfRooms;
+        const total = inv?.totalRooms;
 
         if (booked + item.quantity > total) {
           throw new CustomError(
@@ -444,7 +451,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       specialRequests,
     } = req.body;
 
-    // 1️⃣ Fetch booking
+    // 1️ Fetch booking
     const booking = await Booking.findOne({
       _id: bookingId,
       userId,
@@ -540,6 +547,12 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
           400,
         );
       }
+      // if (isRoomBlocked(room, checkIn, checkOut)) {
+      //   throw new CustomError(
+      //     `Room ${room.name} is blocked for selected dates`,
+      //     400
+      //   );
+      // }
 
       // Availability check
       const inventories = await RoomInventory.find({
@@ -753,7 +766,21 @@ export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
   const bookingDoc = await Booking.findById(bookingId);
   bookingDoc.paymentMode = "PAY_ON_ARRIVAL";
   bookingDoc.status = "confirmed";
+
+  // Assign confirmation code ONLY once
+  if (!booking.confirmationCode) {
+    booking.confirmationCode = `BK-${booking._id
+      .toString()
+      .slice(-6)
+      .toUpperCase()}`;
+  }
   await bookingDoc.save();
+
+  if (!booking.invoiceId) {
+    createCustomerInvoice(booking._id).catch((error) =>
+      console.log("Invoice generation failed", error),
+    );
+  }
 
   successResponse(res, 200, "Mode applied on booking");
 });
