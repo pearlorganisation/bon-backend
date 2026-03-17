@@ -257,13 +257,6 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       );
       if (!room) throw new CustomError("Room not found", 404);
 
-      // ❌ Blocked date check
-      if (isRoomBlocked(room, checkIn, checkOut)) {
-        throw new CustomError(
-          `Room ${room.name} is blocked for selected dates`,
-          400,
-        );
-      }
       // // ❌ Blocked date check
       // if (isRoomBlocked(room, checkIn, checkOut)) {
       //   throw new CustomError(
@@ -541,12 +534,6 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         throw new CustomError("Room not found", 404);
       }
 
-      if (isRoomBlocked(room, checkIn, checkOut)) {
-        throw new CustomError(
-          `Room ${room.name} is blocked for selected dates`,
-          400,
-        );
-      }
       // if (isRoomBlocked(room, checkIn, checkOut)) {
       //   throw new CustomError(
       //     `Room ${room.name} is blocked for selected dates`,
