@@ -10,6 +10,13 @@ import axios from "axios";
 import { configDotenv } from "dotenv";
 import Admin from "../../models/Admin/admin.model.js";
 import AdminSubscriptionPlan from "../../models/Admin/admin.subscription.model.js";
+import { normalizeDate,getDatesBetween } from "../Booking/booking.controller.js";
+import RoomModel from "../../models/Listing/room.model.js";
+import RoomInventoryModel from "../../models/Listing/roomInventory.model.js";
+import Booking from "../../models/Listing/booking.model.js";
+import ManualRoomBlock from "../../models/Listing/manualRoomBlock.model.js";
+import mongoose from "mongoose";
+
 configDotenv();
 
 //verify  partner
@@ -629,4 +636,312 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
   }).sort({ createdAt: 1 });
 
   successResponse(res, 200, "successfully fetched current plans", { plans });
+});
+
+
+//PARTNER
+//manully blocked room
+
+export const blockRoom = asyncHandler(async (req,res,next)=>{
+      
+   const partnerId = req.user._id;
+
+      let { propertyId, roomId, startDate, endDate, rooms, reason, notes } = req.body;
+
+      if(!propertyId  || !roomId){
+        throw new CustomError("propertyId and roomId are required",400);
+      }
+      if (!startDate || !endDate)
+        throw new CustomError("start date and end dates dates are required", 400);
+      
+       startDate =normalizeDate(startDate);
+       endDate =normalizeDate(endDate);
+
+      if (isNaN(startDate) || isNaN(endDate))
+        throw new CustomError("Invalid date format", 400);
+
+      if (endDate < startDate)
+        throw new CustomError(
+          "endDate date must be after startDate",
+          400
+        );
+        const reasonFeilds =["OFFLINE_BOOKING", "MAINTENANCE", "OWNER_BLOCK", "OTHER"];
+        if ( !reason  || !reasonFeilds.includes(reason)){
+              throw new CustomError(`reason is required and should be  ${reasonFeilds}`);
+        }
+
+          if (!rooms || rooms <= 0)
+            throw new CustomError(
+              " number of rooms are required and must be greater than 0 ",
+              400
+            );
+
+
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+        try {
+          const room = await RoomModel.findById(roomId).session(session);
+
+          if (!room) throw new CustomError("Room not found", 404);
+
+          const dates = getDatesBetween(startDate, endDate);
+
+          const inventories = await RoomInventoryModel.find({
+            roomId,
+            date: { $in: dates },
+          }).session(session);
+
+          const inventoryMap = new Map();
+
+          inventories.forEach((inv) => {
+            inventoryMap.set(new Date(inv.date).toISOString(), inv);
+          });
+
+          // Validate availability
+          for (const date of dates) {
+            const key = normalizeDate(date).toISOString();
+            const inv = inventoryMap.get(key);
+
+            const booked = inv?.bookedRooms || 0;
+            const total = inv?.totalRooms || room.numberOfRooms;
+
+            if (booked + rooms > total) {
+              throw new CustomError(
+                `Not enough rooms to block on ${key.slice(0, 10)}`,
+                400
+              );
+            }
+          }
+
+          // Update inventory
+          for (const date of dates) {
+            await RoomInventoryModel.findOneAndUpdate(
+              { roomId, date },
+              {
+                $setOnInsert: {
+                  propertyId,
+                  roomId,
+                  date,
+                  totalRooms: room.numberOfRooms,
+                },
+                $inc: { bookedRooms: rooms },
+              },
+              { upsert: true, session }
+            );
+          }
+
+          const block = await ManualRoomBlock.create(
+            [
+              {
+                propertyId,
+                roomId,
+                partnerId,
+                startDate,
+                endDate,
+                rooms,
+                reason,
+                notes,
+              },
+            ],
+            { session }
+          );
+
+          await session.commitTransaction();
+          session.endSession();
+
+          successResponse(res, 201, "Rooms blocked successfully", block[0]);
+        } catch (err) {
+          await session.abortTransaction();
+          session.endSession();
+          throw err;
+        }
+
+});
+
+export const releaseBlock = asyncHandler(async (req, res) => {
+
+  const { id } = req.params;
+  const partnerId =req.user._id;
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+
+    const block = await ManualRoomBlock.findOne({_id:id,partnerId}).session(session);
+
+    if (!block) throw new CustomError("manually block  room data  not found", 404);
+    if (block.released) throw new CustomError("Block already released", 400);
+     
+    const dates = getDatesBetween(block.startDate, block.endDate);
+
+    for (const date of dates) {
+
+     const inv = await RoomInventoryModel.findOne({
+       roomId: block.roomId,
+       date,
+     }).session(session);
+
+     if (!inv || inv.bookedRooms < block.rooms) {
+       throw new CustomError("Inventory mismatch while releasing block", 400);
+     }
+
+     await RoomInventoryModel.findOneAndUpdate(
+       { roomId: block.roomId, date },
+       { $inc: { bookedRooms: -block.rooms } },
+       { session }
+     );
+
+    }
+
+    block.released = true;
+    block.releasedAt = new Date();
+    block.releasedBy = partnerId;
+
+    await block.save({ session });
+
+    await session.commitTransaction();
+    session.endSession();
+
+    successResponse(res, 200, "Block released successfully", block);
+
+  } catch (err) {
+
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+
+  }
+
+});
+
+export const getPartnerRoomCalendar = asyncHandler(async (req, res) => {
+  const { propertyId, startDate, endDate } = req.query;
+   const partnerId =req.user._id;
+
+  if (!propertyId) throw new CustomError("propertyId is required", 400);
+
+  const property= await Property.findOne({_id:propertyId ,partnerId});
+
+  if(!property)throw new CustomError("property not found", 400);
+
+  if (!startDate || !endDate)
+    throw new CustomError("startDate and endDate are required", 400);
+
+  const start = normalizeDate(startDate);
+  const end = normalizeDate(endDate);
+
+  if (isNaN(start) || isNaN(end))
+    throw new CustomError("Invalid date format", 400);
+
+  if (end < start)
+    throw new CustomError("endDate must be after startDate", 400);
+
+  const dates = getDatesBetween(start, end);
+
+  const rooms = await RoomModel.find({ propertyId });
+
+  const roomIds = rooms.map((r) => r._id);
+
+  const inventories = await RoomInventoryModel.find({
+    roomId: { $in: roomIds },
+    date: { $in: dates },
+  });
+
+  const bookings = await Booking.find({
+    "rooms.roomId": { $in: roomIds },
+    checkInDate: { $lte: end },
+    checkOutDate: { $gte: start },
+  });
+
+  const manualBlocks = await ManualRoomBlock.find({
+    partnerId,
+    roomId: { $in: roomIds },
+    released: false,
+    startDate: { $lte: end },
+    endDate: { $gte: start },
+  });
+
+  const inventoryMap = new Map();
+
+  inventories.forEach((inv) => {
+    const key = `${inv.roomId}_${normalizeDate(inv.date).toISOString()}`;
+    inventoryMap.set(key, inv);
+  });
+
+  const result = [];
+
+  for (const room of rooms) {
+    const roomDates = [];
+
+    for (const date of dates) {
+      const normalized = normalizeDate(date);
+      const key = `${room._id}_${normalized.toISOString()}`;
+
+      const inv = inventoryMap.get(key);
+
+      const bookedRooms = inv?.bookedRooms || 0;
+      const totalRooms = inv?.totalRooms || room.numberOfRooms;
+
+      const dateBookings = [];
+
+      bookings.forEach((b) => {
+        const roomItem = b.rooms.find(
+          (r) => r.roomId.toString() === room._id.toString()
+        );
+
+        if (!roomItem) return;
+
+        if (
+          normalized >= normalizeDate(b.checkInDate) &&
+          normalized <= normalizeDate(b.checkOutDate)
+        ) {
+          dateBookings.push({
+            bookingId: b._id,
+            checkInDate: b.checkInDate,
+            checkOutDate: b.checkOutDate,
+            rooms: roomItem.quantity,
+            status: b.status,
+          });
+        }
+      });
+
+      const dateBlocks = [];
+
+      manualBlocks.forEach((block) => {
+        if (block.roomId.toString() !== room._id.toString()) return;
+
+        if (
+          normalized >= normalizeDate(block.startDate) &&
+          normalized <= normalizeDate(block.endDate)
+        ) {
+          dateBlocks.push({
+            blockId: block._id,
+            startDate: block.startDate,
+            endDate: block.endDate,
+            rooms: block.rooms,
+            reason: block.reason,
+          });
+        }
+      });
+
+      roomDates.push({
+        date: normalized,
+        bookedRooms,
+        availableRooms: totalRooms - bookedRooms,
+        bookings: dateBookings,
+        manualBlocks: dateBlocks,
+      });
+    }
+
+    result.push({
+      roomId: room._id,
+      roomName: room.name,
+      totalRooms: room.numberOfRooms,
+      dates: roomDates,
+    });
+  }
+
+  successResponse(res, 200, "Room calendar fetched", result);
 });

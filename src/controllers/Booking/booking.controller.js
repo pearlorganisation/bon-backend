@@ -38,16 +38,16 @@ export const getDatesBetween = (checkIn, checkOut) => {
   return dates;
 };
 
-export const isRoomBlocked = (room, checkIn, checkOut) => {
-  if (!room.blockedDates?.length) return false;
+// export const isRoomBlocked = (room, checkIn, checkOut) => {
+//   if (!room.blockedDates?.length) return false;
 
-  return room.blockedDates.some((block) => {
-    const blockStart = new Date(block.startDate);
-    const blockEnd = new Date(block.endDate);
+//   return room.blockedDates.some((block) => {
+//     const blockStart = new Date(block.startDate);
+//     const blockEnd = new Date(block.endDate);
 
-    return checkIn < blockEnd && checkOut > blockStart;
-  });
-};
+//     return checkIn < blockEnd && checkOut > blockStart;
+//   });
+// };
 
 // const isRoomAvailable = async ({
 //   roomId,
@@ -257,13 +257,13 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       );
       if (!room) throw new CustomError("Room not found", 404);
 
-      // ❌ Blocked date check
-      if (isRoomBlocked(room, checkIn, checkOut)) {
-        throw new CustomError(
-          `Room ${room.name} is blocked for selected dates`,
-          400
-        );
-      }
+      // // ❌ Blocked date check
+      // if (isRoomBlocked(room, checkIn, checkOut)) {
+      //   throw new CustomError(
+      //     `Room ${room.name} is blocked for selected dates`,
+      //     400
+      //   );
+      // }
 
       //  Date-wise availability
       const inventories = await RoomInventory.find({
@@ -281,7 +281,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
         const key = normalizeDate(date).toISOString();
         const inv = inventoryMap.get(key);
         const booked = inv?.bookedRooms || 0;
-        const total = inv?.totalRooms || room.numberOfRooms;
+        const total = inv?.totalRooms 
 
         if (booked + item.quantity > total) {
           throw new CustomError(
@@ -293,6 +293,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
       // 🔐 Reserve inventory
       for (const date of dates) {
+
         const updated = await RoomInventory.findOneAndUpdate(
           { roomId: item.roomId, date },
           {
@@ -444,7 +445,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       specialRequests,
     } = req.body;
 
-    // 1️⃣ Fetch booking
+    // 1️ Fetch booking
     const booking = await Booking.findOne({
       _id: bookingId,
       userId,
@@ -534,12 +535,12 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         throw new CustomError("Room not found", 404);
       }
 
-      if (isRoomBlocked(room, checkIn, checkOut)) {
-        throw new CustomError(
-          `Room ${room.name} is blocked for selected dates`,
-          400
-        );
-      }
+      // if (isRoomBlocked(room, checkIn, checkOut)) {
+      //   throw new CustomError(
+      //     `Room ${room.name} is blocked for selected dates`,
+      //     400
+      //   );
+      // }
 
       // Availability check
       const inventories = await RoomInventory.find({
@@ -1759,6 +1760,7 @@ export const releaseInventory = async (booking) => {
     throw error;
   }
 };
+
 
 
 //Invoice  controllers
