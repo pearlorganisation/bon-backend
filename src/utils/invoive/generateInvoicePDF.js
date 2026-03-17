@@ -54,17 +54,17 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
     });
 
     // --- 1. HEADER & LOGO ---
-   const normalizeDate = (date) => {
+    const normalizeDate = (date) => {
       const d = new Date(date);
       d.setUTCHours(0, 0, 0, 0);
       return d;
     };
 
-     const nights = Math.ceil(
-      ( normalizeDate(booking.checkOutDate) -
-         normalizeDate(booking.checkInDate)) /
-         (1000 * 60 * 60 * 24)
-     );
+    const nights = Math.ceil(
+      (normalizeDate(booking.checkOutDate) -
+        normalizeDate(booking.checkInDate)) /
+        (1000 * 60 * 60 * 24)
+    );
     const logoPath = path.join(process.cwd(), "public", "bonfire_logo.jpeg");
     if (fs.existsSync(logoPath)) {
       doc.image(logoPath, 50, 45, { width: 80 });
@@ -98,6 +98,15 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       width: metaWidth,
       align: "right",
     });
+    doc.text(
+      `Payment Mode: ${booking.paymentMode.replace("_", " ")}`,
+      metaX,
+      125,
+      {
+        width: metaWidth,
+        align: "right",
+      }
+    );
 
     // Property Address (Top Left)
     doc.moveDown(1);
@@ -111,11 +120,13 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         width: propertyWidth,
       });
     doc.fontSize(9).font("Helvetica").fillColor("#444444");
-    doc.text("123, Luxury Lane, Goa, India", 50, doc.y + 2, {
+    doc.text(booking.propertyId.address || "N/A", 50, doc.y + 2, {
       width: propertyWidth,
     });
     doc.text(
-      `GSTIN: ${booking.propertyId?.documentVerification?.GSTIN?.gstin || "N/A"}`,
+      `GSTIN: ${
+        booking.propertyId?.documentVerification?.GSTIN?.gstin || "N/A"
+      }`,
       50,
       doc.y + 2,
       { width: propertyWidth }
@@ -248,12 +259,14 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         width: colDiscW,
         align: "right",
       });
-      console.log("nights",nights);
+      console.log("nights", nights);
       console.log(
         (room.pricePerNight - room.discount) * room.quantity * nights
       );
       doc.text(
-        formatCurrency((room.pricePerNight - room.discount)* room.quantity * nights),
+        formatCurrency(
+          (room.pricePerNight - room.discount) * room.quantity * nights
+        ),
         colTotalX,
         rowY,
         { width: colTotalW, align: "right" }
@@ -354,7 +367,12 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
     const totalY = rowY + 80;
     doc.rect(breakdownX, totalY, breakdownW, 30).fill("#000000");
     doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(12);
-    doc.text("TOTAL PAID", breakdownX + 10, totalY + 9, { width: 100 });
+    doc.text(
+      booking.paymentStatus === "paid" ? "TOTAL PAID" : "PAYMENT DUE",
+      breakdownX + 10,
+      totalY + 9,
+      { width: 100 }
+    );
     doc.text(formatCurrency(booking.totalPrice), breakdownX + 110, totalY + 9, {
       width: 80,
       align: "right",
@@ -362,19 +380,33 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
 
     // --- 5. PAYMENT DETAILS ---
     const paymentY = totalY + 60;
+
     doc
       .fillColor("#000000")
       .fontSize(10)
       .font("Helvetica-Bold")
       .text("PAYMENT INFORMATION", 50, paymentY);
+
     doc.fontSize(9).font("Helvetica").fillColor("#666666");
-    doc.text(`Method: ${booking.payment.paymentMethod}`, 50, paymentY + 15);
-    doc.text(
-      `Transaction ID: ${booking.payment.razorpayPaymentId}`,
-      50,
-      paymentY + 28
-    );
-    doc.text(`Currency: ${booking.payment.currency}`, 50, paymentY + 40);
+
+    if (booking.paymentStatus === "paid" && booking.paymentMode === "PAY_NOW") {
+      doc.text(`Status: PAID`, 50, paymentY + 15);
+      doc.text(`Method: ${booking.payment.paymentMethod}`, 50, paymentY + 28);
+      doc.text(
+        `Transaction ID: ${booking.payment.razorpayPaymentId}`,
+        50,
+        paymentY + 41
+      );
+      doc.text(`Currency: ${booking.payment.currency}`, 50, paymentY + 54);
+    } else if (booking.paymentMode === "PAY_ON_ARRIVAL" ) {
+      doc.text(`Status: PAYMENT DUE`, 50, paymentY + 15);
+      doc.text(
+        `Please complete the payment during check-in at the property.`,
+        50,
+        paymentY + 41,
+        { width: 400 }
+      );
+    }
 
     // --- 6. FOOTER ---
     const footerY = 760;

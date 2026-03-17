@@ -55,7 +55,7 @@ export const createCustomerInvoice = async (bookingId) => {
     const invoiceNumber = await generateInvoiceNumber();
 
     const booking = await Booking.findById(bookingId)
-      .populate("propertyId", "name documentVerification")
+      .populate("propertyId", "name address documentVerification")
       .populate("rooms.roomId", "name");
 
     if (!booking) {
