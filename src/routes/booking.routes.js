@@ -19,25 +19,25 @@ router.post(
   "/update/:bookingId",
   protect,
   authorizeRoles("CUSTOMER"),
-  updateBooking
+  updateBooking,
 );
 router.post(
-  "/pay-on-arrival",
+  "/pay-on-arrival/:bookingId",
   protect,
   authorizeRoles("CUSTOMER"),
-  selectPayOnArrivalMode
+  selectPayOnArrivalMode,
 );
 router.post(
   "/create-order/:bookingId",
   protect,
   authorizeRoles("CUSTOMER"),
-  createRazorpayOrder
+  createRazorpayOrder,
 );
 router.post(
   "/cancel/:bookingId",
   protect,
   authorizeRoles("CUSTOMER", "PARTNER"),
-  cancelBooking
+  cancelBooking,
 );
 //df
 router.get("/my-bookings", protect, authorizeRoles("CUSTOMER"), getMyBooking);
