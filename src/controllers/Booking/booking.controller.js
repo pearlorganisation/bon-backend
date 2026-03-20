@@ -1237,7 +1237,7 @@ export const deleteBooking = asyncHandler(async (req, res, next) => {
     next(err);
   }
 });
-
+//customer
 export const getMyBooking = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
 
@@ -1437,7 +1437,7 @@ export const updateGuestBookingStatus = asyncHandler(async (req, res, next) => {
   }
 
   /* ---------------- FETCH BOOKING WITH PROPERTY ---------------- */
-
+     
   const result = await Booking.aggregate([
     {
       $match: {
@@ -1560,8 +1560,8 @@ export const splitMoney = async (booking, partnerId) => {
     if (partnerPlan.PlanType === "COMMISSION") {
       adminAmount = (partnerPlan.commissionPercentage * baseAmount) / 100;
 
-      const { gstAmount } = getGST(adminAmount);
-      adminGST = gstAmount;
+      const ADMIN_GST_RATE = 18;
+      adminGST = (adminAmount * ADMIN_GST_RATE) / 100;
 
       partnerAmount = baseAmount - adminAmount - adminGST;
     } else {
@@ -1665,8 +1665,8 @@ export const splitCancellationMoney = async (booking, retainedAmount) => {
     if (partnerPlan.PlanType === "COMMISSION") {
       adminAmount = (partnerPlan.commissionPercentage * retainedBase) / 100;
 
-      const { gstAmount } = getGST(adminAmount);
-      adminGST = gstAmount;
+      const ADMIN_GST_RATE = 18;
+      adminGST = (adminAmount * ADMIN_GST_RATE) / 100;
 
       partnerAmount = retainedBase - adminAmount - adminGST;
     } else {
@@ -1756,4 +1756,4 @@ export const releaseInventory = async (booking) => {
   }
 };
 
-//Invoice  controllers
+

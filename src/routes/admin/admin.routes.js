@@ -20,6 +20,9 @@ import {
   updateSubscriptionPlan,
   upsertCommissionRange,
   getPlatformPlans,
+  releasePartnerMonthlyPayout,
+  getPartnerMonthlyPayouts,
+  getAdminMonthlyFinance,
 } from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
@@ -80,4 +83,22 @@ route.get(
   authorizeRoles("ADMIN"),
   getPropertyDetailsById
 );
+
+route.post(
+  "/release-partner-payout",
+  authorizeRoles("ADMIN"),
+  releasePartnerMonthlyPayout
+);
+
+route.get(
+  "/get-partner-monthly-payout",
+  authorizeRoles("ADMIN"),
+  getPartnerMonthlyPayouts
+);
+route.get(
+  "/get-admin-monthly-finance",
+  authorizeRoles("ADMIN"),
+  getAdminMonthlyFinance
+);
+
 export default route;

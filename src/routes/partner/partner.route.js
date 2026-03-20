@@ -6,7 +6,6 @@ import {
   getPartnerPropertyByID,
   getAllProperties,
   changePropertyStatus,
-  getPropertyDetailsById,
   requestPropertyApproval,
   getAllPropertyTypes,
   getPropertyTypeWithProperties,
@@ -28,7 +27,6 @@ import {
   createPartnerFundAccount,
   buyNewCommissionPlan,
   buyNewSubscriptionPlan,
-  subscriptionWebhookController,
   getMyPlans,
   blockRoom,
   releaseBlock,
@@ -152,7 +150,6 @@ router.get(
 );
 router.delete("/delete-rooms", protect, deleteRoomsByTypes);
 router.delete("/delete-single-room/:roomId", protect, deleteRoom);
-//df
 
 router.get("/RoomDetails/:roomId", getRoomDetailsById);
 
@@ -162,5 +159,8 @@ router.get("/RoomDetails/:roomId", getRoomDetailsById);
 router.post("/block-room", protect, blockRoom);
 router.post("/release-block/:id", protect, releaseBlock);
 router.get("/room-calendar", protect, getPartnerRoomCalendar);
+
+
+
 
 export default router;
