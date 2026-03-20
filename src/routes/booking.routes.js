@@ -7,6 +7,7 @@ import {
   selectPayOnArrivalMode,
   getMyBooking,
   getBooking,
+  updateGuestBookingStatus,
 } from "../controllers/Booking/booking.controller.js";
 
 // Middleware to check authentication and roles (Placeholder names)df
@@ -22,7 +23,7 @@ router.post(
   updateBooking
 );
 router.post(
-  "/pay-on-arrival",
+  "/pay-on-arrival/:bookingId",
   protect,
   authorizeRoles("CUSTOMER"),
   selectPayOnArrivalMode
@@ -43,5 +44,7 @@ router.post(
 router.get("/my-bookings", protect, authorizeRoles("CUSTOMER"), getMyBooking);
 
 router.get("/", protect, authorizeRoles("ADMIN", "PARTNER"), getBooking);
+
+router.post("/update-booking-status", protect,authorizeRoles("PARTNER"), updateGuestBookingStatus);
 
 export default router;

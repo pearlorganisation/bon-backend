@@ -59,7 +59,7 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
       // admin_gst_amount: { type: Number, default: 0 },
       status: {
         type: String,
-        enum: ["pending", "received", "failed"],
+        enum: ["pending", "received"],
         default: "pending",
       },
     },

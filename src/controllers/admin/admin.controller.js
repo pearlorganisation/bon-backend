@@ -8,6 +8,7 @@ import AdminSubscriptionPlan from "../../models/Admin/admin.subscription.model.j
 import { configDotenv } from "dotenv";
 import { razorpay } from "../../config/razorpayConfig.js";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
+import Booking from "../../models/Listing/booking.model.js";
 
 configDotenv();
 
@@ -219,7 +220,7 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
 
 export const releasePartnerMonthlyPayout = asyncHandler(
   async (req, res, next) => {
-    const { partnerId ,date } = req.params;
+    const { partnerId, date } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(partnerId)) {
       return next(new CustomError("Invalid partnerId", 400));
@@ -227,9 +228,9 @@ export const releasePartnerMonthlyPayout = asyncHandler(
 
     /* ---------- GET PREVIOUS MONTH ---------- */
     const dateObj = new Date(date);
-     if (isNaN(dateObj)) {
-       return next(new CustomError("Invalid date format", 400));
-     }
+    if (isNaN(dateObj)) {
+      return next(new CustomError("Invalid date format", 400));
+    }
     // const prevMonthDate = new Date(now.getFullYear(), now.getMonth() - 1);
     const payoutMonth = prevMonthDate.getMonth() + 1;
     const payoutYear = prevMonthDate.getFullYear();
@@ -482,3 +483,315 @@ export const getPartnerMonthlyPayouts = asyncHandler(async (req, res, next) => {
     partnersMonthlyPayouts
   );
 });
+
+export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
+  const date = req.query.date;
+
+  let dateObj;
+
+  if (date) {
+    dateObj = new Date(date);
+    if (isNaN(dateObj)) {
+      return next(new CustomError("Invalid date format", 400));
+    }
+  } else {
+    dateObj = new Date();
+  }
+
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+
+  const result = await PartnerMonthlyPayoutModel.aggregate([
+    {
+      $match: {
+        payoutMonth: month,
+        payoutYear: year,
+      },
+    },
+
+    {
+      $facet: {
+        /* -----------------------------------
+           1. BOOKING STATS (GST + AMOUNT)
+        ----------------------------------- */
+        bookingStats: [
+          { $unwind: "$bookings" },
+          {
+            $group: {
+              _id: null,
+              totalAdminGST: { $sum: "$bookings.admin_gst" },
+              totalAdminAmount: { $sum: "$bookings.adminAmount" },
+              totalBookings: { $sum: 1 },
+            },
+          },
+        ],
+
+        /* -----------------------------------
+           2. PARTNER PAYOUT SUMMARY
+        ----------------------------------- */
+        partnerPayout: [
+          {
+            $group: {
+              _id: null,
+              totalPaid: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$partnerWallet.status", "paid"] },
+                    "$partnerWallet.payableAmount",
+                    0,
+                  ],
+                },
+              },
+              totalPending: {
+                $sum: {
+                  $cond: [
+                    { $ne: ["$partnerWallet.status", "paid"] },
+                    "$partnerWallet.payableAmount",
+                    0,
+                  ],
+                },
+              },
+            },
+          },
+        ],
+
+        /* -----------------------------------
+           3. ADMIN GROSS PROFIT
+        ----------------------------------- */
+        adminProfit: [
+          { $unwind: "$bookings" },
+
+          {
+            $group: {
+              _id: "$_id", // per payout document
+              adminAmount: { $sum: "$bookings.adminAmount" },
+              adminGST: { $sum: "$bookings.admin_gst" },
+              receivable: { $first: "$adminWallet.receivableAmount" },
+              status: { $first: "$adminWallet.status" },
+            },
+          },
+
+          {
+            $project: {
+              total: {
+                $subtract: [
+                  {
+                    $add: ["$adminAmount", "$adminGST"],
+                  },
+                  {
+                    $cond: [{ $eq: ["$status", "pending"] }, "$receivable", 0],
+                  },
+                ],
+              },
+            },
+          },
+
+          {
+            $group: {
+              _id: null,
+              grossProfit: { $sum: "$total" },
+            },
+          },
+        ],
+        /* -----------------------------------
+           4. total monthly revenue 
+        ----------------------------------- */
+        totalRevenue: [
+          { $unwind: "$bookings" },
+          {
+            $group: {
+              _id: null,
+              totalRevenue: {
+                $sum: {
+                  $add: [
+                    "$bookings.partnerAmount",
+                    "$bookings.partner_gst",
+                    "$bookings.adminAmount",
+                    "$bookings.admin_gst",
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  // Safely extract results
+  const bookingStats = result[0]?.bookingStats[0] || {};
+  const partnerPayout = result[0]?.partnerPayout[0] || {};
+  const adminProfit = result[0]?.adminProfit[0] || {};
+  const totalRevenue = result[0]?.totalRevenue[0] || {};
+
+  const data = {
+    /* Booking */
+    totalRevenue: totalRevenue.totalRevenue || 0,
+
+    totalAdminGST: bookingStats.totalAdminGST || 0,
+    // totalAdminAmount: bookingStats.totalAdminAmount || 0,
+    totalBookings: bookingStats.totalBookings || 0,
+
+    /* Partner */
+    partnerPaidAmount: partnerPayout.totalPaid || 0,
+    partnerPendingAmount: partnerPayout.totalPending || 0,
+
+    /* Admin */
+    adminGrossProfit: adminProfit.grossProfit || 0,
+  };
+
+  return successResponse(res, 200, `Finance report for ${month}/${year}`, data);
+});
+
+export const getWeeklySalesFromBookings = asyncHandler(
+  async (req, res, next) => {
+    const date = req.query.date;
+
+    let dateObj = date ? new Date(date) : new Date();
+
+    if (isNaN(dateObj)) {
+      return next(new CustomError("Invalid date format", 400));
+    }
+
+    const month = dateObj.getMonth() + 1;
+    const year = dateObj.getFullYear();
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 1);
+
+    const result = await Booking.aggregate([
+      {
+        $match: {
+          status: "confirmed",
+          createdAt: {
+            $gte: startDate,
+            $lt: endDate,
+          },
+        },
+      },
+
+      {
+        $group: {
+          _id: {
+            dayOfWeek: { $dayOfWeek: "$createdAt" },
+          },
+          totalRevenue: { $sum: "$totalPrice" },
+          totalBookings: { $sum: 1 },
+        },
+      },
+
+      {
+        $project: {
+          _id: 0,
+          dayOfWeek: "$_id.dayOfWeek",
+          totalRevenue: 1,
+          totalBookings: 1,
+        },
+      },
+    ]);
+
+    /* ---------- FORMAT MON → SUN ---------- */
+
+    const daysMap = {
+      1: "Sun",
+      2: "Mon",
+      3: "Tue",
+      4: "Wed",
+      5: "Thu",
+      6: "Fri",
+      7: "Sat",
+    };
+
+    const orderedDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+    const formatted = orderedDays.map((day) => {
+      const found = result.find((r) => daysMap[r.dayOfWeek] === day);
+
+      return {
+        day,
+        totalRevenue: found ? found.totalRevenue : 0,
+        totalBookings: found ? found.totalBookings : 0,
+      };
+    });
+
+    return successResponse(
+      res,
+      200,
+      `Weekly sales (GMV) for ${month}/${year}`,
+      formatted
+    );
+  }
+);
+
+export const getTopPerformerHotels = asyncHandler(async (req, res, next) => {
+  const date = req.query.date;
+
+  let dateObj = date ? new Date(date) : new Date();
+
+  if (isNaN(dateObj)) {
+    return next(new CustomError("Invalid date format", 400));
+  }
+
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+
+  const result = await Booking.aggregate([
+    {
+      $match: {
+        status: "confirmed",
+        createdAt: {
+          $gte: startDate,
+          $lt: endDate,
+        },
+      },
+    },
+
+    /* ---------- JOIN PROPERTY ---------- */
+    {
+      $lookup: {
+        from: "properties",
+        localField: "propertyId",
+        foreignField: "_id",
+        as: "property",
+      },
+    },
+    { $unwind: "$property" },
+
+    /* ---------- GROUP BY PROPERTY ---------- */
+    {
+      $group: {
+        _id: "$property._id",
+
+        propertyName: { $first: "$property.name" },
+        city: { $first: "$property.city" },
+        state: { $first: "$property.state" },
+        country: { $first: "$property.country" },
+
+        totalRevenue: { $sum: "$totalPrice" },
+        totalBookings: { $sum: 1 },
+      },
+    },
+
+    /* ---------- SORT ---------- */
+    {
+      $sort: { totalRevenue: -1 },
+    },
+
+    /* ---------- LIMIT (TOP 5) ---------- */
+    {
+      $limit: 5,
+    },
+  ]);
+
+  return successResponse(
+    res,
+    200,
+    `Top performing hotels for ${month}/${year}`,
+    result
+  );
+});
+
+
