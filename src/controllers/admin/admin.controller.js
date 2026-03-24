@@ -286,7 +286,7 @@ export const releasePartnerMonthlyPayout = asyncHandler(
     payout.partnerWallet.razorpayPayoutId = payoutResponse.id;
     payout.partnerWallet.razorpayStatus = razorpayStatus;
     payout.partnerWallet.razorpayStatusDetail =
-      payoutResponse?.status_details?.description || "Payout failed";
+      payoutResponse?.status_details?.description;
 
     if (razorpayStatus === "failed") {
       payout.partnerWallet.status = "failed";
@@ -398,6 +398,73 @@ export const razorpayPayoutWebhook = async (req, res) => {
     return res.status(500).json({ message: "Webhook error" });
   }
 };
+
+export const confirmAdminMonthlyPayout = asyncHandler(
+  async (req, res, next) => {
+    const { date, partnerId } = req.query;
+
+    if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+      return next(new CustomError("Invalid partnerId", 400));
+    }
+
+    let dateObj = date ? new Date(date) : new Date();
+
+    if (isNaN(dateObj)) {
+      return next(new CustomError("Invalid date format", 400));
+    }
+
+    const payoutMonth = dateObj.getMonth() + 1;
+    const payoutYear = dateObj.getFullYear();
+
+    const monthlyPayout = await PartnerMonthlyPayoutModel.findOne({
+      partnerId,
+      payoutMonth,
+      payoutYear,
+    });
+
+    if (!monthlyPayout) {
+      return next(
+        new CustomError(
+          `No record found for ${payoutMonth}, ${payoutYear}`,
+          404
+        )
+      );
+    }
+
+    if (!monthlyPayout.adminWallet) {
+      return next(new CustomError("Admin wallet not found", 400));
+    }
+
+    if (monthlyPayout.adminWallet.receivableAmount <= 0) {
+      return next(
+        new CustomError(
+          `For ${payoutMonth}/${payoutYear}, receivable amount is ${monthlyPayout.adminWallet.receivableAmount}`,
+          400
+        )
+      );
+    }
+
+    if (monthlyPayout.adminWallet.status === "received") {
+      return next(
+        new CustomError(
+          `For ${payoutMonth}/${payoutYear}, amount already received`,
+          400
+        )
+      );
+    }
+
+    monthlyPayout.adminWallet.status = "received";
+    await monthlyPayout.save();
+
+    return successResponse(
+      res,
+      200,
+      "Admin wallet status updated successfully"
+    );
+  }
+);
+
+// admin  Payment & Finance dashborad  controllers
 
 export const getPartnerMonthlyPayouts = asyncHandler(async (req, res, next) => {
   const date = req.query.date;
@@ -779,11 +846,6 @@ export const getTopPerformerHotels = asyncHandler(async (req, res, next) => {
     {
       $sort: { totalRevenue: -1 },
     },
-
-    /* ---------- LIMIT (TOP 5) ---------- */
-    {
-      $limit: 5,
-    },
   ]);
 
   return successResponse(
@@ -794,4 +856,136 @@ export const getTopPerformerHotels = asyncHandler(async (req, res, next) => {
   );
 });
 
+export const getMonthlyRefundsData = asyncHandler(async (req, res, next) => {
+  const date = req.query.date;
 
+  let dateObj = date ? new Date(date) : new Date();
+
+  if (isNaN(dateObj)) {
+    throw new CustomError("Invalid date format", 400);
+  }
+
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+
+  const result = await Booking.aggregate([
+    /* ---------- FILTER BOOKINGS ---------- */
+    {
+      $match: {
+        status: "cancelled",
+        paymentStatus: {
+          $in: ["refund_pending", "refunded", "refund_failed"],
+        },
+        createdAt: {
+          $gte: startDate,
+          $lt: endDate,
+        },
+      },
+    },
+    {
+      $lookup: {
+        from: "auths", //  collection name (check in DB, usually lowercase plural)
+        localField: "userId",
+        foreignField: "_id",
+        as: "Customer",
+      },
+    },
+    {
+      $unwind: {
+        path: "$Customer",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    /* ---------- LOOKUP USER (cancelledBy) ---------- */
+    {
+      $lookup: {
+        from: "auths", //  collection name (check in DB, usually lowercase plural)
+        localField: "cancellation.cancelledBy",
+        foreignField: "_id",
+        as: "cancelledByUser",
+      },
+    },
+
+    /* ---------- UNWIND ---------- */
+    {
+      $unwind: {
+        path: "$cancelledByUser",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+
+    /* ---------- PROJECT REQUIRED DATA ---------- */
+    {
+      $project: {
+        _id: 1,
+        Customer: {
+          _id: "$Customer._id",
+          name: "$Customer.name",
+        },
+        propertyId: 1,
+        checkInDate: 1,
+        checkOutDate: 1,
+        totalPrice: 1,
+        paymentStatus: 1,
+        paymentMode: 1,
+        "cancellation.cancellationDate": 1,
+        "cancellation.refundAmount": 1,
+        "cancellation.reason": 1,
+
+        cancelledBy: {
+          _id: "$cancelledByUser._id",
+          name: "$cancelledByUser.name", // adjust field
+          role: "$cancelledByUser.role",
+        },
+      },
+    },
+
+    /* ---------- GROUP (TOTAL REFUND ONLY FOR refunded) ---------- */
+    {
+      $group: {
+        _id: null,
+        bookings: { $push: "$$ROOT" },
+
+        totalRefundAmount: {
+          $sum: {
+            $cond: [
+              { $eq: ["$paymentStatus", "refunded"] },
+              "$cancellation.refundAmount",
+              0,
+            ],
+          },
+        },
+
+        // totalRefundedBookings: {
+        //   $sum: {
+        //     $cond: [{ $eq: ["$paymentStatus", "refunded"] }, 1, 0],
+        //   },
+        // },
+      },
+    },
+
+    /* ---------- CLEAN RESPONSE ---------- */
+    {
+      $project: {
+        _id: 0,
+        bookings: 1,
+        totalRefundAmount: 1,
+      },
+    },
+  ]);
+
+  return successResponse(
+    res,
+    200,
+    "Monthly refund data fetched",
+    result[0] || {
+      bookings: [],
+      totalRefundAmount: 0,
+     
+    }
+  );
+});

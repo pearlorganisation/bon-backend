@@ -23,6 +23,10 @@ import {
   releasePartnerMonthlyPayout,
   getPartnerMonthlyPayouts,
   getAdminMonthlyFinance,
+  confirmAdminMonthlyPayout,
+  getWeeklySalesFromBookings,
+  getTopPerformerHotels,
+  getMonthlyRefundsData,
 } from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
@@ -56,7 +60,14 @@ route.patch(
 );
 
 route.get("/get-all-partners", authorizeRoles("ADMIN"), getAllPartners);
+route.get(
+  "/get-property-by-id/:propertyId",
+  authorizeRoles("ADMIN"),
+  getPropertyDetailsById
+);
 
+
+// plan and subscription
 route.get(
   "/get-patform-plans",
   authorizeRoles("ADMIN", "PARTNER"),
@@ -78,18 +89,22 @@ route.put(
  updateSubscriptionPlan
 );
 
-route.get(
-  "/get-property-by-id/:propertyId",
-  authorizeRoles("ADMIN"),
-  getPropertyDetailsById
-);
+
+
+//payout apis 
 
 route.post(
   "/release-partner-payout",
   authorizeRoles("ADMIN"),
   releasePartnerMonthlyPayout
 );
+route.post(
+  "/confirm-admin-payout",
+  authorizeRoles("ADMIN"),
+  confirmAdminMonthlyPayout
+);
 
+// admin  Payment & Finance dashborad  api
 route.get(
   "/get-partner-monthly-payout",
   authorizeRoles("ADMIN"),
@@ -99,6 +114,22 @@ route.get(
   "/get-admin-monthly-finance",
   authorizeRoles("ADMIN"),
   getAdminMonthlyFinance
+);
+route.get(
+  "/get-weekly-sales",
+  authorizeRoles("ADMIN"),
+  getWeeklySalesFromBookings
+);
+
+route.get(
+  "/get-top-permormers",
+  authorizeRoles("ADMIN"),
+  getTopPerformerHotels
+);
+route.get(
+  "/get-monthly-refunds",
+  authorizeRoles("ADMIN"),
+  getMonthlyRefundsData
 );
 
 export default route;

@@ -324,7 +324,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   }
 
   if (req.body?.childrenCharge) {
-    let childrenCharge =JSON.parse(req.body.childrenCharge)
+    let childrenCharge = JSON.parse(req.body.childrenCharge);
     if (childrenCharge) {
       if (childrenCharge.age < 2 && childrenCharge.age > 18) {
         return next(
@@ -334,7 +334,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
       if (!childrenCharge.charge)
         return next(new CustomError(" children charges required"));
     }
-    property.childrenCharge=childrenCharge;
+    property.childrenCharge = childrenCharge;
   }
 
   if (req.body?.imagesToDelete) {
@@ -1055,7 +1055,6 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const propertyRoomMap = {};
 
   for (const room of roomsList) {
-
     let maxBooked = 0;
 
     for (const date of dates) {
@@ -1189,7 +1188,6 @@ export const getPropertyTypeWithProperties = async (req, res) => {
 };
 
 // partner
-
 export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
   const { propertyId } = req.params;
   const role = req.user.role;
