@@ -1620,6 +1620,7 @@ export const splitMoney = async (booking, partnerId) => {
     } else {
       // Partner collected → Partner must pay admin
       wallet.adminWallet.receivableAmount += adminAmount + adminGST;
+      wallet.adminWallet.receivableGST += adminGST;
     }
 
     await wallet.save();

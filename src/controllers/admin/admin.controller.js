@@ -586,8 +586,8 @@ export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
           {
             $group: {
               _id: null,
-              totalAdminGST: { $sum: "$bookings.admin_gst" },
-              totalAdminAmount: { $sum: "$bookings.adminAmount" },
+              // totalAdminGST: { $sum: "$bookings.admin_gst" },
+              // totalAdminAmount: { $sum: "$bookings.adminAmount" },
               totalBookings: { $sum: 1 },
             },
           },
@@ -630,24 +630,62 @@ export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
 
           {
             $group: {
-              _id: "$_id", // per payout document
+              _id: "$_id",
+
               adminAmount: { $sum: "$bookings.adminAmount" },
               adminGST: { $sum: "$bookings.admin_gst" },
-              receivable: { $first: "$adminWallet.receivableAmount" },
+
+              receivableAmount: { $first: "$adminWallet.receivableAmount" },
+              receivableGST: { $first: "$adminWallet.receivableGST" },
               status: { $first: "$adminWallet.status" },
             },
           },
 
           {
             $project: {
-              total: {
+              /* ---------------- GROSS ---------------- */
+              gross: {
                 $subtract: [
+                  { $add: ["$adminAmount", "$adminGST"] },
                   {
-                    $add: ["$adminAmount", "$adminGST"],
+                    $cond: [
+                      { $eq: ["$status", "pending"] },
+                      { $add: ["$receivableAmount", "$receivableGST"] },
+                      0,
+                    ],
                   },
+                ],
+              },
+
+              /* ---------------- PROFIT ---------------- */
+              profit: {
+                $cond: [
+                  { $eq: ["$status", "pending"] },
+
                   {
-                    $cond: [{ $eq: ["$status", "pending"] }, "$receivable", 0],
+                    $subtract: [
+                      {
+                        $subtract: [
+                          { $add: ["$adminAmount", "$adminGST"] },
+                          {
+                            $add: ["$receivableAmount", "$receivableGST"],
+                          },
+                        ],
+                      },
+                      { $subtract: ["$adminGST", "$receivableGST"] },
+                    ],
                   },
+
+                  "$adminAmount",
+                ],
+              },
+
+              /* ---------------- CURRENT GST ---------------- */
+              currentGST: {
+                $cond: [
+                  { $eq: ["$status", "pending"] },
+                  { $subtract: ["$adminGST", "$receivableGST"] }, // pending case
+                  "$adminGST", // received case
                 ],
               },
             },
@@ -656,7 +694,9 @@ export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
           {
             $group: {
               _id: null,
-              grossProfit: { $sum: "$total" },
+              totalGrossAmount: { $sum: "$gross" },
+              totalProfit: { $sum: "$profit" },
+              totalCurrentGST: { $sum: "$currentGST" },
             },
           },
         ],
@@ -695,7 +735,6 @@ export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
     /* Booking */
     totalRevenue: totalRevenue.totalRevenue || 0,
 
-    totalAdminGST: bookingStats.totalAdminGST || 0,
     // totalAdminAmount: bookingStats.totalAdminAmount || 0,
     totalBookings: bookingStats.totalBookings || 0,
 
@@ -704,7 +743,9 @@ export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
     partnerPendingAmount: partnerPayout.totalPending || 0,
 
     /* Admin */
-    adminGrossProfit: adminProfit.grossProfit || 0,
+    totalGrossAmount: adminProfit.totalGrossAmount || 0,
+    totalNetProfit: adminProfit.totalProfit || 0,
+    currentAdminGST: adminProfit.currentGST || 0,
   };
 
   return successResponse(res, 200, `Finance report for ${month}/${year}`, data);
@@ -985,7 +1026,127 @@ export const getMonthlyRefundsData = asyncHandler(async (req, res, next) => {
     result[0] || {
       bookings: [],
       totalRefundAmount: 0,
-     
     }
   );
 });
+
+//Analytics & Reports
+
+export const getYearly_Revenue_Tax_Data = asyncHandler(
+  async (req, res, next) => {
+    const date = req.query.date;
+
+    let dateObj = date ? new Date(date) : new Date();
+
+    if (isNaN(dateObj)) {
+      throw new CustomError("Invalid date format", 400);
+    }
+
+    const year = dateObj.getFullYear();
+
+    const result = await PartnerMonthlyPayoutModel.aggregate([
+      {
+        $match: {
+          payoutYear: year,
+        },
+      },
+
+      /* ---------------- UNWIND BOOKINGS ---------------- */
+      { $unwind: "$bookings" },
+
+      /* ---------------- GROUP PER DOC ---------------- */
+      {
+        $group: {
+          _id: {
+            payoutId: "$_id",
+            month: "$payoutMonth",
+          },
+
+          adminAmount: { $sum: "$bookings.adminAmount" },
+          adminGST: { $sum: "$bookings.admin_gst" },
+
+          receivableAmount: { $first: "$adminWallet.receivableAmount" },
+          receivableGST: { $first: "$adminWallet.receivableGST" },
+          status: { $first: "$adminWallet.status" },
+        },
+      },
+
+      /* ---------------- APPLY YOUR PROFIT + GST LOGIC ---------------- */
+      {
+        $project: {
+          month: "$_id.month",
+
+          profit: {
+            $cond: [
+              { $eq: ["$status", "pending"] },
+
+              {
+                $subtract: [
+                  {
+                    $subtract: [
+                      { $add: ["$adminAmount", "$adminGST"] },
+                      {
+                        $add: ["$receivableAmount", "$receivableGST"],
+                      },
+                    ],
+                  },
+                  { $subtract: ["$adminGST", "$receivableGST"] },
+                ],
+              },
+
+              "$adminAmount",
+            ],
+          },
+
+          currentGST: {
+            $cond: [
+              { $eq: ["$status", "pending"] },
+              { $subtract: ["$adminGST", "$receivableGST"] },
+              "$adminGST",
+            ],
+          },
+        },
+      },
+
+      /* ---------------- FINAL GROUP BY MONTH ---------------- */
+      {
+        $group: {
+          _id: "$month",
+          totalProfit: { $sum: "$profit" },
+          totalGST: { $sum: "$currentGST" },
+        },
+      },
+
+      /* ---------------- FORMAT ---------------- */
+      {
+        $project: {
+          _id: 0,
+          month: "$_id",
+          totalProfit: 1,
+          totalGST: 1,
+        },
+      },
+
+      { $sort: { month: 1 } },
+    ]);
+
+    /* ---------------- FILL MISSING MONTHS ---------------- */
+    const fullYearData = Array.from({ length: 12 }, (_, i) => {
+      const month = i + 1;
+      const found = result.find((r) => r.month === month);
+
+      return {
+        month,
+        totalProfit: found?.totalProfit || 0,
+        totalGST: found?.totalGST || 0,
+      };
+    });
+
+    return successResponse(
+      res,
+      200,
+      `Yearly revenue & GST report for ${year}`,
+      fullYearData
+    );
+  }
+);
