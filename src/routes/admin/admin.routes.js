@@ -27,6 +27,7 @@ import {
   getWeeklySalesFromBookings,
   getTopPerformerHotels,
   getMonthlyRefundsData,
+  getMonthlySubscriptionsData,
 } from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
@@ -131,5 +132,38 @@ route.get(
   authorizeRoles("ADMIN"),
   getMonthlyRefundsData
 );
+route.get(
+  "/get-monthly-subscriptions-data",
+  authorizeRoles("ADMIN"),
+  getMonthlySubscriptionsData
+);
+
+//Analytics & Reports
+
+route.get(
+  "/get-yearly-revenue-tax",
+  authorizeRoles("ADMIN"),
+  getYearly_Revenue_Tax_Data
+);
+
+route.get(
+  "/get-monthly-hotels-data",
+  authorizeRoles("ADMIN"),
+  getMonthlyHotelsData
+);
+
+route.get(
+  "/get-monthly-customer-data",
+  authorizeRoles("ADMIN"),
+  getMonthlyCustomerData
+);
+
+route.get(
+  "/get-monthly-bookings-data",
+  authorizeRoles("ADMIN"),
+  getMonthlyBookingsData
+);
+
+
 
 export default route;

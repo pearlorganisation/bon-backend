@@ -9,6 +9,7 @@ import { configDotenv } from "dotenv";
 import { razorpay } from "../../config/razorpayConfig.js";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 import Booking from "../../models/Listing/booking.model.js";
+import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 
 configDotenv();
 
@@ -1030,6 +1031,106 @@ export const getMonthlyRefundsData = asyncHandler(async (req, res, next) => {
   );
 });
 
+export const getMonthlySubscriptionsData = asyncHandler(
+  async (req, res, next) => {
+    const date = req.query.date;
+    let dateObj = date ? new Date(date) : new Date();
+
+    if (isNaN(dateObj)) {
+      throw new CustomError("Invalid date format", 400);
+    }
+
+    const month = dateObj.getMonth() + 1;
+    const year = dateObj.getFullYear();
+
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 1);
+
+    const result = await PartnerPlan.aggregate([
+      {
+        $match: {
+          PlanType: "SUBSCRIPTION",
+          planStatus: { $in: ["ACTIVE", "UPCOMING"] },
+          createdAt: {
+            $gte: startDate,
+            $lt: endDate,
+          },
+        },
+      },
+
+      /* ---------------- PARTNER LOOKUP ---------------- */
+      {
+        $lookup: {
+          from: "auths",
+          localField: "partnerId",
+          foreignField: "_id",
+          as: "partner",
+        },
+      },
+      { $unwind: "$partner" },
+
+      /* ---------------- PLAN LOOKUP ---------------- */
+      {
+        $lookup: {
+          from: "adminsubscriptionplans",
+          localField: "subscriptionPlanId",
+          foreignField: "_id",
+          as: "subscriptionPlan",
+        },
+      },
+      { $unwind: "$subscriptionPlan" },
+
+      /* ---------------- FACET ---------------- */
+      {
+        $facet: {
+          /* -------- TOTAL AMOUNT -------- */
+          totalSubscriptionAmount: [
+            {
+              $group: {
+                _id: null,
+                total: { $sum: "$subscriptionPlan.price" },
+              },
+            },
+          ],
+
+          /* -------- PARTNER DETAILS -------- */
+          partnerDetails: [
+            {
+              $project: {
+                _id: 0,
+
+                partnerId: "$partner._id",
+                name: "$partner.name",
+                email: "$partner.email",
+                address: "$partner.address",
+                city: "$partner.city",
+
+                planName: "$subscriptionPlan.name",
+                price: "$subscriptionPlan.price",
+                durationDays: "$subscriptionPlan.durationDays",
+
+                planStatus: 1,
+                startDate: 1,
+                endDate: 1,
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    /* ---------------- SAFE EXTRACTION ---------------- */
+    const totalAmount = result[0]?.totalSubscriptionAmount[0]?.total || 0;
+
+    const partnerDetails = result[0]?.partnerDetails || [];
+
+    return successResponse(res, 200, `Subscription data for ${month}/${year}`, {
+      totalSubscriptionAmount: totalAmount,
+      partners: partnerDetails,
+    });
+  }
+);
+
 //Analytics & Reports
 
 export const getYearly_Revenue_Tax_Data = asyncHandler(
@@ -1150,3 +1251,270 @@ export const getYearly_Revenue_Tax_Data = asyncHandler(
     );
   }
 );
+
+export const getMonthlyHotelsData = asyncHandler(async (req, res, next) => {
+  const date = req.query.date;
+  let dateObj = date ? new Date(date) : new Date();
+
+  if (isNaN(dateObj)) {
+    throw new CustomError("Invalid date format", 400);
+  }
+
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+
+  const result = await Property.aggregate([
+    {
+      $facet: {
+        /* ---------------- TOTAL HOTELS ---------------- */
+        totalHotels: [
+          {
+            $count: "total",
+          },
+        ],
+
+        /* ---------------- ACTIVE HOTELS ---------------- */
+        activeHotels: [
+          {
+            $match: { status: "active" },
+          },
+          {
+            $count: "total",
+          },
+        ],
+
+        /* ---------------- NEW HOTELS THIS MONTH ---------------- */
+        newHotels: [
+          {
+            $match: {
+              createdAt: {
+                $gte: startDate,
+                $lt: endDate,
+              },
+            },
+          },
+          {
+            $count: "total",
+          },
+        ],
+      },
+    },
+  ]);
+
+  /* ---------------- SAFE EXTRACTION ---------------- */
+  const totalHotels = result[0]?.totalHotels[0]?.total || 0;
+  const activeHotels = result[0]?.activeHotels[0]?.total || 0;
+  const newHotels = result[0]?.newHotels[0]?.total || 0;
+
+  return successResponse(res, 200, `Hotel stats for ${month}/${year}`, {
+    totalHotels,
+    activeHotels,
+    newHotels,
+  });
+});
+
+export const getMonthlyCustomerData = asyncHandler(async (req, res, next) => {
+  const date = req.query.date;
+  let dateObj = date ? new Date(date) : new Date();
+
+  if (isNaN(dateObj)) {
+    throw new CustomError("Invalid date format", 400);
+  }
+
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+
+  const result = await Auth.aggregate([
+    {
+      $match: {
+        role: "CUSTOMER",
+        isVerified: true,
+      },
+    },
+
+    {
+      $facet: {
+        /* ---------------- TOTAL CUSTOMERS ---------------- */
+        totalCustomers: [
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+            },
+          },
+        ],
+
+        /* ---------------- NEW CUSTOMERS ---------------- */
+        newCustomers: [
+          {
+            $match: {
+              createdAt: {
+                $gte: startDate,
+                $lt: endDate,
+              },
+            },
+          },
+          {
+            $group: {
+              _id: null,
+              total: { $sum: 1 },
+            },
+          },
+        ],
+
+        /* ---------------- AVG STAY DAYS ---------------- */
+        avgStay: [
+          {
+            $lookup: {
+              from: "bookings",
+              let: { userId: "$_id" },
+              pipeline: [
+                {
+                  $match: {
+                    $expr: { $eq: ["$userId", "$$userId"] },
+                    checkInDate: { $gte: startDate, $lt: endDate },
+                  },
+                },
+              ],
+              as: "bookings",
+            },
+          },
+          { $unwind: "$bookings" },
+
+          {
+            $project: {
+              stayDays: {
+                $divide: [
+                  {
+                    $subtract: [
+                      "$bookings.checkOutDate",
+                      "$bookings.checkInDate",
+                    ],
+                  },
+                  1000 * 60 * 60 * 24,
+                ],
+              },
+            },
+          },
+
+          {
+            $group: {
+              _id: null,
+              avgStayDays: { $avg: "$stayDays" },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  /* ---------------- SAFE EXTRACTION ---------------- */
+  const totalCustomers = result[0]?.totalCustomers[0]?.total || 0;
+  const newCustomers = result[0]?.newCustomers[0]?.total || 0;
+  const avgStayDays = result[0]?.avgStay[0]?.avgStayDays || 0;
+
+  return successResponse(res, 200, `Customer stats for ${month}/${year}`, {
+    totalCustomers,
+    newCustomers,
+    avgStayDays: Number(avgStayDays.toFixed(2)),
+  });
+});
+
+export const getMonthlyBookingsData = asyncHandler(async (req, res, next) => {
+  const date = req.query.date;
+  let dateObj = date ? new Date(date) : new Date();
+
+  if (isNaN(dateObj)) {
+    throw new CustomError("Invalid date format", 400);
+  }
+
+  const month = dateObj.getMonth() + 1;
+  const year = dateObj.getFullYear();
+
+  const startDate = new Date(year, month - 1, 1);
+  const endDate = new Date(year, month, 1);
+
+  const result = await Booking.aggregate([
+    {
+      $match: {
+        createdAt: {
+          $gte: startDate,
+          $lt: endDate,
+        },
+      },
+    },
+
+    {
+      $facet: {
+        /* ---------------- STATUS COUNT ---------------- */
+        statusStats: [
+          {
+            $group: {
+              _id: null,
+
+              confirmed: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", "confirmed"] }, 1, 0],
+                },
+              },
+
+              pending: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", "pending"] }, 1, 0],
+                },
+              },
+
+              expired: {
+                $sum: {
+                  $cond: [{ $eq: ["$status", "expired"] }, 1, 0],
+                },
+              },
+            },
+          },
+        ],
+
+        /* ---------------- PAYMENT MODE COUNT ---------------- */
+        paymentModeStats: [
+          {
+            $group: {
+              _id: null,
+
+              payNow: {
+                $sum: {
+                  $cond: [{ $eq: ["$paymentMode", "PAY_NOW"] }, 1, 0],
+                },
+              },
+
+              payOnArrival: {
+                $sum: {
+                  $cond: [{ $eq: ["$paymentMode", "PAY_ON_ARRIVAL"] }, 1, 0],
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  /* ---------------- SAFE EXTRACTION ---------------- */
+  const statusStats = result[0]?.statusStats[0] || {};
+  const paymentStats = result[0]?.paymentModeStats[0] || {};
+
+  const data = {
+    confirmed: statusStats.confirmed || 0,
+    pending: statusStats.pending || 0,
+    expired: statusStats.expired || 0,
+
+    payNow: paymentStats.payNow || 0,
+    payOnArrival: paymentStats.payOnArrival || 0,
+  };
+
+  return successResponse(res, 200, `Booking stats for ${month}/${year}`, data);
+});
