@@ -1,4 +1,4 @@
-import Tour from "./tour.model";
+import Tour from "./tour.model.js";
 import {
   uploadFileToCloudinary,
   deleteFileFromCloudinary,
@@ -84,7 +84,6 @@ export const createTour = asyncHandler(async (req, res, next) => {
   return successResponse(res, 201, "Tour created successfully", tour);
 });
 
-
 export const updateTour = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
 
@@ -107,7 +106,6 @@ export const updateTour = asyncHandler(async (req, res, next) => {
   if (!tour) {
     return next(new CustomError("Tour not found", 404));
   }
-
   /* ---------- PARSE ---------- */
   duration = safeJSONParse(duration, tour.duration);
   highlights = safeJSONParse(highlights, tour.highlights);
@@ -143,11 +141,11 @@ export const updateTour = asyncHandler(async (req, res, next) => {
     id,
     {
       tourName: tourName?.toLowerCase().trim() || tour.tourName,
-      description,
-      destinationCovered,
-      tourType,
+      description: description ?? tour.description,
+      destinationCovered: destinationCovered ?? tour.destinationCovered,
+      tourType: tourType ?? tour.tourType,
+      price: price ?? tour.price,
       duration,
-      price,
       discountPrice,
       highlights,
       bannerText,
@@ -187,8 +185,7 @@ export const getAllTours = asyncHandler(async (req, res, next) => {
 
   return successResponse(res, 200, "Tours fetched successfully", tours);
 });
-
-
+     
 export const getTours = asyncHandler(async (req, res, next) => {
     const tours = await Tour.find({ status: "active" }).sort({
       priority: -1,

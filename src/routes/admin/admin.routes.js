@@ -28,6 +28,10 @@ import {
   getTopPerformerHotels,
   getMonthlyRefundsData,
   getMonthlySubscriptionsData,
+  getYearly_Revenue_Tax_Data,
+  getMonthlyHotelsData,
+  getMonthlyCustomerData,
+  getMonthlyBookingsData,
 } from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
