@@ -6,7 +6,7 @@ const AdminSubscriptionPlanSchema = new mongoose.Schema(
     price: Number,
     durationDays: { type: Number, default: 30 },
     isActive: { type: Boolean, default: true },
-
+            
     benefits: {
       searchBoost: {
         type: Number,

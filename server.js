@@ -22,7 +22,7 @@ connectDB()
     process.exit(1);
   });
 
-if (process.env.ENABLE_CRON === true) {
+if (process.env.ENABLE_CRON === "true") {
   expireDocumentAccessCron();
   sub_admin_cron();
   expireInactivePendingBookingsCron();

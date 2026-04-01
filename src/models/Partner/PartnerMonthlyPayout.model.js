@@ -46,9 +46,9 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
       paidAt: Date,
       razorpayStatusDetail: String,
       invoiceId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: "Invoice",
-          },
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Invoice",
+      },
     },
 
     adminWallet: {
@@ -56,7 +56,7 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
         type: Number,
         default: 0,
       },
-      // admin_gst_amount: { type: Number, default: 0 },
+      receivableGST: { type: Number, default: 0 },
       status: {
         type: String,
         enum: ["pending", "received"],
