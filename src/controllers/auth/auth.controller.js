@@ -49,7 +49,6 @@ export const register = asyncHandler(async (req, res, next) => {
     try {
       await OTP.findOneAndReplace(
         { email, type: "REGISTER" },
-        { email, type: "REGISTER" },
         { otp, email, type: "REGISTER" },
         { upsert: true, new: true }
       );
@@ -70,11 +69,11 @@ export const register = asyncHandler(async (req, res, next) => {
   let newUser = null;
   try {
     // A. Create OTP Record first
-    await OTP.create({
-      otp,
-      email,
-      type: "REGISTER",
-    });
+     await OTP.findOneAndReplace(
+       { email, type: "REGISTER" },
+       { otp, email, type: "REGISTER" },
+       { upsert: true, new: true }
+     );
 
     // B. Create User (Force isVerified: false)
     newUser = await Auth.create({
