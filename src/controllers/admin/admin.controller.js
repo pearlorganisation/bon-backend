@@ -11,6 +11,8 @@ import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout
 import Booking from "../../models/Listing/booking.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 
+import Property from "../../models/Listing/property.model.js";
+
 configDotenv();
 
 export const getAllPartners = asyncHandler(async (req, res, next) => {
