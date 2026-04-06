@@ -94,6 +94,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
 
     partner.gstinList = gstinList;
     partner.isPanVerified = true;
+    partner.isVerified =true;
 
     // Save the document
     await partner.save();

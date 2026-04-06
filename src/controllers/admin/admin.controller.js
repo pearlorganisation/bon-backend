@@ -400,6 +400,79 @@ export const razorpayPayoutWebhook = async (req, res) => {
   }
 };
 
+export const confirmPartnerMonthlyPayout = asyncHandler(
+  async (req, res, next) => {
+    const { partnerId, date } = req.query;
+  
+    /* ---------- VALIDATE PARTNER ---------- */
+    if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+      return next(new CustomError("Invalid partnerId", 400));
+    }
+
+    /* ---------- PARSE DATE ---------- */
+    let dateObj = date ? new Date(date) : new Date();
+
+    if (isNaN(dateObj)) {
+      return next(new CustomError("Invalid date format", 400));
+    }
+
+    const payoutMonth = dateObj.getMonth() + 1;
+    const payoutYear = dateObj.getFullYear();
+
+    /* ---------- FIND PAYOUT ---------- */
+    const payout = await PartnerMonthlyPayoutModel.findOne({
+      partnerId,
+      payoutMonth,
+      payoutYear,
+    });
+
+    if (!payout) {
+      return next(
+        new CustomError(`No payout found for ${payoutMonth}/${payoutYear}`, 404)
+      );
+    }
+
+    if (!payout.partnerWallet) {
+      return next(new CustomError("Partner wallet not found", 400));
+    }
+
+    /* ---------- VALIDATIONS ---------- */
+    if (payout.partnerWallet.payableAmount <= 0) {
+      return next(
+        new CustomError(
+          `No payable amount for ${payoutMonth}/${payoutYear}`,
+          400
+        )
+      );
+    }
+
+    if (payout.partnerWallet.status === "paid") {
+      return next(
+        new CustomError(
+          `Payout already marked as paid for ${payoutMonth}/${payoutYear}`,
+          400
+        )
+      );
+    }
+
+    /* ---------- MANUAL UPDATE ---------- */
+
+    payout.partnerWallet.status = "paid";
+    payout.partnerWallet.paidAt = new Date();
+
+    await payout.save();
+
+    /* ---------- RESPONSE ---------- */
+    return successResponse(res, 200, "Partner payout marked as paid manually", {
+      partnerId,
+      payoutMonth,
+      payoutYear,
+      payableAmount: payout.partnerWallet.payableAmount,
+      status: payout.partnerWallet.status,
+    });
+  }
+);
+
 export const confirmAdminMonthlyPayout = asyncHandler(
   async (req, res, next) => {
     const { date, partnerId } = req.query;

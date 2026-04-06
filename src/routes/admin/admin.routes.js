@@ -32,6 +32,7 @@ import {
   getMonthlyHotelsData,
   getMonthlyCustomerData,
   getMonthlyBookingsData,
+  confirmPartnerMonthlyPayout,
 } from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
@@ -98,16 +99,25 @@ route.put(
 
 //payout apis 
 
+// route.post(
+//   "/release-partner-payout",
+//   authorizeRoles("ADMIN"),
+//   releasePartnerMonthlyPayout
+// );
+
 route.post(
-  "/release-partner-payout",
+  "/confirm-partner-payout",
   authorizeRoles("ADMIN"),
-  releasePartnerMonthlyPayout
+  confirmPartnerMonthlyPayout
 );
+
 route.post(
   "/confirm-admin-payout",
   authorizeRoles("ADMIN"),
   confirmAdminMonthlyPayout
 );
+
+
 
 // admin  Payment & Finance dashborad  api
 route.get(
