@@ -756,8 +756,8 @@ export const selectPayOnArrivalMode = asyncHandler(async (req, res, next) => {
   bookingDoc.status = "confirmed";
 
   // Assign confirmation code ONLY once
-  if (!booking.confirmationCode) {
-    booking.confirmationCode = `BK-${booking._id
+  if (!bookingDoc.confirmationCode) {
+    bookingDoc.confirmationCode = `BK-${booking._id
       .toString()
       .slice(-6)
       .toUpperCase()}`;
@@ -1573,27 +1573,31 @@ export const splitMoney = async (booking, partnerId) => {
 
     const partnerPlan = booking.partnerPlan;
 
-    const baseAmount = booking.totalPrice - booking.priceBreakdown.gst_amount;
+    const baseAmount = round(
+      booking.totalPrice - booking.priceBreakdown.gst_amount
+    );
 
     const roomGST = booking.priceBreakdown.gst_amount || 0;
 
     let adminAmount = 0;
     let adminGST = 0;
     let partnerAmount = 0;
-    let partnerGST = roomGST;
+    let partnerGST = round(roomGST);
 
     /* ---------- PLAN CALCULATION ---------- */
 
     if (partnerPlan.PlanType === "COMMISSION") {
-      adminAmount = (partnerPlan.commissionPercentage * baseAmount) / 100;
+      adminAmount = round(
+        (partnerPlan.commissionPercentage * baseAmount) / 100
+      );
 
       const ADMIN_GST_RATE = 18;
-      adminGST = (adminAmount * ADMIN_GST_RATE) / 100;
+      adminGST = round((adminAmount * ADMIN_GST_RATE) / 100);
 
-      partnerAmount = baseAmount - adminAmount - adminGST;
+      partnerAmount = round(baseAmount - adminAmount - adminGST);
     } else {
       // SUBSCRIPTION
-      partnerAmount = baseAmount;
+      partnerAmount = round(baseAmount);
     }
 
     /* ---------- FIND MONTH ---------- */
@@ -1631,23 +1635,28 @@ export const splitMoney = async (booking, partnerId) => {
 
     /* ---------- PUSH BOOKING ENTRY ---------- */
 
-    wallet.bookings.push({
-      bookingId: booking._id,
-      partnerAmount,
-      partner_gst: partnerGST,
-      adminAmount,
-      admin_gst: adminGST,
-    });
+  wallet.bookings.push({
+    bookingId: booking._id,
+    partnerAmount: round(partnerAmount),
+    partner_gst: round(partnerGST),
+    adminAmount: round(adminAmount),
+    admin_gst: round(adminGST),
+  });
 
     /* ---------- WALLET UPDATE ---------- */
 
     if (booking.paymentMode === "PAY_NOW") {
-      // Admin collected → Admin must pay partner
-      wallet.partnerWallet.payableAmount += partnerAmount + partnerGST;
+      wallet.partnerWallet.payableAmount = round(
+        wallet.partnerWallet.payableAmount + partnerAmount + partnerGST
+      );
     } else {
-      // Partner collected → Partner must pay admin
-      wallet.adminWallet.receivableAmount += adminAmount + adminGST;
-      wallet.adminWallet.receivableGST += adminGST;
+      wallet.adminWallet.receivableAmount = round(
+        wallet.adminWallet.receivableAmount + adminAmount
+      );
+
+      wallet.adminWallet.receivableGST = round(
+        wallet.adminWallet.receivableGST + adminGST
+      );
     }
 
     await wallet.save();
@@ -1674,14 +1683,14 @@ export const splitCancellationMoney = async (booking, retainedAmount) => {
 
     const totalPrice = booking.totalPrice;
     const totalGST = booking.priceBreakdown.gst_amount || 0;
-    const totalBase = totalPrice - totalGST;
+    const totalBase = round(totalPrice - totalGST);
 
     // proportion retained %
-    const retainedPercentage = retainedAmount / totalPrice;
+    const retainedPercentage = round(retainedAmount / totalPrice);
 
     // proportional split
-    const retainedBase = totalBase * retainedPercentage;
-    const retainedGST = totalGST * retainedPercentage;
+    const retainedBase = round(totalBase * retainedPercentage);
+    const retainedGST = round(totalGST * retainedPercentage);
 
     let adminAmount = 0;
     let adminGST = 0;
@@ -1691,15 +1700,17 @@ export const splitCancellationMoney = async (booking, retainedAmount) => {
     /* ---------- PLAN CALCULATION ---------- */
 
     if (partnerPlan.PlanType === "COMMISSION") {
-      adminAmount = (partnerPlan.commissionPercentage * retainedBase) / 100;
+      adminAmount = round(
+        (partnerPlan.commissionPercentage * retainedBase) / 100
+      );
 
       const ADMIN_GST_RATE = 18;
-      adminGST = (adminAmount * ADMIN_GST_RATE) / 100;
+      adminGST = round((adminAmount * ADMIN_GST_RATE) / 100);
 
-      partnerAmount = retainedBase - adminAmount - adminGST;
+      partnerAmount = round(retainedBase - adminAmount - adminGST);
     } else {
       // SUBSCRIPTION
-      partnerAmount = retainedBase;
+      partnerAmount = round(retainedBase);
     }
 
     /* ---------- WALLET UPDATE ---------- */
@@ -1731,7 +1742,9 @@ export const splitCancellationMoney = async (booking, retainedAmount) => {
       admin_gst: adminGST,
     });
 
-    wallet.partnerWallet.payableAmount += partnerAmount + partnerGST;
+    wallet.partnerWallet.payableAmount = round(
+      wallet.partnerWallet.payableAmount + partnerAmount + partnerGST
+    );
 
     await wallet.save();
 
