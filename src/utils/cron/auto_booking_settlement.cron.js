@@ -55,6 +55,7 @@ export const autoBookingSettlementCron = () => {
 
               await Booking.findByIdAndUpdate(booking._id, {
                 status: "auto_settled",
+                paymentStatus: "paid",
               });
 
               console.log(`Booking ${booking._id} auto settled`);
