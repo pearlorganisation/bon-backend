@@ -106,13 +106,13 @@ route.put(
 // );
 
 route.post(
-  "/confirm-partner-payout",
+  "/confirm-partner-payout",  //admin ne partner ko pasie pay kardiya h
   authorizeRoles("ADMIN"),
   confirmPartnerMonthlyPayout
 );
 
 route.post(
-  "/confirm-admin-payout",
+  "/confirm-admin-payout", // admin ko paise mil gaee h
   authorizeRoles("ADMIN"),
   confirmAdminMonthlyPayout
 );

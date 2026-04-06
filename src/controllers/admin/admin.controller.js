@@ -10,7 +10,7 @@ import { razorpay } from "../../config/razorpayConfig.js";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 import Booking from "../../models/Listing/booking.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
-
+import mongoose from "mongoose";
 import Property from "../../models/Listing/property.model.js";
 
 configDotenv();
@@ -846,7 +846,7 @@ export const getWeeklySalesFromBookings = asyncHandler(
     const result = await Booking.aggregate([
       {
         $match: {
-          status: "confirmed",
+        paymentStatus: "paid",
           createdAt: {
             $gte: startDate,
             $lt: endDate,
