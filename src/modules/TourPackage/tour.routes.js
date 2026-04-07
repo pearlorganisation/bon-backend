@@ -44,6 +44,6 @@ router.put(
 router.delete("/delete/:id", protect, authorizeRoles("ADMIN"), deleteTour);
 router.get("/get-all-tour", protect, authorizeRoles("ADMIN"), getAllTours);
 
-router.get("/get-active-tours", protect, getTours);
+router.get("/get-active-tours", getTours);
 
 export default router;
