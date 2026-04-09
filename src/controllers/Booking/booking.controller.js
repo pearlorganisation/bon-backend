@@ -175,6 +175,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
   try {
     const {
       propertyId,
+      pricingType,
       rooms,
       checkInDate,
       checkOutDate,
@@ -236,6 +237,13 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     }
 
     const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+    if (pricingType === "WEEK" && nights !== 7) {
+      throw new CustomError("Weekly booking must be exactly 7 days", 400);
+    }
+
+    if (pricingType === "MONTH" && nights !== 30) {
+      throw new CustomError("Monthly booking must be exactly 30 days", 400);
+    }
 
     let basePrice = 0;
     let discountAmount = 0;
@@ -315,30 +323,67 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
       //  Pricing
       totalCapacity += room.capacity * item.quantity;
-      const roomPrice = room.pricePerNight * item.quantity * nights;
-      basePrice += roomPrice;
+      let roomPrice = 0;
+      let effectivePrice = 0;
 
-      let effectivePrice = room.pricePerNight;
+      if (pricingType === "NIGHT") {
+        roomPrice = room.pricePerNight * item.quantity * nights;
 
-      if (room.discount > 0) {
-        discountAmount +=
-          (room.discount / 100) * room.pricePerNight * item.quantity * nights;
+        if (room.discount > 0) {
+          discountAmount +=
+            (room.discount / 100) * room.pricePerNight * item.quantity * nights;
 
-        effectivePrice =
-          room.pricePerNight - (room.discount * room.pricePerNight) / 100;
+          effectivePrice =
+            room.pricePerNight - (room.discount * room.pricePerNight) / 100;
+        } else {
+          effectivePrice = room.pricePerNight;
+        }
+      } else if (pricingType === "WEEK") {
+        if (room.weeklyPrice == 0) {
+          throw new CustomError(
+            "Weekly price not available for this room",
+            400
+          );
+        }
+
+        roomPrice = room.weeklyPrice * item.quantity;
+
+        // ❌ NO DISCOUNT
+        effectivePrice = room.weeklyPrice / 7;
+      } else if (pricingType === "MONTH") {
+        if (room.monthlyPrice == 0) {
+          throw new CustomError(
+            "Monthly price not available for this room",
+            400
+          );
+        }
+
+        roomPrice = room.monthlyPrice * item.quantity;
+
+        // ❌ NO DISCOUNT
+        effectivePrice = room.monthlyPrice / 30;
       }
 
-      let gst = getGST(effectivePrice);
-      total_gst += gst.gstAmount * item.quantity * nights;
+      basePrice += round(roomPrice);
+
+     const gst = getGST(round(effectivePrice));
+     const roomGstAmount = round(gst.gstAmount * item.quantity * nights);
+      total_gst += roomGstAmount;
 
       const roomDetails = {
         roomId: item.roomId,
         quantity: item.quantity,
-        pricePerNight: room.pricePerNight,
-        discount: round((room.discount * room.pricePerNight) / 100),
+        pricePerNight:
+          pricingType === "NIGHT"
+            ? room.pricePerNight
+            : round(roomPrice / nights),
+        discount:
+          pricingType === "NIGHT"
+            ? round((room.discount * room.pricePerNight) / 100)
+            : 0,
         room_gst: {
           gst_rate: gst.gstRate,
-          gst_amount: gst.gstAmount * item.quantity * nights,
+          gst_amount: roomGstAmount,
         },
         extraServices: [],
       };
@@ -398,6 +443,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
           rooms: roomsData,
           checkInDate: checkIn,
           checkOutDate: checkOut,
+          pricingType,
           numberOfGuests,
           primaryGuestDetails,
           specialRequests,
@@ -438,6 +484,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 
     const {
       rooms,
+      pricingType,
       checkInDate,
       checkOutDate,
       numberOfGuests,
@@ -497,6 +544,13 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     }
 
     const nights = Math.ceil((checkOut - checkIn) / (1000 * 60 * 60 * 24));
+    if (pricingType === "WEEK" && nights !== 7) {
+      throw new CustomError("Weekly booking must be exactly 7 days", 400);
+    }
+
+    if (pricingType === "MONTH" && nights !== 30) {
+      throw new CustomError("Monthly booking must be exactly 30 days", 400);
+    }
 
     // 4️⃣ Release OLD inventory
     const oldDates = getDatesBetween(booking.checkInDate, booking.checkOutDate);
@@ -591,31 +645,57 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       // 6️ Pricing
       totalCapacity += room.capacity * item.quantity;
 
-      const roomPrice = room.pricePerNight * item.quantity * nights;
+      let roomPrice = 0;
+      let effectivePrice = 0;
 
-      basePrice += roomPrice;
+      if (pricingType === "NIGHT") {
+        roomPrice = room.pricePerNight * item.quantity * nights;
 
-      let effectivePrice = room.pricePerNight;
+        if (room.discount > 0) {
+          discountAmount +=
+            (room.discount / 100) * room.pricePerNight * item.quantity * nights;
 
-      if (room.discount > 0) {
-        discountAmount +=
-          (room.discount / 100) * room.pricePerNight * item.quantity * nights;
+          effectivePrice =
+            room.pricePerNight - (room.discount * room.pricePerNight) / 100;
+        } else {
+          effectivePrice = room.pricePerNight;
+        }
+      } else if (pricingType === "WEEK") {
+        if (room.weeklyPrice==0) {
+          throw new CustomError("Weekly price not available", 400);
+        }
 
-        effectivePrice =
-          room.pricePerNight - (room.discount * room.pricePerNight) / 100;
+        roomPrice = room.weeklyPrice * item.quantity;
+        effectivePrice = room.weeklyPrice / 7;
+      } else if (pricingType === "MONTH") {
+        if (room.monthlyPrice==0) {
+          throw new CustomError("Monthly price not available", 400);
+        }
+
+        roomPrice = room.monthlyPrice * item.quantity;
+        effectivePrice = room.monthlyPrice / 30;
       }
 
+      basePrice += round(roomPrice);
+
       // GST per room (same as createBooking)
-      const gst = getGST(effectivePrice);
-      const roomGstAmount = gst.gstAmount * item.quantity * nights;
+     const gst = getGST(round(effectivePrice));
+     const roomGstAmount = round(gst.gstAmount * item.quantity * nights);
 
       total_gst += roomGstAmount;
 
       const roomDetails = {
         roomId: item.roomId,
         quantity: item.quantity,
-        pricePerNight: room.pricePerNight,
-        discount: room.discount,
+        pricePerNight:
+          pricingType === "NIGHT"
+            ? room.pricePerNight
+            : round(roomPrice / nights),
+
+        discount:
+          pricingType === "NIGHT"
+            ? round((room.discount * room.pricePerNight) / 100)
+            : 0,
         room_gst: {
           gst_rate: gst.gstRate,
           gst_amount: roomGstAmount,
@@ -673,6 +753,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     booking.rooms = roomsData;
     booking.checkInDate = checkIn;
     booking.checkOutDate = checkOut;
+    booking.pricingType = pricingType;
     booking.numberOfGuests = numberOfGuests;
     booking.primaryGuestDetails = primaryGuestDetails;
     booking.specialRequests = specialRequests;
@@ -1057,7 +1138,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
           cancellationPolicy: booking.propertyId.cancellationPolicy,
           checkInDate: booking.checkInDate,
         });
-       // refundPercentage = 100;
+        // refundPercentage = 100;
       }
 
       refundAmount = round((booking.totalPrice * refundPercentage) / 100);
@@ -1635,13 +1716,13 @@ export const splitMoney = async (booking, partnerId) => {
 
     /* ---------- PUSH BOOKING ENTRY ---------- */
 
-  wallet.bookings.push({
-    bookingId: booking._id,
-    partnerAmount: round(partnerAmount),
-    partner_gst: round(partnerGST),
-    adminAmount: round(adminAmount),
-    admin_gst: round(adminGST),
-  });
+    wallet.bookings.push({
+      bookingId: booking._id,
+      partnerAmount: round(partnerAmount),
+      partner_gst: round(partnerGST),
+      adminAmount: round(adminAmount),
+      admin_gst: round(adminGST),
+    });
 
     /* ---------- WALLET UPDATE ---------- */
 
