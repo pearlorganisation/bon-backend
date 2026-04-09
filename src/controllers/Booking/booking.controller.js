@@ -514,7 +514,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       );
     }
 
-    // 5️⃣ Re-check & reserve NEW inventory
+    // 5️ Re-check & reserve NEW inventory
     let basePrice = 0;
     let discountAmount = 0;
     let extraFees = 0;
@@ -588,7 +588,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         }
       }
 
-      // 6️⃣ Pricing
+      // 6️ Pricing
       totalCapacity += room.capacity * item.quantity;
 
       const roomPrice = room.pricePerNight * item.quantity * nights;
@@ -1053,15 +1053,15 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
       if (req.user?.role === "PARTNER") {
         refundPercentage = 100;
       } else {
-        // refundPercentage = calculateRefundPercentage({
-        //   cancellationPolicy: booking.propertyId.cancellationPolicy,
-        //   checkInDate: booking.checkInDate,
-        // });
-        refundPercentage = 100;
+        refundPercentage = calculateRefundPercentage({
+          cancellationPolicy: booking.propertyId.cancellationPolicy,
+          checkInDate: booking.checkInDate,
+        });
+       // refundPercentage = 100;
       }
 
-      refundAmount = (booking.totalPrice * refundPercentage) / 100;
-      retainedAmount = booking.totalPrice - refundAmount;
+      refundAmount = round((booking.totalPrice * refundPercentage) / 100);
+      retainedAmount = round(booking.totalPrice - refundAmount);
 
       //  split payment what to do ...
       if (retainedAmount > 0) {
@@ -1080,7 +1080,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
     booking.cancellation = {
       cancelledBy: userId,
       cancellationDate: new Date(),
-      refundAmount: round(refundAmount),
+      refundAmount: Math.round(refundAmount * 100),
       reason,
     };
 

@@ -10,12 +10,16 @@ import axios from "axios";
 import { configDotenv } from "dotenv";
 import Admin from "../../models/Admin/admin.model.js";
 import AdminSubscriptionPlan from "../../models/Admin/admin.subscription.model.js";
-import { normalizeDate,getDatesBetween } from "../Booking/booking.controller.js";
+import {
+  normalizeDate,
+  getDatesBetween,
+} from "../Booking/booking.controller.js";
 import RoomModel from "../../models/Listing/room.model.js";
 import RoomInventoryModel from "../../models/Listing/roomInventory.model.js";
 import Booking from "../../models/Listing/booking.model.js";
 import ManualRoomBlock from "../../models/Listing/manualRoomBlock.model.js";
 import mongoose from "mongoose";
+import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 
 configDotenv();
 
@@ -49,7 +53,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
             "x-client-id": process.env.CASHFREE_CLIENT_ID,
             "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
           },
-        },
+        }
       ),
       axios.post(
         process.env.GSTIN_PAN_API_URL,
@@ -60,7 +64,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
             "x-client-id": process.env.CASHFREE_CLIENT_ID,
             "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
           },
-        },
+        }
       ),
     ]);
 
@@ -94,7 +98,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
 
     partner.gstinList = gstinList;
     partner.isPanVerified = true;
-    partner.isVerified =true;
+    partner.isVerified = true;
 
     // Save the document
     await partner.save();
@@ -144,7 +148,7 @@ export const getPartnerKYC = asyncHandler(async (req, res, next) => {
   }
 
   const partner = await Partner.findOne(partnerQuery).select(
-    "panDetails gstinList isPanVerified",
+    "panDetails gstinList isPanVerified"
   );
 
   if (!partner) {
@@ -206,7 +210,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
           "x-client-id": process.env.CASHFREE_CLIENT_ID,
           "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
         },
-      },
+      }
     );
 
     const gstinInfo = response.data;
@@ -222,7 +226,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
 
     // 4️⃣ Check if GSTIN is linked to PAN
     const isLinkedWithPAN = partner?.gstinList?.some(
-      (g) => g.gstin?.toUpperCase() === gstinInfo.GSTIN?.toUpperCase(),
+      (g) => g.gstin?.toUpperCase() === gstinInfo.GSTIN?.toUpperCase()
     );
 
     const message = isLinkedWithPAN
@@ -344,8 +348,8 @@ export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         error?.error?.description || error.message || "Fund setup failed",
-        error.status || 500,
-      ),
+        error.status || 500
+      )
     );
   }
 });
@@ -361,7 +365,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!accountHolderName || !accountNumber || !ifscCode) {
       throw new CustomError(
         "accountHolderName, accountNumber and ifscCode are required",
-        400,
+        400
       );
     }
 
@@ -382,7 +386,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!partner?.razorpay?.contactId) {
       throw new CustomError(
         "Payout contact not found. Setup payout first.",
-        400,
+        400
       );
     }
 
@@ -425,8 +429,8 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         error?.error?.description || error.message || "Bank update failed",
-        error.status || 500,
-      ),
+        error.status || 500
+      )
     );
   }
 });
@@ -469,7 +473,7 @@ export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
 
   if (commissionPercentage < min || commissionPercentage > max) {
     return next(
-      new CustomError("commission percentage is outside platform range", 400),
+      new CustomError("commission percentage is outside platform range", 400)
     );
   }
 
@@ -583,8 +587,8 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         err?.error?.description || "payment gateway error",
-        err.statusCode || 502,
-      ),
+        err.statusCode || 502
+      )
     );
   }
 });
@@ -625,7 +629,7 @@ export const subscriptionWebhookController = asyncHandler(
     await plan.save();
 
     return res.status(200).json({ success: true });
-  },
+  }
 );
 
 export const getMyPlans = asyncHandler(async (req, res, next) => {
@@ -639,161 +643,159 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "successfully fetched current plans", { plans });
 });
 
-
 //PARTNER
 //manully blocked room
 
-export const blockRoom = asyncHandler(async (req,res,next)=>{
-      
-   const partnerId = req.user._id;
+export const blockRoom = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
 
-      let { propertyId, roomId, startDate, endDate, rooms, reason, notes } = req.body;
+  let { propertyId, roomId, startDate, endDate, rooms, reason, notes } =
+    req.body;
 
-      if(!propertyId  || !roomId){
-        throw new CustomError("propertyId and roomId are required",400);
-      }
-      if (!startDate || !endDate)
-        throw new CustomError("start date and end dates dates are required", 400);
-      
-       startDate =normalizeDate(startDate);
-       endDate =normalizeDate(endDate);
+  if (!propertyId || !roomId) {
+    throw new CustomError("propertyId and roomId are required", 400);
+  }
+  if (!startDate || !endDate)
+    throw new CustomError("start date and end dates dates are required", 400);
 
-      if (isNaN(startDate) || isNaN(endDate))
-        throw new CustomError("Invalid date format", 400);
+  startDate = normalizeDate(startDate);
+  endDate = normalizeDate(endDate);
 
-      if (endDate < startDate)
-        throw new CustomError(
-          "endDate date must be after startDate",
-          400
-        );
-        const reasonFeilds =["OFFLINE_BOOKING", "MAINTENANCE", "OWNER_BLOCK", "OTHER"];
-        if ( !reason  || !reasonFeilds.includes(reason)){
-              throw new CustomError(`reason is required and should be  ${reasonFeilds}`);
-        }
+  if (isNaN(startDate) || isNaN(endDate))
+    throw new CustomError("Invalid date format", 400);
 
-          if (!rooms || rooms <= 0)
-            throw new CustomError(
-              " number of rooms are required and must be greater than 0 ",
-              400
-            );
+  if (endDate < startDate)
+    throw new CustomError("endDate date must be after startDate", 400);
+  const reasonFeilds = [
+    "OFFLINE_BOOKING",
+    "MAINTENANCE",
+    "OWNER_BLOCK",
+    "OTHER",
+  ];
+  if (!reason || !reasonFeilds.includes(reason)) {
+    throw new CustomError(`reason is required and should be  ${reasonFeilds}`);
+  }
 
-
-        const session = await mongoose.startSession();
-        session.startTransaction();
-
-        try {
-          const room = await RoomModel.findById(roomId).session(session);
-
-          if (!room) throw new CustomError("Room not found", 404);
-
-          const dates = getDatesBetween(startDate, endDate);
-
-          const inventories = await RoomInventoryModel.find({
-            roomId,
-            date: { $in: dates },
-          }).session(session);
-
-          const inventoryMap = new Map();
-
-          inventories.forEach((inv) => {
-            inventoryMap.set(new Date(inv.date).toISOString(), inv);
-          });
-
-          // Validate availability
-          for (const date of dates) {
-            const key = normalizeDate(date).toISOString();
-            const inv = inventoryMap.get(key);
-
-            const booked = inv?.bookedRooms || 0;
-            const total = inv?.totalRooms || room.numberOfRooms;
-
-            if (booked + rooms > total) {
-              throw new CustomError(
-                `Not enough rooms to block on ${key.slice(0, 10)}`,
-                400
-              );
-            }
-          }
-
-          // Update inventory
-          for (const date of dates) {
-            await RoomInventoryModel.findOneAndUpdate(
-              { roomId, date },
-              {
-                $setOnInsert: {
-                  propertyId,
-                  roomId,
-                  date,
-                  totalRooms: room.numberOfRooms,
-                },
-                $inc: { bookedRooms: rooms },
-              },
-              { upsert: true, session }
-            );
-          }
-
-          const block = await ManualRoomBlock.create(
-            [
-              {
-                propertyId,
-                roomId,
-                partnerId,
-                startDate,
-                endDate,
-                rooms,
-                reason,
-                notes,
-              },
-            ],
-            { session }
-          );
-
-          await session.commitTransaction();
-          session.endSession();
-
-          successResponse(res, 201, "Rooms blocked successfully", block[0]);
-        } catch (err) {
-          await session.abortTransaction();
-          session.endSession();
-          throw err;
-        }
-
-});
-
-export const releaseBlock = asyncHandler(async (req, res) => {
-
-  const { id } = req.params;
-  const partnerId =req.user._id;
+  if (!rooms || rooms <= 0)
+    throw new CustomError(
+      " number of rooms are required and must be greater than 0 ",
+      400
+    );
 
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
+    const room = await RoomModel.findById(roomId).session(session);
 
-    const block = await ManualRoomBlock.findOne({_id:id,partnerId}).session(session);
+    if (!room) throw new CustomError("Room not found", 404);
 
-    if (!block) throw new CustomError("manually block  room data  not found", 404);
+    const dates = getDatesBetween(startDate, endDate);
+
+    const inventories = await RoomInventoryModel.find({
+      roomId,
+      date: { $in: dates },
+    }).session(session);
+
+    const inventoryMap = new Map();
+
+    inventories.forEach((inv) => {
+      inventoryMap.set(new Date(inv.date).toISOString(), inv);
+    });
+
+    // Validate availability
+    for (const date of dates) {
+      const key = normalizeDate(date).toISOString();
+      const inv = inventoryMap.get(key);
+
+      const booked = inv?.bookedRooms || 0;
+      const total = inv?.totalRooms || room.numberOfRooms;
+
+      if (booked + rooms > total) {
+        throw new CustomError(
+          `Not enough rooms to block on ${key.slice(0, 10)}`,
+          400
+        );
+      }
+    }
+
+    // Update inventory
+    for (const date of dates) {
+      await RoomInventoryModel.findOneAndUpdate(
+        { roomId, date },
+        {
+          $setOnInsert: {
+            propertyId,
+            roomId,
+            date,
+            totalRooms: room.numberOfRooms,
+          },
+          $inc: { bookedRooms: rooms },
+        },
+        { upsert: true, session }
+      );
+    }
+
+    const block = await ManualRoomBlock.create(
+      [
+        {
+          propertyId,
+          roomId,
+          partnerId,
+          startDate,
+          endDate,
+          rooms,
+          reason,
+          notes,
+        },
+      ],
+      { session }
+    );
+
+    await session.commitTransaction();
+    session.endSession();
+
+    successResponse(res, 201, "Rooms blocked successfully", block[0]);
+  } catch (err) {
+    await session.abortTransaction();
+    session.endSession();
+    throw err;
+  }
+});
+
+export const releaseBlock = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const partnerId = req.user._id;
+
+  const session = await mongoose.startSession();
+  session.startTransaction();
+
+  try {
+    const block = await ManualRoomBlock.findOne({ _id: id, partnerId }).session(
+      session
+    );
+
+    if (!block)
+      throw new CustomError("manually block  room data  not found", 404);
     if (block.released) throw new CustomError("Block already released", 400);
-     
+
     const dates = getDatesBetween(block.startDate, block.endDate);
 
     for (const date of dates) {
+      const inv = await RoomInventoryModel.findOne({
+        roomId: block.roomId,
+        date,
+      }).session(session);
 
-     const inv = await RoomInventoryModel.findOne({
-       roomId: block.roomId,
-       date,
-     }).session(session);
+      if (!inv || inv.bookedRooms < block.rooms) {
+        throw new CustomError("Inventory mismatch while releasing block", 400);
+      }
 
-     if (!inv || inv.bookedRooms < block.rooms) {
-       throw new CustomError("Inventory mismatch while releasing block", 400);
-     }
-
-     await RoomInventoryModel.findOneAndUpdate(
-       { roomId: block.roomId, date },
-       { $inc: { bookedRooms: -block.rooms } },
-       { session }
-     );
-
+      await RoomInventoryModel.findOneAndUpdate(
+        { roomId: block.roomId, date },
+        { $inc: { bookedRooms: -block.rooms } },
+        { session }
+      );
     }
 
     block.released = true;
@@ -806,26 +808,22 @@ export const releaseBlock = asyncHandler(async (req, res) => {
     session.endSession();
 
     successResponse(res, 200, "Block released successfully", block);
-
   } catch (err) {
-
     await session.abortTransaction();
     session.endSession();
     throw err;
-
   }
-
 });
 
 export const getPartnerRoomCalendar = asyncHandler(async (req, res) => {
   const { propertyId, startDate, endDate } = req.query;
-   const partnerId =req.user._id;
+  const partnerId = req.user._id;
 
   if (!propertyId) throw new CustomError("propertyId is required", 400);
 
-  const property= await Property.findOne({_id:propertyId ,partnerId});
+  const property = await Property.findOne({ _id: propertyId, partnerId });
 
-  if(!property)throw new CustomError("property not found", 400);
+  if (!property) throw new CustomError("property not found", 400);
 
   if (!startDate || !endDate)
     throw new CustomError("startDate and endDate are required", 400);
@@ -945,4 +943,525 @@ export const getPartnerRoomCalendar = asyncHandler(async (req, res) => {
   }
 
   successResponse(res, 200, "Room calendar fetched", result);
+});
+
+//partner dashboard controller
+
+export const getPartnerMonthlyFinance = asyncHandler(async (req, res, next) => {
+  const { date, propertyId } = req.query;
+  const partnerId = req.user._id;
+  /* ---------- VALIDATION ---------- */
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return next(new CustomError("Invalid partnerId", 400));
+  }
+
+  // if (propertyId && !mongoose.Types.ObjectId.isValid(propertyId)) {
+  //   return next(new CustomError("Invalid propertyId", 400));
+  // }
+
+  let dateObj = date ? new Date(date) : new Date();
+
+  if (isNaN(dateObj)) {
+    return next(new CustomError("Invalid date format", 400));
+  }
+
+  const payoutMonth = dateObj.getMonth() + 1;
+  const payoutYear = dateObj.getFullYear();
+
+  /* =========================================================
+     AGGREGATION PIPELINE
+  ========================================================= */
+  const result = await PartnerMonthlyPayoutModel.aggregate([
+    {
+      $match: {
+        partnerId: new mongoose.Types.ObjectId(partnerId),
+        payoutMonth,
+        payoutYear,
+      },
+    },
+
+    /* ---------- UNWIND BOOKINGS ---------- */
+    { $unwind: "$bookings" },
+
+    /* ---------- LOOKUP BOOKINGS ---------- */
+    {
+      $lookup: {
+        from: "bookings",
+        localField: "bookings.bookingId",
+        foreignField: "_id",
+        as: "booking",
+      },
+    },
+    { $unwind: "$booking" },
+
+    {
+      $match: {
+        ...(propertyId && {
+          "booking.propertyId": new mongoose.Types.ObjectId(propertyId),
+        }),
+        "booking.paymentStatus": "paid",
+      },
+    },
+
+    /* =========================================================
+       FACET
+    ========================================================= */
+    {
+      $facet: {
+        /* -----------------------------------
+           1. TOTAL BOOKINGS
+        ----------------------------------- */
+        bookings: [
+          {
+            $group: {
+              _id: null,
+              totalBookings: { $sum: 1 },
+            },
+          },
+        ],
+
+        /* -----------------------------------
+           2. TOTAL REVENUE
+        ----------------------------------- */
+        revenue: [
+          {
+            $group: {
+              _id: null,
+              totalRevenue: { $sum: "$booking.totalPrice" },
+            },
+          },
+        ],
+
+        /* -----------------------------------
+           3. GROSS & NET PROFIT (PARTNER LOGIC)
+        ----------------------------------- */
+        profit: [
+          {
+            $group: {
+              _id: null,
+
+              /* ---------------- GROSS ---------------- */
+              grossProfit: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$booking.paymentMode", "PAY_NOW"] },
+
+                    {
+                      $cond: [
+                        { $eq: ["$partnerWallet.status", "paid"] },
+                        {
+                          $add: [
+                            "$bookings.partnerAmount",
+                            "$bookings.partner_gst",
+                          ],
+                        },
+                        0,
+                      ],
+                    },
+
+                    /* PAY_ON_ARRIVAL */
+                    {
+                      $add: [
+                        "$bookings.partnerAmount",
+                        "$bookings.partner_gst",
+                      ],
+                    },
+                  ],
+                },
+              },
+
+              /* ---------------- NET ---------------- */
+              netProfit: {
+                $sum: {
+                  $cond: [
+                    { $eq: ["$booking.paymentMode", "PAY_NOW"] },
+
+                    {
+                      $cond: [
+                        { $eq: ["$partnerWallet.status", "paid"] },
+                        "$bookings.partnerAmount",
+                        0,
+                      ],
+                    },
+
+                    /* PAY_ON_ARRIVAL */
+                    "$bookings.partnerAmount",
+                  ],
+                },
+              },
+            },
+          },
+        ],
+      },
+    },
+  ]);
+
+  /* =========================================================
+     SAFE EXTRACTION
+  ========================================================= */
+  const bookings = result[0]?.bookings[0] || {};
+  const revenue = result[0]?.revenue[0] || {};
+  const profit = result[0]?.profit[0] || {};
+
+  /* =========================================================
+     FINAL RESPONSE
+     ========================================================= */
+
+  const data = {
+    totalBookings: bookings.totalBookings || 0,
+    totalRevenue: revenue.totalRevenue || 0,
+    grossProfit: profit.grossProfit || 0,
+    netProfit: profit.netProfit || 0,
+  };
+
+  return successResponse(
+    res,
+    200,
+    `Partner finance report for ${payoutMonth}/${payoutYear}`,
+    data
+  );
+});
+
+export const getPartnerYearlyAnalysis = asyncHandler(async (req, res, next) => {
+  const { year, propertyId } = req.query;
+
+  const partnerId = req.user._id;
+  /* ---------- VALIDATION ---------- */
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return next(new CustomError("Invalid partnerId", 400));
+  }
+
+  // if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+  //   return next(new CustomError("Invalid propertyId", 400));
+  // }
+
+  const selectedYear = year ? Number(year) : new Date().getFullYear();
+
+  /* =========================================================
+     AGGREGATION
+  ========================================================= */
+  const result = await PartnerMonthlyPayoutModel.aggregate([
+    {
+      $match: {
+        partnerId: new mongoose.Types.ObjectId(partnerId),
+        payoutYear: selectedYear,
+      },
+    },
+
+    /* ---------- UNWIND BOOKINGS ---------- */
+    { $unwind: "$bookings" },
+
+    /* ---------- LOOKUP BOOKINGS ---------- */
+    {
+      $lookup: {
+        from: "bookings",
+        localField: "bookings.bookingId",
+        foreignField: "_id",
+        as: "booking",
+      },
+    },
+    { $unwind: "$booking" },
+
+    /* ---------- FILTER PROPERTY ---------- */
+    {
+      $match: {
+        ...(propertyId && {
+          "booking.propertyId": new mongoose.Types.ObjectId(propertyId),
+        }),
+        "booking.paymentStatus": "paid",
+      },
+    },
+
+    /* =========================================================
+       GROUP BY MONTH
+    ========================================================= */
+    {
+      $group: {
+        _id: "$payoutMonth",
+
+        totalBookings: { $sum: 1 },
+
+        /* ---------------- NET PROFIT ---------------- */
+        netProfit: {
+          $sum: {
+            $cond: [
+              { $eq: ["$booking.paymentMode", "PAY_NOW"] },
+
+              {
+                $cond: [
+                  { $eq: ["$partnerWallet.status", "paid"] },
+                  "$bookings.partnerAmount",
+                  0,
+                ],
+              },
+
+              /* PAY_ON_ARRIVAL */
+              "$bookings.partnerAmount",
+            ],
+          },
+        },
+      },
+    },
+
+    /* ---------- SORT MONTH ---------- */
+    { $sort: { _id: 1 } },
+  ]);
+
+  /* =========================================================
+     FORMAT (12 MONTHS FIXED)
+  ========================================================= */
+
+  const monthNames = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  const months = Array.from({ length: 12 }, (_, i) => ({
+    monthNumber: i + 1,
+    monthName: monthNames[i],
+    totalBookings: 0,
+    netProfit: 0,
+  }));
+
+  result.forEach((item) => {
+    const index = item._id - 1;
+
+    months[index] = {
+      monthNumber: item._id,
+      monthName: monthNames[index],
+      totalBookings: item.totalBookings,
+      netProfit: item.netProfit,
+    };
+  });
+  return successResponse(
+    res,
+    200,
+    `Yearly analysis for ${selectedYear}`,
+    months
+  );
+});
+
+export const getRecentBookingByID = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
+  const { propertyId } = req.params;
+  const { limit = 5 } = req.query; // default 5 bookings
+
+  /* ---------- VALIDATION ---------- */
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+    return next(new CustomError("Invalid partnerId", 400));
+  }
+
+  if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+    return next(new CustomError("Invalid propertyId", 400));
+  }
+
+  /* ---------- FETCH BOOKINGS ---------- */
+  const bookings = await Booking.find({
+    propertyId,
+    status: { $in: ["pending", "confirmed", "expired"] },
+  })
+    .sort({ createdAt: -1 })
+    .limit(Number(limit))
+    .populate("userId", "fullName email phone")
+    .populate("rooms.roomId", "name typeOfRoom");
+
+  /* ---------- RESPONSE ---------- */
+  return successResponse(
+    res,
+    200,
+    "Recent bookings fetched successfully",
+    bookings
+  );
+});
+
+//revenue and performance
+
+export const getPartnerMonthlyBookingsData = asyncHandler(
+  async (req, res, next) => {
+    const partnerId = req.user._id;
+    const { propertyId, date } = req.query;
+
+    /* ---------- VALIDATION ---------- */
+    if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+      return next(new CustomError("Invalid partnerId", 400));
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+      return next(new CustomError("Invalid propertyId", 400));
+    }
+
+    let dateObj = date ? new Date(date) : new Date();
+    if (isNaN(dateObj)) {
+      return next(new CustomError("Invalid date format", 400));
+    }
+
+    const payoutMonth = dateObj.getMonth() + 1;
+    const payoutYear = dateObj.getFullYear();
+
+    /* =========================================================
+     AGGREGATION
+  ========================================================= */
+    const result = await PartnerMonthlyPayoutModel.aggregate([
+      {
+        $match: {
+          partnerId: new mongoose.Types.ObjectId(partnerId),
+          payoutMonth,
+          payoutYear,
+        },
+      },
+
+      /* ---------- UNWIND BOOKINGS ---------- */
+      { $unwind: "$bookings" },
+
+      /* ---------- LOOKUP BOOKING ---------- */
+      {
+        $lookup: {
+          from: "bookings",
+          localField: "bookings.bookingId",
+          foreignField: "_id",
+          as: "booking",
+        },
+      },
+      { $unwind: "$booking" },
+
+      /* ---------- FILTER PROPERTY ---------- */
+      {
+        $match: {
+          "booking.propertyId": new mongoose.Types.ObjectId(propertyId),
+          "booking.paymentStatus": "paid",
+        },
+      },
+
+      /* =========================================================
+       FACET
+    ========================================================= */
+      {
+        $facet: {
+          /* ---------- ALL BOOKINGS ---------- */
+          bookings: [
+            {
+              $project: {
+                bookingId: "$booking._id",
+                totalPrice: "$booking.totalPrice",
+                paymentMode: "$booking.paymentMode",
+                status: "$booking.status",
+                checkInDate: "$booking.checkInDate",
+                checkOutDate: "$booking.checkOutDate",
+                createdAt: "$booking.createdAt",
+              },
+            },
+            { $sort: { createdAt: -1 } },
+          ],
+
+          /* ---------- STATS ---------- */
+          stats: [
+            {
+              $group: {
+                _id: null,
+
+                totalBookings: { $sum: 1 },
+
+                payNowTotal: {
+                  $sum: {
+                    $cond: [
+                      { $eq: ["$booking.paymentMode", "PAY_NOW"] },
+                      "$booking.totalPrice",
+                      0,
+                    ],
+                  },
+                },
+
+                payOnArrivalTotal: {
+                  $sum: {
+                    $cond: [
+                      { $eq: ["$booking.paymentMode", "PAY_ON_ARRIVAL"] },
+                      "$booking.totalPrice",
+                      0,
+                    ],
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    ]);
+
+    /* =========================================================
+     SAFE EXTRACTION
+  ========================================================= */
+    const bookings = result[0]?.bookings || [];
+    const stats = result[0]?.stats[0] || {};
+
+    const data = {
+      totalBookings: stats.totalBookings || 0,
+      payNowTotal: stats.payNowTotal || 0,
+      payOnArrivalTotal: stats.payOnArrivalTotal || 0,
+      bookings,
+    };
+
+    return successResponse(
+      res,
+      200,
+      `Monthly booking report for ${payoutMonth}/${payoutYear}`,
+      data
+    );
+  }
+);
+
+
+export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
+  const { date } = req.query;
+
+  /* ---------- DATE HANDLING ---------- */
+  let dateObj = date ? new Date(date) : new Date();
+
+  if (isNaN(dateObj)) {
+    return next(new CustomError("Invalid date format", 400));
+  }
+
+  const payoutMonth = dateObj.getMonth() + 1;
+  const payoutYear = dateObj.getFullYear();
+
+  /* ---------- FETCH PAYOUT ---------- */
+  const payout = await PartnerMonthlyPayoutModel.findOne({
+    partnerId,
+    payoutMonth,
+    payoutYear,
+  }).lean();
+
+  if (!payout) {
+    return next(
+      new CustomError(
+        `No payout data found for ${payoutMonth}/${payoutYear}`,
+        404
+      )
+    );
+  }
+
+  /* ---------- CALCULATIONS ---------- */
+  const totalBookings = payout.bookings?.length || 0;
+
+ 
+
+  /* ---------- RESPONSE ---------- */
+  const data = {
+    totalBookings,
+    /* Wallet Info */
+    partnerWallet: payout.partnerWallet,
+    adminWallet: payout.adminWallet,
+  };
+
+  return successResponse(res, 200, "Payout fetched successfully", data);
 });
