@@ -31,7 +31,7 @@ router.post(
   protect,
   authorizeRoles("ADMIN"),
   upload.single("image"),
-  createTour
+  createTour,
 );
 
 router.put(
@@ -39,16 +39,11 @@ router.put(
   protect,
   authorizeRoles("ADMIN"),
   upload.single("image"),
-  updateTour
+  updateTour,
 );
-router.delete(
-  "/delete/:id",
-  protect,
-  authorizeRoles("ADMIN"),
-  deleteTour
-);
+router.delete("/delete/:id", protect, authorizeRoles("ADMIN"), deleteTour);
 router.get("/get-all-tour", protect, authorizeRoles("ADMIN"), getAllTours);
 
-router.get("/get-active-tours", protect, authorizeRoles("ADMIN"), getTours);
+router.get("/get-active-tours", getTours);
 
 export default router;
