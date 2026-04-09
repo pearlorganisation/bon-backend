@@ -1307,12 +1307,27 @@ export const getYearly_Revenue_Tax_Data = asyncHandler(
     ]);
 
     /* ---------------- FILL MISSING MONTHS ---------------- */
+    const monthNames = [
+      "Jan",
+      "Feb",
+      "Mar",
+      "Apr",
+      "May",
+      "Jun",
+      "Jul",
+      "Aug",
+      "Sep",
+      "Oct",
+      "Nov",
+      "Dec",
+    ];
     const fullYearData = Array.from({ length: 12 }, (_, i) => {
       const month = i + 1;
       const found = result.find((r) => r.month === month);
 
       return {
         month,
+        monthName : monthNames[i],
         totalProfit: found?.totalProfit || 0,
         totalGST: found?.totalGST || 0,
       };

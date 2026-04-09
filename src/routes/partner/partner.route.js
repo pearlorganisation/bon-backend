@@ -31,6 +31,10 @@ import {
   blockRoom,
   releaseBlock,
   getPartnerRoomCalendar,
+  getPartnerMonthlyFinance,
+  getPartnerYearlyAnalysis,
+  getPartnerMonthlyBookingsData,
+  getMyMonthlyPayout,
 } from "../../controllers/partner/parnter.controller.js";
 import {
   authorizeRoles,
@@ -161,6 +165,40 @@ router.post("/release-block/:id", protect, releaseBlock);
 router.get("/room-calendar", protect, getPartnerRoomCalendar);
 
 
+//partner dashboard api 
+
+router.get(
+  "/get-my-monthly-finance",
+  protect,
+  authorizeRoles("PARTNER"),
+  getPartnerMonthlyFinance
+);
+
+router.get(
+  "/get-yearly-analysis",
+  protect,
+  authorizeRoles("PARTNER"),
+  getPartnerYearlyAnalysis
+);
+router.get(
+  "/get-recent-booking/:propertyId",
+  protect,
+  authorizeRoles("PARTNER"),
+  getPartnerYearlyAnalysis
+);
+
+router.get(
+  "/get-property-montlhy-booking-data",
+  protect,
+  authorizeRoles("PARTNER"),
+  getPartnerMonthlyBookingsData
+);
+router.get(
+  "/get-my-montlhy-payout",
+  protect,
+  authorizeRoles("PARTNER"),
+  getMyMonthlyPayout
+);
 
 
 export default router;
