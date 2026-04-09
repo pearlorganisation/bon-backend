@@ -31,6 +31,12 @@ export const createTour = asyncHandler(async (req, res, next) => {
     contact,
   } = req.body;
 
+  const sanitizeValue = (val) => (val === "null" || val === "" ? null : val);
+
+  discountPrice = sanitizeValue(discountPrice);
+  price = sanitizeValue(price);
+  priority = sanitizeValue(priority);
+
   /* ---------- PARSE ---------- */
   duration = safeJSONParse(duration, {});
   highlights = safeJSONParse(highlights, []);
@@ -106,7 +112,16 @@ export const updateTour = asyncHandler(async (req, res, next) => {
   if (!tour) {
     return next(new CustomError("Tour not found", 404));
   }
-  /* ---------- PARSE ---------- */
+
+  /* ---------- SANITIZE NUMERIC/NULL STRINGS ---------- */
+  // Convert string "null" or empty strings to actual null/undefined
+  const sanitizeValue = (val) => (val === "null" || val === "" ? null : val);
+
+  discountPrice = sanitizeValue(discountPrice);
+  price = sanitizeValue(price);
+  priority = sanitizeValue(priority);
+
+  /* ---------- PARSE JSON FIELDS ---------- */
   duration = safeJSONParse(duration, tour.duration);
   highlights = safeJSONParse(highlights, tour.highlights);
   contact = safeJSONParse(contact, tour.contact);
@@ -154,7 +169,7 @@ export const updateTour = asyncHandler(async (req, res, next) => {
       status,
       coverImage,
     },
-    { new: true, runValidators: true }
+    { new: true, runValidators: true },
   );
 
   return successResponse(res, 200, "Tour updated successfully", updatedTour);
@@ -185,11 +200,11 @@ export const getAllTours = asyncHandler(async (req, res, next) => {
 
   return successResponse(res, 200, "Tours fetched successfully", tours);
 });
-     
+
 export const getTours = asyncHandler(async (req, res, next) => {
-    const tours = await Tour.find({ status: "active" }).sort({
-      priority: -1,
-      createdAt: -1,
-    });
-    return successResponse(res, 200, "Tours fetched successfully", tours);
+  const tours = await Tour.find({ status: "active" }).sort({
+    priority: -1,
+    createdAt: -1,
   });
+  return successResponse(res, 200, "Tours fetched successfully", tours);
+});
