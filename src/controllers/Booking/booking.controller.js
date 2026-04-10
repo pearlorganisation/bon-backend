@@ -1161,7 +1161,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
     booking.cancellation = {
       cancelledBy: userId,
       cancellationDate: new Date(),
-      refundAmount: Math.round(refundAmount * 100),
+      refundAmount: refundAmount,
       reason,
     };
 
@@ -1177,7 +1177,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         const refund = await razorpay.payments.refund(
           booking.payment.razorpayPaymentId,
           {
-            amount: round(refundAmount * 100),
+            amount: Math.round(refundAmount * 100),
             notes: {
               bookingId: booking._id.toString(),
               reason,
