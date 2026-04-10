@@ -10,6 +10,8 @@ const roomSchema = new mongoose.Schema(
     name: { type: String }, // e.g., "Deluxe Room"
     capacity: { type: Number, default: 2 },
     pricePerNight: { type: Number, required: true },
+    weeklyPrice: { type: Number, default: 0 },
+    monthlyPrice: { type: Number, default: 0 },
     discount: {
       type: Number, // percent or flat
       default: 0,
@@ -421,7 +423,7 @@ const roomSchema = new mongoose.Schema(
     //   },
     // ],
   },
-  { timestamps: true },
+  { timestamps: true }
 );
 
 roomSchema.virtual("Bookings", {

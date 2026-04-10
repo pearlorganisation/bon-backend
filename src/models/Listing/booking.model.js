@@ -50,6 +50,11 @@ const bookingSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    pricingType: {
+      type: String,
+      enum: ["NIGHT", "WEEK", "MONTH"],
+      default: "NIGHT",
+    },
     // Total number of guests (sum across all rooms, validated against capacities)
     numberOfGuests: {
       adults: { type: Number },
@@ -67,7 +72,7 @@ const bookingSchema = new mongoose.Schema(
       discountAmount: { type: Number, default: 0 },
       // taxes: { type: Number, default: 0 },
       extraServicesFee: { type: Number, default: 0 }, // e.g., service fees, cleaning fees
-       childrenCharge: {type:Number,default:0},
+      childrenCharge: { type: Number, default: 0 },
       partnerPlanId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "PartnerPlan",
@@ -78,7 +83,7 @@ const bookingSchema = new mongoose.Schema(
     paymentMode: {
       type: String,
       enum: ["PAY_NOW", "PAY_ON_ARRIVAL"],
-      // required: true,   
+      // required: true,
       default: null,
     },
     //paymwnt object only  for PAY_NOW
@@ -148,7 +153,7 @@ const bookingSchema = new mongoose.Schema(
     invoiceId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Invoice",
-      default:null,
+      default: null,
     },
   },
   { timestamps: true }
