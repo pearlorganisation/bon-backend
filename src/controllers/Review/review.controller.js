@@ -5,15 +5,16 @@ import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
 import Booking from "../../models/Listing/booking.model.js";
+import mongoose from "mongoose";
 
 export const createReview = asyncHandler(async (req, res, next) => {
-  const { bookingId ,review, rooms } = req.body;
+  const { bookingId, review, rooms } = req.body;
   const userId = req.user._id;
 
   /* ================= VALIDATION ================= */
   if (!bookingId || !rooms || !Array.isArray(rooms) || rooms.length === 0) {
     return next(
-      new CustomError("bookingId and rooms ratings are required", 400)
+      new CustomError("bookingId and rooms ratings are required", 400),
     );
   }
 
@@ -27,7 +28,7 @@ export const createReview = asyncHandler(async (req, res, next) => {
   /* ================= USER VALIDATION ================= */
   if (booking.userId.toString() !== userId.toString()) {
     return next(
-      new CustomError("You are not allowed to review this booking", 403)
+      new CustomError("You are not allowed to review this booking", 403),
     );
   }
 
@@ -38,7 +39,7 @@ export const createReview = asyncHandler(async (req, res, next) => {
 
   if (booking.paymentStatus !== "paid") {
     return next(
-      new CustomError("Payment must be completed to submit review", 400)
+      new CustomError("Payment must be completed to submit review", 400),
     );
   }
 
@@ -47,7 +48,7 @@ export const createReview = asyncHandler(async (req, res, next) => {
 
   if (existingReview) {
     return next(new CustomError("You have already reviewed this booking", 400));
-  }         
+  }
 
   /* ================= ROOM VALIDATION ================= */
   const bookingRoomIds = booking.rooms.map((r) => r.roomId.toString());
@@ -57,7 +58,7 @@ export const createReview = asyncHandler(async (req, res, next) => {
   for (const r of rooms) {
     if (!r.roomId || r.rating === undefined) {
       return next(
-        new CustomError("Each room must have roomId and rating", 400)
+        new CustomError("Each room must have roomId and rating", 400),
       );
     }
 
@@ -104,7 +105,7 @@ export const updateReview = asyncHandler(async (req, res, next) => {
   /* ================= VALIDATION ================= */
   if (!bookingId || !rooms || !Array.isArray(rooms) || rooms.length === 0) {
     return next(
-      new CustomError("bookingId and rooms ratings are required", 400)
+      new CustomError("bookingId and rooms ratings are required", 400),
     );
   }
 
@@ -121,7 +122,7 @@ export const updateReview = asyncHandler(async (req, res, next) => {
   /* ================= USER VALIDATION ================= */
   if (booking.userId.toString() !== userId.toString()) {
     return next(
-      new CustomError("You are not allowed to update this review", 403)
+      new CustomError("You are not allowed to update this review", 403),
     );
   }
 
@@ -130,7 +131,7 @@ export const updateReview = asyncHandler(async (req, res, next) => {
 
   if (daysDiff > 7) {
     return next(
-      new CustomError("Review can only be updated within 7 days", 400)
+      new CustomError("Review can only be updated within 7 days", 400),
     );
   }
 
@@ -142,7 +143,7 @@ export const updateReview = asyncHandler(async (req, res, next) => {
   for (const r of rooms) {
     if (!r.roomId || r.rating === undefined) {
       return next(
-        new CustomError("Each room must have roomId and rating", 400)
+        new CustomError("Each room must have roomId and rating", 400),
       );
     }
 
@@ -212,14 +213,12 @@ export const updateReview = asyncHandler(async (req, res, next) => {
 //     );
 //   }
 
-
 //   /* ================= DELETE ================= */
 //   await review.deleteOne();
 
 //   /* ================= RESPONSE ================= */
 //   successResponse(res, 200, "Review deleted successfully", {});
 // });
-
 
 export const getPropertyReviews = asyncHandler(async (req, res, next) => {
   const { propertyId } = req.params;
