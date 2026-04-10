@@ -41,10 +41,10 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
         enum: ["pending", "processing", "paid", "failed"],
         default: "pending",
       },
-      razorpayPayoutId: String,
-      razorpayStatus: String,
-      paidAt: Date,
-      razorpayStatusDetail: String,
+      // razorpayPayoutId: String,
+      // razorpayStatus: String,
+      // paidAt: Date,
+      // razorpayStatusDetail: String,
       invoiceId: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Invoice",
@@ -64,16 +64,16 @@ const PartnerMonthlyPayoutSchema = new mongoose.Schema(
       },
     },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 /* ---------- PREVENT DUPLICATE PAYOUT ---------- */
 PartnerMonthlyPayoutSchema.index(
   { partnerId: 1, payoutMonth: 1, payoutYear: 1 },
-  { unique: true }
+  { unique: true },
 );
 
 export default mongoose.model(
   "PartnerMonthlyPayout",
-  PartnerMonthlyPayoutSchema
+  PartnerMonthlyPayoutSchema,
 );

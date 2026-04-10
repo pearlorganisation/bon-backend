@@ -35,6 +35,7 @@ import {
   getPartnerYearlyAnalysis,
   getPartnerMonthlyBookingsData,
   getMyMonthlyPayout,
+  getRecentBookingByID,
 } from "../../controllers/partner/parnter.controller.js";
 import {
   authorizeRoles,
@@ -157,48 +158,45 @@ router.delete("/delete-single-room/:roomId", protect, deleteRoom);
 
 router.get("/RoomDetails/:roomId", getRoomDetailsById);
 
-
 // manually block room
 
 router.post("/block-room", protect, blockRoom);
 router.post("/release-block/:id", protect, releaseBlock);
 router.get("/room-calendar", protect, getPartnerRoomCalendar);
 
-
-//partner dashboard api 
+//partner dashboard api
 
 router.get(
   "/get-my-monthly-finance",
   protect,
   authorizeRoles("PARTNER"),
-  getPartnerMonthlyFinance
+  getPartnerMonthlyFinance,
 );
 
 router.get(
   "/get-yearly-analysis",
   protect,
   authorizeRoles("PARTNER"),
-  getPartnerYearlyAnalysis
+  getPartnerYearlyAnalysis,
 );
 router.get(
   "/get-recent-booking/:propertyId",
   protect,
   authorizeRoles("PARTNER"),
-  getPartnerYearlyAnalysis
+  getRecentBookingByID,
 );
 
 router.get(
   "/get-property-montlhy-booking-data",
   protect,
   authorizeRoles("PARTNER"),
-  getPartnerMonthlyBookingsData
+  getPartnerMonthlyBookingsData,
 );
 router.get(
-  "/get-my-montlhy-payout",
+  "/get-my-montlhy-payouts",
   protect,
   authorizeRoles("PARTNER"),
-  getMyMonthlyPayout
+  getMyMonthlyPayout,
 );
-
 
 export default router;
