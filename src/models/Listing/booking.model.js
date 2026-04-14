@@ -28,6 +28,7 @@ const bookingSchema = new mongoose.Schema(
           default: 1,
         },
         pricePerNight: { type: Number, default: 0 },
+        packagePrice: {type: Number,default: 0 },
         discount: { type: Number, default: 0 },
         room_gst: {
           gst_rate: Number,

@@ -11,17 +11,29 @@ const invoiceSchema = new mongoose.Schema(
     invoiceType: {
       type: String,
       enum: [
-        "CUSTOMER_INVOICE", // pay now customer invoice
-        "COMMISSION_INVOICE", // commission per booking
-        "PAYOUT_STATEMENT", // monthly payout to partner
+        "BOOKING_INVOICE", //  for partner and custoemer invoice
+        "PARTNER_PLAN_INVOICE", //  commission and subscription
+        "PAYOUT_STATEMENT_INVOICE", // monthly payout to partner
       ],
       required: true,
     },
 
-
     /* ---------------- DOCUMENT ---------------- */
 
     pdfUrl: String,
+    pdfUrl2: {
+      type: String,
+      validate: {
+        validator: function (value) {
+          // If invoiceType is NOT BOOKING_INVOICE, pdfUrl2 must be empty/undefined
+          if (this.invoiceType !== "BOOKING_INVOICE" && value) {
+            return false;
+          }
+          return true;
+        },
+        message: "pdfUrl2 is only allowed for BOOKING_INVOICE type.",
+      },
+    }, //only  in case for BOOKING_INVOICE  ->partner booking invoice pdf
 
     issuedAt: {
       type: Date,
