@@ -28,11 +28,11 @@ app.post(
   express.raw({ type: "application/json" }),
   razorpayRefundWebhook
 );
-app.post(
-  "api/v1/webhook/razorpay-payout",
-  express.raw({type:"application/json"}),
-  razorpayPayoutWebhook
-)
+// app.post(
+//   "api/v1/webhook/razorpay-payout",
+//   express.raw({type:"application/json"}),
+//   razorpayPayoutWebhook
+// )
 
 /* Middlewares */
 app.use(express.json());

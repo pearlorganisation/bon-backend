@@ -437,3 +437,4 @@ roomSchema.set("toObject", { virtuals: true });
 roomSchema.set("toJSON", { virtuals: true });
 
 export default mongoose.model("Room", roomSchema);
+

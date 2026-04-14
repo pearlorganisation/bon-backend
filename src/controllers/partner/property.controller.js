@@ -515,7 +515,7 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
 
   if (user.role === "ADMIN") {
     // Admin can see all properties
-    Object.assign(query, { status: { $ne: "pending" } });
+    Object.assign(query, { verified: { $ne: "pending" } });
   } else if (user.role === "PARTNER") {
     // Partner can see only their properties
     Object.assign(query, { partnerId: user._id });
