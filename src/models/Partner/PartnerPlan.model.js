@@ -21,10 +21,14 @@ const PartnerPlanSchema = new mongoose.Schema(
     subscriptionPlanId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "AdminSubscriptionPlan",
+      default:null
     },
     subscriptionPayment: {
       orderId: { type: String },
       paymentId: { type: String },
+      totalAmount: Number,
+      gstAmount : Number,
+      gstRate: Number,
     },
 
     startDate: Date,
@@ -34,6 +38,12 @@ const PartnerPlanSchema = new mongoose.Schema(
       enum: ["INACTIVE", "ACTIVE", "UPCOMING", "EXPIRED"],
       required: true,
     },
+
+    invoiceId: {
+         type: mongoose.Schema.Types.ObjectId,
+         ref: "Invoice",
+         default: null,
+       },
   },
   { timestamps: true }
 );

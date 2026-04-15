@@ -10,6 +10,9 @@ import PDFDocument from "pdfkit";
 import { format, subDays } from "date-fns";
 import fs from "fs";
 import path from "path";
+import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
+import Admin from "../../models/Admin/admin.model.js";
+import { generatePartnerPlanInvoicePDF } from "./generatePartnerPlanInvoicePDF.js";
 
 // const booking = {
 //   confirmationCode: "BNF-987654",
@@ -93,6 +96,41 @@ export const createBookingInvoice = async (bookingId) => {
 };
 
 // Helper to fetch images for PDF
-
 const id = "69d357c5017b8f918d833454";
-//createCustomerInvoice(id);
+//createBookingInvoice(id);
+
+export const createParterPlanInvoice = async (planId) => {
+  try {
+    const invoiceNumber = await generateInvoiceNumber();
+
+    const plan = await PartnerPlan.findById(planId)
+      .populate("partnerId")
+      .populate("subscriptionPlanId");
+
+    if (!plan) {
+      throw new Error("no plan found");
+    }
+     const commissionData = await Admin.find().select("commission");
+
+    const url = await generatePartnerPlanInvoicePDF(plan,commissionData,invoiceNumber);
+     console.log(url);
+    // const invoice = await Invoice.create({
+    //   invoiceNumber,
+    //   invoiceType: "PARTNER_PLAN_INVOICE",
+    //   pdfUrl: url,
+    // });
+    // console.log(invoice);
+    // plan.invoiceId = invoice._id;
+    // await plan.save();
+
+    //return invoice;
+
+    // create
+  } catch (error) {
+    console.error(" partner plan Invoice generation failed:", error);
+    throw error;
+  }
+};
+
+
+//createParterPlanInvoice("69afef2fd3e153437fdb7440");

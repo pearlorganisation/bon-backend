@@ -15,6 +15,7 @@ import { isGeneratorFunction } from "util/types";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 import { createBookingInvoice } from "../../utils/invoive/createInvoice.js";
 import Review from "../../models/Listing/review.model.js";
+import Admin from "../../models/Admin/admin.model.js";
 
 const round = (num) => Math.round(num * 100) / 100;
 // utils/dateUtils.js
@@ -147,15 +148,20 @@ const calculateRefundPercentage = ({
   return 0;
 };
 
-const getGST = (amount) => {
+const getGST = async (amount) => {
+  const admin = await Admin.findOne();
+
+  if (!admin || !admin.roomGSTSlabs) {
+    throw new Error("no Room GST Slabs set by Admin");
+  }
+  const slabs = admin.roomGSTSlabs;
   let gstRate = 0;
 
-  if (amount <= 1000) {
-    gstRate = 0;
-  } else if (amount <= 7500) {
-    gstRate = 5;
-  } else {
-    gstRate = 18;
+  for (let slab of slabs) {
+    if (amount <= slab.upto) {
+      gstRate = slab.rate;
+      break;
+    }
   }
 
   const gstAmount = (amount * gstRate) / 100;
@@ -367,7 +373,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
       basePrice += round(roomPrice);
 
-      const gst = getGST(round(effectivePrice));
+      const gst = await getGST(round(effectivePrice));
       const roomGstAmount = round(gst.gstAmount * item.quantity * nights);
       total_gst += roomGstAmount;
 
@@ -681,7 +687,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       basePrice += round(roomPrice);
 
       // GST per room (same as createBooking)
-      const gst = getGST(round(effectivePrice));
+      const gst = await getGST(round(effectivePrice));
       const roomGstAmount = round(gst.gstAmount * item.quantity * nights);
 
       total_gst += roomGstAmount;
@@ -1677,8 +1683,11 @@ export const splitMoney = async (booking, partnerId) => {
       adminAmount = round(
         (partnerPlan.commissionPercentage * baseAmount) / 100
       );
-
-      const ADMIN_GST_RATE = 18;
+      const admin = await Admin.findOne();
+      if (!admin || !admin?.gstOnServices) {
+        throw new Error("No GST on service Tax set by admin");
+      }
+      const ADMIN_GST_RATE = admin?.gstOnServices;
       adminGST = round((adminAmount * ADMIN_GST_RATE) / 100);
 
       partnerAmount = round(baseAmount - adminAmount - adminGST);
@@ -1790,8 +1799,11 @@ export const splitCancellationMoney = async (booking, retainedAmount) => {
       adminAmount = round(
         (partnerPlan.commissionPercentage * retainedBase) / 100
       );
-
-      const ADMIN_GST_RATE = 18;
+       const admin =await Admin.findOne();
+      if (!admin || !admin?.gstOnServices) {
+        throw new Error("No GST on service Tax set by admin");
+      }
+      const ADMIN_GST_RATE = admin?.gstOnServices;
       adminGST = round((adminAmount * ADMIN_GST_RATE) / 100);
 
       partnerAmount = round(retainedBase - adminAmount - adminGST);

@@ -496,6 +496,10 @@ export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
     endDate,
   });
 
+  createParterPlanInvoice(plan._id).catch((error) =>
+    console.log("Invoice generation failed", error)
+  );
+
   successResponse(res, 201, "commission plan created", plan);
 });
 
@@ -542,7 +546,7 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
   const endDate = new Date(startDate);
   endDate.setDate(endDate.getDate() + plan.durationDays);
 
-  // 4. reuse or create INACTIVE (payment pending) plan
+  // 4. reuse or create INACTIVE plan
   let inactivePlan = await PartnerPlan.findOne({
     partnerId,
     planStatus: "INACTIVE",
@@ -560,27 +564,53 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
   inactivePlan.startDate = startDate;
   inactivePlan.endDate = endDate;
 
-  inactivePlan.subscriptionPayment = inactivePlan.subscriptionPayment || {};
+  // 5. get GST config
+  const admin = await Admin.findOne();
 
-  // 5. create razorpay order
+  if (!admin || admin.gstOnServices === undefined) {
+    return next(new CustomError("Service GST not configured", 500));
+  }
+
+  const gstRate = admin.gstOnServices;
+
+  //  GST Calculation
+  const baseAmount = round(plan.price);
+  const gstAmount = round((baseAmount * gstRate) / 100);
+  const totalAmount = round(baseAmount + gstAmount);
+
+  // 6. create razorpay order
   try {
     const order = await razorpay.orders.create({
-      amount: Math.round(plan.price * 100),
+      amount: Math.round(totalAmount * 100),
       currency: "INR",
       receipt: inactivePlan._id.toString(),
-
       notes: {
         purpose: "SUBSCRIPTION",
         partnerPlanId: inactivePlan._id.toString(),
       },
     });
 
-    inactivePlan.subscriptionPayment.orderId = order.id;
+    //  Save proper breakdown (important for invoices)
+    inactivePlan.subscriptionPayment = {
+      orderId: order.id,
+      gstRate,
+      gstAmount,
+      totalAmount,
+    };
+
     await inactivePlan.save();
 
     successResponse(res, 201, "order created", {
       orderId: order.id,
-      amount: plan.price,
+
+      //  Return full breakdown (frontend + invoice ready)
+      pricing: {
+        baseAmount,
+        gstRate,
+        gstAmount,
+        totalAmount,
+      },
+
       currency: "INR",
     });
   } catch (err) {
@@ -638,9 +668,20 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
   const plans = await PartnerPlan.find({
     partnerId,
     planStatus: { $in: ["ACTIVE", "UPCOMING"] },
-  }).sort({ createdAt: 1 });
+  }).sort({ createdAt: 1 }).populate("subscriptionPlanId");
 
   successResponse(res, 200, "successfully fetched current plans", { plans });
+});
+
+export const getPlanById = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
+  const planId =req.params.planId;
+   if(planId){
+    throw new Error("PlanId required");
+   }
+  const plan = await PartnerPlan.findOne( { _id:planId ,partnerId}).populate("subscriptionPlanId");
+
+  successResponse(res, 200, "successfully fetched current plans", {plan});
 });
 
 //PARTNER
@@ -1419,7 +1460,6 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
   }
 );
 
-
 export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
   const { date } = req.query;
@@ -1452,8 +1492,6 @@ export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
 
   /* ---------- CALCULATIONS ---------- */
   const totalBookings = payout.bookings?.length || 0;
-
- 
 
   /* ---------- RESPONSE ---------- */
   const data = {
