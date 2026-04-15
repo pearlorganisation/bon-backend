@@ -33,6 +33,7 @@ import {
   getMonthlyCustomerData,
   getMonthlyBookingsData,
   confirmPartnerMonthlyPayout,
+  upsertGSTConfig,
 } from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
@@ -95,6 +96,7 @@ route.put(
  updateSubscriptionPlan
 );
 
+route.post("/upsert-gst-config",authorizeRoles("ADMIN"),upsertGSTConfig);
 
 
 //payout apis 

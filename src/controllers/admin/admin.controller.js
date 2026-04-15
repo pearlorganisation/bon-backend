@@ -80,6 +80,70 @@ export const getAllPartners = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "successfully fetched partners", partners);
 });
 
+export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+  const { roomGSTSlabs, gstOnServices } = req.body;
+
+  //  Role check
+  if (req.user.role !== "ADMIN") {
+    return next(new CustomError("Permission denied", 403));
+  }
+
+  //  Validate GST on services
+  if (
+    gstOnServices !== undefined &&
+    (gstOnServices < 0 || gstOnServices > 100)
+  ) {
+    return next(new CustomError("Invalid GST on services", 400));
+  }
+
+  //  Validate room slabs
+  if (roomGSTSlabs) {
+    if (!Array.isArray(roomGSTSlabs) || roomGSTSlabs.length === 0) {
+      return next(
+        new CustomError("Room GST slabs must be a non-empty array", 400)
+      );
+    }
+
+    // sort slabs by upto
+    roomGSTSlabs.sort((a, b) => a.upto - b.upto);
+
+    for (let i = 0; i < roomGSTSlabs.length; i++) {
+      const slab = roomGSTSlabs[i];
+
+      if (
+        typeof slab.upto !== "number" ||
+        typeof slab.rate !== "number" ||
+        slab.upto <= 0 ||
+        slab.rate < 0 ||
+        slab.rate > 100
+      ) {
+        return next(new CustomError("Invalid slab format", 400));
+      }
+
+      // ensure increasing order
+      if (i > 0 && slab.upto <= roomGSTSlabs[i - 1].upto) {
+        return next(
+          new CustomError("Slabs must be in strictly increasing order", 400)
+        );
+      }
+    }
+  }
+
+  // 🛠 Build update object dynamically
+  const updateData = {};
+
+  if (roomGSTSlabs) updateData.roomGSTSlabs = roomGSTSlabs;
+  if (gstOnServices !== undefined) updateData.gstOnServices = gstOnServices;
+
+  const admin = await Admin.findOneAndUpdate({ userId }, updateData, {
+    new: true,
+    upsert: true,
+  });
+
+  successResponse(res, 200, "GST configuration updated successfully", admin);
+});
+
 // platform  subscription and commision plan
 
 export const upsertCommissionRange = asyncHandler(async (req, res, next) => {
@@ -1163,7 +1227,16 @@ export const getMonthlySubscriptionsData = asyncHandler(
             {
               $group: {
                 _id: null,
-                total: { $sum: "$subscriptionPlan.price" },
+                total: { $sum: "$subscriptionPayment.totalAmount" },
+              },
+            },
+          ],
+          /* -------- TOTAL gst -------- */
+          totalSubscriptionGST: [
+            {
+              $group: {
+                _id: null,
+                total: { $sum: "$subscriptionPayment.gstAmount" },
               },
             },
           ],
@@ -1183,7 +1256,7 @@ export const getMonthlySubscriptionsData = asyncHandler(
                 planName: "$subscriptionPlan.name",
                 price: "$subscriptionPlan.price",
                 durationDays: "$subscriptionPlan.durationDays",
-
+                subscriptionPayment:1,
                 planStatus: 1,
                 startDate: 1,
                 endDate: 1,

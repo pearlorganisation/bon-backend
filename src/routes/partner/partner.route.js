@@ -36,6 +36,7 @@ import {
   getPartnerMonthlyBookingsData,
   getMyMonthlyPayout,
   getRecentBookingByID,
+  getPlanById,
 } from "../../controllers/partner/parnter.controller.js";
 import {
   authorizeRoles,
@@ -97,6 +98,12 @@ router.get(
   protect,
   authorizeRoles("PARTNER", "ADMIN"),
   getMyPlans,
+);
+router.get(
+  "/get-plan/:planId",
+  protect,
+  authorizeRoles("PARTNER", "ADMIN"),
+  getPlanById
 );
 
 //---------- property routes ----------------
