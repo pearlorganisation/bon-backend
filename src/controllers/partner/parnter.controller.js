@@ -602,7 +602,7 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
     successResponse(res, 201, "order created", {
       orderId: order.id,
-
+      planId: inactivePlan._id,
       //  Return full breakdown (frontend + invoice ready)
       pricing: {
         baseAmount,
@@ -668,20 +668,24 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
   const plans = await PartnerPlan.find({
     partnerId,
     planStatus: { $in: ["ACTIVE", "UPCOMING"] },
-  }).sort({ createdAt: 1 }).populate("subscriptionPlanId");
+  })
+    .sort({ createdAt: 1 })
+    .populate("subscriptionPlanId");
 
   successResponse(res, 200, "successfully fetched current plans", { plans });
 });
 
 export const getPlanById = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
-  const planId =req.params.planId;
-   if(planId){
+  const planId = req.params.planId;
+  if (planId) {
     throw new Error("PlanId required");
-   }
-  const plan = await PartnerPlan.findOne( { _id:planId ,partnerId}).populate("subscriptionPlanId");
+  }
+  const plan = await PartnerPlan.findOne({ _id: planId, partnerId }).populate(
+    "subscriptionPlanId"
+  );
 
-  successResponse(res, 200, "successfully fetched current plans", {plan});
+  successResponse(res, 200, "successfully fetched current plans", { plan });
 });
 
 //PARTNER
