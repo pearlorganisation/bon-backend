@@ -114,16 +114,16 @@ export const createParterPlanInvoice = async (planId) => {
 
     const url = await generatePartnerPlanInvoicePDF(plan,commissionData,invoiceNumber);
      console.log(url);
-    // const invoice = await Invoice.create({
-    //   invoiceNumber,
-    //   invoiceType: "PARTNER_PLAN_INVOICE",
-    //   pdfUrl: url,
-    // });
-    // console.log(invoice);
-    // plan.invoiceId = invoice._id;
-    // await plan.save();
+    const invoice = await Invoice.create({
+      invoiceNumber,
+      invoiceType: "PARTNER_PLAN_INVOICE",
+      pdfUrl: url,
+    });
+    console.log(invoice);
+    plan.invoiceId = invoice._id;
+    await plan.save();
 
-    //return invoice;
+    return invoice;
 
     // create
   } catch (error) {
@@ -133,4 +133,5 @@ export const createParterPlanInvoice = async (planId) => {
 };
 
 
-//createParterPlanInvoice("69afef2fd3e153437fdb7440");
+// createParterPlanInvoice("69e0bfb72a751495ee4706b8");
+// createParterPlanInvoice("69d35f0fecc687c0a6235796");
