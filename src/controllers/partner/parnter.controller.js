@@ -20,6 +20,7 @@ import Booking from "../../models/Listing/booking.model.js";
 import ManualRoomBlock from "../../models/Listing/manualRoomBlock.model.js";
 import mongoose from "mongoose";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
+import { createParterPlanInvoice } from "../../utils/invoive/createInvoice.js";
 
 configDotenv();
 const round = (num) => Math.round(num * 100) / 100;
@@ -496,7 +497,7 @@ export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
     endDate,
   });
 
-  createParterPlanInvoice(plan._id).catch((error) =>
+     createParterPlanInvoice(plan._id).catch((error) =>
     console.log("Invoice generation failed", error)
   );
 
@@ -600,6 +601,10 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
     await inactivePlan.save();
 
+      createParterPlanInvoice(inactivePlan._id).catch((error) =>
+        console.log("Invoice generation failed", error)
+      );
+
     successResponse(res, 201, "order created", {
       orderId: order.id,
       planId: inactivePlan._id,
@@ -657,6 +662,9 @@ export const subscriptionWebhookController = asyncHandler(
     plan.planStatus = activePlan ? "UPCOMING" : "ACTIVE";
 
     await plan.save();
+      createParterPlanInvoice(plan._id).catch((error) =>
+      console.log("Invoice generation failed", error)
+    );
 
     return res.status(200).json({ success: true });
   }
