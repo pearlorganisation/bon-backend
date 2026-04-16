@@ -22,7 +22,7 @@ import mongoose from "mongoose";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 
 configDotenv();
-
+const round = (num) => Math.round(num * 100) / 100;
 //verify  partner
 //
 export const partner_KYC = asyncHandler(async (req, res, next) => {

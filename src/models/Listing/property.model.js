@@ -107,7 +107,7 @@ const propertySchema = new mongoose.Schema(
     // },
 
     childrenCharge: {
-      age: Number,
+      age: {type : Number,default: 17},
       charge: { type: Number, require: true, default: 0 },
     },
     Images: [{ secure_url: String, public_id: String }],
