@@ -924,6 +924,8 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     rooms = 1,
     propertyType,
     propertyId,
+    adults = 1,
+    childrens,
   } = req.query;
 
   if (!checkIn || !checkOut) {
@@ -1026,6 +1028,22 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
   const propertyIds = properties.map((p) => p._id);
 
+  let parsedChildren = [];
+
+  try {
+    parsedChildren = childrens ? JSON.parse(childrens) : [];
+  } catch (err) {
+    throw new CustomError("Invalid childrens format", 400);
+  }
+
+  const totalChildren = parsedChildren.length;
+
+  const childConfigMap = {}; // propertyId → config
+
+  properties.forEach((p) => {
+    childConfigMap[p._id] = p.childrenCharge;
+  });
+
   // 2️ Get rooms
   const roomsList = await Room.find({
     propertyId: { $in: propertyIds },
@@ -1067,6 +1085,22 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     const availableRooms = room.numberOfRooms - maxBooked;
     /// console.log(availableRooms);
     if (availableRooms < rooms) continue;
+
+    const propertyChildConfig = childConfigMap[room.propertyId];
+
+    let ChildTreatAsAdultCount = 0;
+
+    if (parsedChildren.length && propertyChildConfig) {
+      ChildTreatAsAdultCount = parsedChildren.filter(
+        (c) => Number(c.age) > Number(propertyChildConfig.age)
+      ).length;
+    }
+
+  
+    const effectiveAdults = Number(adults || 0) + ChildTreatAsAdultCount; 
+    const totalCapacity = room.capacity * rooms;
+    // filter
+    if (effectiveAdults > totalCapacity) continue; //means total person is  more than rooms capacity
 
     if (!propertyRoomMap[room.propertyId]) {
       propertyRoomMap[room.propertyId] = [];
