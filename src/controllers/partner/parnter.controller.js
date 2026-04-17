@@ -259,7 +259,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
     });
   } catch (error) {
     console.log("GSTIN Verification Error", error?.response?.data || error);
-
+  
     let message = error?.response?.data
       ? error?.response?.data?.message
       : "Internal server error";
