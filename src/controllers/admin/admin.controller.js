@@ -1269,11 +1269,12 @@ export const getMonthlySubscriptionsData = asyncHandler(
 
     /* ---------------- SAFE EXTRACTION ---------------- */
     const totalAmount = result[0]?.totalSubscriptionAmount[0]?.total || 0;
-
+     const totalGST = result[0]?.totalSubscriptionGST[0]?.total || 0;
     const partnerDetails = result[0]?.partnerDetails || [];
 
     return successResponse(res, 200, `Subscription data for ${month}/${year}`, {
       totalSubscriptionAmount: totalAmount,
+      totalSubscriptionGST: totalGST,
       partners: partnerDetails,
     });
   }
