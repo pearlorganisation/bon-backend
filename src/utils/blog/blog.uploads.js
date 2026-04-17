@@ -1,5 +1,6 @@
 import cloudinary from "cloudinary";
 import fs from "fs";
+import path from "path";
 
 cloudinary.v2.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -8,16 +9,37 @@ cloudinary.v2.config({
 });
 
 export const uploadBlogImage = async (filePath) => {
+  if (!filePath) return null;
+
+  // Normalize the path for the current OS
+  const absolutePath = path.resolve(filePath);
+
   try {
-    const result = await cloudinary.v2.uploader.upload(filePath, {
+    // Verify file exists before trying to upload
+    if (!fs.existsSync(absolutePath)) {
+      console.error("File does not exist at path:", absolutePath);
+      return null;
+    }
+
+    const result = await cloudinary.v2.uploader.upload(absolutePath, {
       folder: "blogs",
+      resource_type: "auto",
     });
 
-    // Remove local file after upload
-    fs.unlinkSync(filePath);
+    // Delete local file after upload
+    fs.unlink(absolutePath, (err) => {
+      if (err) console.error("Error deleting local file:", err);
+    });
 
     return result.secure_url;
   } catch (error) {
-    throw new Error("Blog image upload failed");
+    console.error("Cloudinary Error:", error);
+    // Cleanup even on failure
+    if (fs.existsSync(absolutePath)) {
+      try {
+        fs.unlinkSync(absolutePath);
+      } catch (e) {}
+    }
+    throw new Error("Failed to upload image to Cloudinary");
   }
 };

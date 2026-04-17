@@ -1,17 +1,15 @@
-
 import slugify from "slugify";
-
+import path from "path";
 import blogModel from "../../models/blog/blog.model.js";
 import mongoose from "mongoose";
 import { uploadBlogImage } from "../../utils/blog/blog.uploads.js";
 
 export const createBlog = async (req, res) => {
   try {
-    const { title, content, category, tags, seoTitle, seoDescription } = req.body;
-
+    const { title, content, category, tags, seoTitle, seoDescription } =
+      req.body;
     const slug = slugify(title, { lower: true, strict: true });
 
-    // Prevent duplicate slug
     const existingBlog = await blogModel.findOne({ slug });
     if (existingBlog) {
       return res.status(409).json({
@@ -20,16 +18,20 @@ export const createBlog = async (req, res) => {
       });
     }
 
+    // --- FIX 1: Initialize variables locally first ---
     let coverImage = null;
-    if (req.files?.coverImage) {
-      coverImage = await uploadBlogImage(req.files.coverImage[0].path);
+    let images = [];
+
+    if (req.files?.coverImage?.[0]) {
+      const filePath = req.files.coverImage[0].path;
+      const uploadedUrl = await uploadBlogImage(filePath);
+      if (uploadedUrl) coverImage = uploadedUrl; // Use local variable
     }
 
-    let images = [];
     if (req.files?.images) {
       for (const file of req.files.images) {
         const imageUrl = await uploadBlogImage(file.path);
-        images.push(imageUrl);
+        if (imageUrl) images.push(imageUrl); // Now images is defined
       }
     }
 
@@ -38,13 +40,14 @@ export const createBlog = async (req, res) => {
       slug,
       content,
       category,
-      tags: tags
-        ? tags.split(",").map((tag) => tag.trim())
-        : [],
+      tags:
+        typeof tags === "string"
+          ? tags.split(",").map((tag) => tag.trim())
+          : tags || [],
       seoTitle,
       seoDescription,
-      coverImage,
-      images,
+      coverImage, // Use local variable
+      images, // Use local variable
       status: "published",
       author: req.user.id,
     });
@@ -55,23 +58,18 @@ export const createBlog = async (req, res) => {
   }
 };
 
-
-
-
 export const getAllBlogs = async (req, res) => {
   try {
     const blogs = await blogModel
-      .find({ status: "published" })
-      .sort({ createdAt: -1 })
-      .select("-content");
+      .find() // Removed status: "published" filter so Admins can see drafts
+      .sort({ createdAt: -1 });
+    // REMOVED .select("-content") so that the Edit form works correctly
 
     res.json({ success: true, data: blogs });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-
 
 export const getBlogByIdAndSlug = async (req, res) => {
   try {
@@ -91,30 +89,17 @@ export const getBlogByIdAndSlug = async (req, res) => {
   }
 };
 
-
-
 export const updateBlog = async (req, res) => {
   try {
     const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res.status(400).json({ success: false, message: "Invalid blog ID" });
-    }
-
     const blog = await blogModel.findById(id);
-    if (!blog) {
-      return res.status(404).json({ success: false, message: "Blog not found" });
-    }
+    if (!blog)
+      return res
+        .status(404)
+        .json({ success: false, message: "Blog not found" });
 
-    const {
-      title,
-      content,
-      category,
-      tags,
-      seoTitle,
-      seoDescription,
-      status,
-    } = req.body;
+    const { title, content, category, tags, seoTitle, seoDescription, status } =
+      req.body;
 
     if (title) {
       blog.title = title;
@@ -122,38 +107,38 @@ export const updateBlog = async (req, res) => {
     }
     if (content) blog.content = content;
     if (category) blog.category = category;
-    if (tags) blog.tags = tags.split(",").map((t) => t.trim());
     if (seoTitle) blog.seoTitle = seoTitle;
     if (seoDescription) blog.seoDescription = seoDescription;
     if (status) blog.status = status;
 
-    if (req.files?.coverImage) {
-      blog.coverImage = await uploadBlogImage(
-        req.files.coverImage[0].path
-      );
+    if (tags) {
+      blog.tags =
+        typeof tags === "string" ? tags.split(",").map((t) => t.trim()) : tags;
+    }
+
+    // --- FIX 2: Handle file updates correctly ---
+    if (req.files?.coverImage?.[0]) {
+      const uploadedUrl = await uploadBlogImage(req.files.coverImage[0].path);
+      if (uploadedUrl) blog.coverImage = uploadedUrl;
     }
 
     if (req.files?.images) {
+      // If you want to replace old images, clear them; otherwise, push to existing
+      // blog.images = [];
       for (const file of req.files.images) {
         const imageUrl = await uploadBlogImage(file.path);
-        blog.images.push(imageUrl);
+        if (imageUrl) blog.images.push(imageUrl);
       }
     }
 
     await blog.save();
-
-    res.status(200).json({
-      success: true,
-      message: "Blog updated successfully",
-      data: blog,
-    });
+    res
+      .status(200)
+      .json({ success: true, message: "Blog updated", data: blog });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-
-
 
 export const deleteBlog = async (req, res) => {
   try {
