@@ -95,7 +95,6 @@ export const createBookingInvoice = async (bookingId) => {
   }
 };
 
-// Helper to fetch images for PDF
 const id = "69d357c5017b8f918d833454";
 //createBookingInvoice(id);
 
@@ -131,7 +130,44 @@ export const createParterPlanInvoice = async (planId) => {
     throw error;
   }
 };
-
-
 // createParterPlanInvoice("69e0bfb72a751495ee4706b8");
 // createParterPlanInvoice("69d35f0fecc687c0a6235796");
+
+
+export const createParterMonthlyPayoutInvoice = async (planId) => {
+  try {
+    const invoiceNumber = await generateInvoiceNumber();
+
+    const plan = await PartnerPlan.findById(planId)
+      .populate("partnerId")
+      .populate("subscriptionPlanId");
+
+    if (!plan) {
+      throw new Error("no plan found");
+    }
+    const commissionData = await Admin.find().select("commission");
+
+    const url = await generatePartnerPlanInvoicePDF(
+      plan,
+      commissionData,
+      invoiceNumber
+    );
+    console.log(url);
+    const invoice = await Invoice.create({
+      invoiceNumber,
+      invoiceType: "PARTNER_PLAN_INVOICE",
+      pdfUrl: url,
+    });
+    console.log(invoice);
+    plan.invoiceId = invoice._id;
+    await plan.save();
+
+    return invoice;
+
+    // create
+  } catch (error) {
+    console.error(" partner plan Invoice generation failed:", error);
+    throw error;
+  }
+};
+
