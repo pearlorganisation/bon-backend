@@ -254,7 +254,6 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     let basePrice = 0;
     let discountAmount = 0;
     let extraFees = 0;
-    let childrenCharge = 0;
     let totalCapacity = 0;
     let total_gst = 0;
     const roomsData = [];
@@ -416,27 +415,28 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
     // 5️ Children charges
     const childConfig = property.childrenCharge;
-    let childCount = 0;
 
-    if (numberOfGuests.children?.length && childConfig) {
-      numberOfGuests.children.forEach((child) => {
-        if (Number(child.age) >= Number(childConfig.age)) {
-          childCount++;
-        }
-      });
+    const children = numberOfGuests.children || [];
+
+    const ChildTreatAsAdultCount = children.filter(
+      (c) => Number(c.age) > Number(childConfig?.age)
+    ).length;
+
+    const remainingChildren = children.length - ChildTreatAsAdultCount;
+
+    const effectiveAdults = numberOfGuests.adults + ChildTreatAsAdultCount;
+
+    if (effectiveAdults > totalCapacity) {
+      throw new CustomError(
+        `Number of guests exceeds room capacity. (${ChildTreatAsAdultCount}) child's age  exceeds the property's maximum age policy. ${childConfig?.age}`,
+        400
+      );
     }
 
-    if (numberOfGuests.adults > totalCapacity)
-      throw new CustomError("Number of guests exceeds room capacity", 400);
+    const totalGuests = effectiveAdults + remainingChildren;
+    const overflow = Math.max(0, totalGuests - totalCapacity);
 
-    const overflow = Math.max(
-      0,
-      numberOfGuests.adults + childCount - totalCapacity
-    );
-
-    if (overflow > 0 && childConfig) {
-      childrenCharge = childConfig.charge * overflow * nights;
-    }
+    const childrenCharge = overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
 
     // 6️ calculate gst
     let totalPrice =
@@ -580,7 +580,6 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     let basePrice = 0;
     let discountAmount = 0;
     let extraFees = 0;
-    let childrenCharge = 0;
     let totalCapacity = 0;
     let total_gst = 0;
     const roomsData = [];
@@ -728,30 +727,30 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
       roomsData.push(roomDetails);
     }
 
-    // 7️⃣ Children charges
+    // 5️ Children charges
     const childConfig = property.childrenCharge;
-    let childCount = 0;
 
-    if (numberOfGuests.children?.length && childConfig) {
-      numberOfGuests.children.forEach((child) => {
-        if (Number(child.age) >= Number(childConfig.age)) {
-          childCount++;
-        }
-      });
+    const children = numberOfGuests.children || [];
+
+    const ChildTreatAsAdultCount = children.filter(
+      (c) => Number(c.age) > Number(childConfig?.age)
+    ).length;
+
+    const remainingChildren = children.length - ChildTreatAsAdultCount;
+
+    const effectiveAdults = numberOfGuests.adults + ChildTreatAsAdultCount;
+
+    if (effectiveAdults > totalCapacity) {
+      throw new CustomError(
+        `Number of guests exceeds room capacity. (${ChildTreatAsAdultCount}) child's age  exceeds the property's maximum age policy. ${childConfig?.age}`,
+        400
+      );
     }
 
-    if (numberOfGuests.adults > totalCapacity) {
-      throw new CustomError("Guests exceed room capacity", 400);
-    }
+    const totalGuests = effectiveAdults + remainingChildren;
+    const overflow = Math.max(0, totalGuests - totalCapacity);
 
-    const overflow = Math.max(
-      0,
-      numberOfGuests.adults + childCount - totalCapacity
-    );
-
-    if (overflow > 0 && childConfig) {
-      childrenCharge = childConfig.charge * overflow * nights;
-    }
+    const childrenCharge = overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
 
     // 8️⃣ Final total (same as createBooking)
     const totalPrice =
@@ -1799,7 +1798,7 @@ export const splitCancellationMoney = async (booking, retainedAmount) => {
       adminAmount = round(
         (partnerPlan.commissionPercentage * retainedBase) / 100
       );
-       const admin =await Admin.findOne();
+      const admin = await Admin.findOne();
       if (!admin || !admin?.gstOnServices) {
         throw new Error("No GST on service Tax set by admin");
       }
