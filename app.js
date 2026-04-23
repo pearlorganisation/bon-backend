@@ -8,7 +8,7 @@ import errorHandler from "./src/middleware/errorHandler.js";
 import cookieParser from "cookie-parser";
 import initSocket from "./src/socket/index.js";
 import { razorpayRefundWebhook } from "./src/controllers/Booking/booking.controller.js";
-import { razorpayPayoutWebhook } from "./src/controllers/admin/admin.controller.js";
+//import { razorpayPayoutWebhook } from "./src/controllers/admin/admin.controller.js";
 import {
   verifyRazorpaySignature,
   razorpayWebhookRouter,

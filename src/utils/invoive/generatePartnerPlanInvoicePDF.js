@@ -25,16 +25,6 @@ const formatDate = (dateStr) => {
   ).padStart(2, "0")}/${date.getFullYear()}`;
 };
 
-const formatDateTime = (dateStr) => {
-  if (!dateStr) return "N/A";
-  const date = new Date(dateStr);
-  return `${String(date.getDate()).padStart(2, "0")}/${String(
-    date.getMonth() + 1
-  ).padStart(2, "0")}/${date.getFullYear()} ${String(date.getHours()).padStart(
-    2,
-    "0"
-  )}:${String(date.getMinutes()).padStart(2, "0")}`;
-};
 
 const formatCurrency = (amount, sign = "") => {
   const num = amount || 0;
@@ -42,10 +32,8 @@ const formatCurrency = (amount, sign = "") => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
-  return `${sign}₹ ${formatted}`;
+  return `${sign}Rs. ${formatted}`;
 };
-
-
 
 export const generatePartnerPlanInvoicePDF = async (
   plan,
@@ -79,12 +67,17 @@ export const generatePartnerPlanInvoicePDF = async (
       const isSubscription = plan.PlanType === "SUBSCRIPTION";
       const isCommission = plan.PlanType === "COMMISSION";
 
-      // Check if payment is done for subscription
+      // Check if payment is done for subscription only
       const isPaid = isSubscription
         ? plan.subscriptionPayment?.paymentId
           ? true
           : false
-        : true; // Commission plans are always considered active
+        : false; // Commission plans don't show payment status
+
+      // Get invoice title based on plan type
+      const invoiceTitle = isCommission
+        ? "COMMISSION PLAN INVOICE"
+        : "SUBSCRIPTION PLAN INVOICE";
 
       // ================= HEADER =================
       doc.rect(0, 0, 595, 110).fill(COLORS.primary);
@@ -93,31 +86,34 @@ export const generatePartnerPlanInvoicePDF = async (
       if (fs.existsSync(logoPath)) {
         doc.image(logoPath, 40, 20, { width: 70 });
       }
-
+      
       doc
         .fillColor("#ffffff")
-        .fontSize(20)
+        .fontSize(18)
         .font("Helvetica-Bold")
-        .text("PARTNER INVOICE", 400, 30, { align: "right" });
+        .text(invoiceTitle, 400, isSubscription ? 20 : 35, { align: "right" });
 
-      const statusColor = isPaid ? COLORS.success : COLORS.danger;
-      doc.roundedRect(455, 60, 95, 20, 4).fill(statusColor);
+      // Only show status badge for subscription plans
+      if (isSubscription) {
+        const statusColor = isPaid ? COLORS.success : COLORS.danger;
+        doc.roundedRect(455, 60, 95, 20, 4).fill(statusColor);
 
-      doc
-        .fillColor("#FFFFFF")
-        .fontSize(9)
-        .font("Helvetica-Bold")
-        .text(isPaid ? "PAID" : "PAYMENT DUE", 455, 65, {
-          width: 95,
-          align: "center",
-        });
+        doc
+          .fillColor("#FFFFFF")
+          .fontSize(9)
+          .font("Helvetica-Bold")
+          .text(isPaid ? "PAID" : "PAYMENT DUE", 455, 65, {
+            width: 95,
+            align: "center",
+          });
+      }
 
       doc.fillColor("#ffffff").font("Helvetica").fontSize(8);
       doc.text(`Invoice Number: ${invoiceNumber}`, 400, 88, {
         align: "right",
       });
       doc.text(
-        `Invoice Date: ${formatDateTime(plan.createdAt || new Date())}`,
+        `Invoice Date: ${formatDate(plan.createdAt || new Date())}`,
         400,
         100,
         { align: "right" }
@@ -177,6 +173,8 @@ export const generatePartnerPlanInvoicePDF = async (
 
       if (isCommission) {
         // COMMISSION PLAN SECTION
+        const partnerCommissionRate = plan.commissionPercentage || 0;
+
         doc
           .roundedRect(40, currentY, 515, 80, 6)
           .fill(COLORS.lightBg)
@@ -187,39 +185,36 @@ export const generatePartnerPlanInvoicePDF = async (
           .fillColor(COLORS.primaryDark)
           .font("Helvetica-Bold")
           .fontSize(10)
-          .text("COMMISSION PLAN DETAILS", 50, currentY + 10);
+          .text("COMMISSION STRUCTURE", 50, currentY + 10);
 
         doc.font("Helvetica").fontSize(9).fillColor(COLORS.textDark);
 
         doc.text(
-          `Commission Rate: ${commissionData?.commission?.min || 10}% - ${
-            commissionData?.commission?.max || 50
-          }%`,
+          `Commission Rate: ${partnerCommissionRate}% of each booking value`,
           50,
           currentY + 35
         );
 
         doc.text(
-          `You earn commission on every booking made through your property listings.`,
+          `This commission will be deducted from your payouts for every booking completed through the platform.`,
           50,
           currentY + 55
         );
-
-        doc
-          .fillColor(COLORS.success)
-          .text(`✓ No upfront payment required`, 50, currentY + 75);
 
         currentY += 100;
       } else if (isSubscription) {
         // SUBSCRIPTION PLAN SECTION
         const subscriptionPlan = plan.subscriptionPlanId;
         const payment = plan.subscriptionPayment || {};
-        const totalAmount = payment.totalAmount || subscriptionPlan?.price || 0;
-        const gstAmount = payment.gstAmount || totalAmount * 0.18;
+
+        // Use the exact totalAmount from payment object
+        const baseAmount = subscriptionPlan?.price || 0;
         const gstRate = payment.gstRate || 18;
+        const gstAmount = payment.gstAmount || (baseAmount * gstRate) / 100;
+        const totalAmount = payment.totalAmount || baseAmount + gstAmount;
 
         doc
-          .roundedRect(40, currentY, 515, 120, 6)
+          .roundedRect(40, currentY, 515, 130, 6)
           .fill(COLORS.lightBg)
           .strokeColor(COLORS.border)
           .stroke();
@@ -228,7 +223,7 @@ export const generatePartnerPlanInvoicePDF = async (
           .fillColor(COLORS.primaryDark)
           .font("Helvetica-Bold")
           .fontSize(10)
-          .text("SUBSCRIPTION PLAN DETAILS", 50, currentY + 10);
+          .text("SUBSCRIPTION DETAILS", 50, currentY + 10);
 
         doc.font("Helvetica").fontSize(9).fillColor(COLORS.textDark);
 
@@ -238,12 +233,12 @@ export const generatePartnerPlanInvoicePDF = async (
           currentY + 35
         );
         doc.text(
-          `Duration: ${subscriptionPlan?.durationDays || 30} Days`,
+          `Plan Duration: ${subscriptionPlan?.durationDays || 30} Days`,
           50,
           currentY + 55
         );
         doc.text(
-          `Plan Price: ${formatCurrency(subscriptionPlan?.price || 0)}`,
+          `Subscription Fee: ${formatCurrency(baseAmount)}`,
           50,
           currentY + 75
         );
@@ -253,42 +248,60 @@ export const generatePartnerPlanInvoicePDF = async (
           currentY + 95
         );
 
+        // Draw a line separator
+        doc
+          .moveTo(50, currentY + 108)
+          .lineTo(250, currentY + 108)
+          .strokeColor(COLORS.primary)
+          .stroke();
+
         doc
           .fillColor(COLORS.primary)
           .font("Helvetica-Bold")
+          .fontSize(10)
           .text(
-            `Total Amount: ${formatCurrency(totalAmount + gstAmount)}`,
+            `Total Amount: ${formatCurrency(totalAmount)}`,
             50,
-            currentY + 115
+            currentY + 118
           );
 
-        // Payment Status
+        // Payment Status Section
         if (payment.paymentId) {
           doc
             .fillColor(COLORS.success)
-            .text(`✓ Payment Completed`, 350, currentY + 35);
+            .font("Helvetica-Bold")
+            .text(` PAYMENT COMPLETED`, 350, currentY + 35);
           doc
             .fillColor(COLORS.textLight)
             .fontSize(8)
-            .text(`Payment ID: ${payment.paymentId}`, 350, currentY + 55);
-          if (payment.orderId) {
-            doc.text(`Order ID: ${payment.orderId}`, 350, currentY + 70);
-          }
+            .text(`Transaction ID: ${payment.paymentId}`, 350, currentY + 55);
+        
+          doc.text(
+            `Payment Date: ${formatDate(plan.updatedAt || new Date())}`,
+            350,
+            currentY + 85
+          );
         } else {
           doc
             .fillColor(COLORS.danger)
-            .text(`⚠ Payment Pending`, 350, currentY + 35);
+            .font("Helvetica-Bold")
+            .text(`PAYMENT PENDING`, 350, currentY + 35);
           doc
             .fillColor(COLORS.textLight)
             .fontSize(8)
             .text(
-              `Please complete payment to activate your plan`,
+              `Amount Due: ${formatCurrency(totalAmount)}`,
               350,
               currentY + 55
             );
+          doc.text(
+            `Please complete payment to activate your subscription plan`,
+            350,
+            currentY + 75
+          );
         }
 
-        currentY += 140;
+        currentY += 155;
       }
 
       // ================= THANK YOU MESSAGE =================
@@ -299,7 +312,7 @@ export const generatePartnerPlanInvoicePDF = async (
         .font("Helvetica-Bold")
         .fontSize(11)
         .text(
-          "THANK YOU FOR CHOOSING BONFIRE LUXURY STAYS",
+          "THANK YOU FOR PARTNERING WITH BONFIRE LUXURY STAYS",
           40,
           currentY + 18,
           {
@@ -314,8 +327,8 @@ export const generatePartnerPlanInvoicePDF = async (
         .fontSize(8)
         .text(
           isCommission
-            ? "Start listing your properties and earn commissions on every booking!"
-            : "Your subscription is now active. Enjoy premium features and priority support!",
+            ? "We look forward to a successful partnership. Start listing your properties today!"
+            : "Your subscription is now active. Enjoy zero commission on all bookings during your subscription period!",
           40,
           currentY + 35,
           { align: "center", width: 515 }
@@ -323,78 +336,103 @@ export const generatePartnerPlanInvoicePDF = async (
 
       currentY += 70;
 
-      // ================= THREE COLUMN FOOTER =================
-      const footerTop = currentY;
-
-      // Support Card (Left)
-      doc
-        .roundedRect(40, footerTop, 165, 80, 6)
-        .fill(COLORS.lightBg)
-        .strokeColor(COLORS.border)
-        .stroke();
+      // ================= PLAN BENEFITS SECTION =================
+      const benefitsTop = currentY;
 
       doc
         .fillColor(COLORS.primaryDark)
         .font("Helvetica-Bold")
-        .fontSize(9)
-        .text("SUPPORT", 50, footerTop + 10);
+        .fontSize(10)
+        .text("KEY BENEFITS", 40, benefitsTop);
 
-      doc.fillColor(COLORS.textLight).fontSize(7);
-
-      doc.text("Email: support@bonfire.com", 50, footerTop + 30);
-      doc.text("Phone: +91 98765 43210", 50, footerTop + 45);
-      doc.text("24/7 Partner Support", 50, footerTop + 60);
-
-      // Next Steps Card (Middle)
-      doc
-        .roundedRect(215, footerTop, 165, 80, 6)
-        .fill(COLORS.lightBg)
-        .strokeColor(COLORS.border)
-        .stroke();
-
-      doc
-        .fillColor(COLORS.primaryDark)
-        .font("Helvetica-Bold")
-        .fontSize(9)
-        .text("NEXT STEPS", 225, footerTop + 10);
-
-      doc.fillColor(COLORS.textLight).fontSize(7);
+      currentY += 20;
 
       if (isCommission) {
-        doc.text("✓ List your properties", 225, footerTop + 30);
-        doc.text("✓ Set competitive prices", 225, footerTop + 45);
-        doc.text("✓ Start earning commissions", 225, footerTop + 60);
+        // Commission Plan Benefits
+        const partnerCommissionRate = plan.commissionPercentage || 0;
+        const benefits = [
+          `• ${partnerCommissionRate}% commission will be deducted per booking`,
+          "• No monthly or annual subscription fees",
+          "• Pay only when you earn from bookings",
+          "• 24/7 priority customer support",
+        ];
+
+        let benefitY = currentY;
+        benefits.forEach((benefit) => {
+          doc
+            .fillColor(COLORS.textDark)
+            .font("Helvetica")
+            .fontSize(8)
+            .text(benefit, 50, benefitY);
+          benefitY += 15;
+        });
+
+        currentY = benefitY + 20;
       } else {
-        doc.text("✓ Access partner dashboard", 225, footerTop + 30);
-        doc.text("✓ List unlimited properties", 225, footerTop + 45);
-        doc.text("✓ Get priority support", 225, footerTop + 60);
+        // Subscription Plan Benefits
+        const subscriptionPlan = plan.subscriptionPlanId;
+        const duration = subscriptionPlan?.durationDays || 30;
+        const benefits = [
+          `• Zero commission on all bookings for ${duration} days`,
+          "• 100% of booking amount goes to you",
+          "• 24/7 priority customer support",
+        ];
+
+        let benefitY = currentY;
+        benefits.forEach((benefit) => {
+          doc
+            .fillColor(COLORS.textDark)
+            .font("Helvetica")
+            .fontSize(8)
+            .text(benefit, 50, benefitY);
+          benefitY += 15;
+        });
+
+        currentY = benefitY + 20;
       }
 
-      // Terms Card (Right)
-      doc
-        .roundedRect(390, footerTop, 165, 80, 6)
-        .fill(COLORS.lightBg)
-        .strokeColor(COLORS.border)
-        .stroke();
+      // ================= INVOICE SUMMARY SECTION =================
+      if (isSubscription && plan.subscriptionPayment?.paymentId) {
+        doc
+          .roundedRect(40, currentY, 515, 45, 6)
+          .fill(COLORS.lightBg)
+          .strokeColor(COLORS.border)
+          .stroke();
+
+        doc
+          .fillColor(COLORS.textDark)
+          .font("Helvetica-Bold")
+          .fontSize(8)
+          .text("INVOICE SUMMARY", 50, currentY + 10);
+
+        doc
+          .fillColor(COLORS.textLight)
+          .font("Helvetica")
+          .fontSize(8)
+          .text(
+            `This is a computer-generated invoice for the subscription plan purchased.`,
+            50,
+            currentY + 25
+          );
+
+        doc
+          .fillColor(COLORS.textLight)
+          .fontSize(7)
+          .text(
+            `For any queries regarding this invoice, please contact partner support.`,
+            50,
+            currentY + 38
+          );
+
+        currentY += 65;
+      }
+
+      // ================= FOOTER =================
+      const footerTop = Math.max(currentY, 680);
 
       doc
-        .fillColor(COLORS.primaryDark)
-        .font("Helvetica-Bold")
-        .fontSize(9)
-        .text("TERMS", 400, footerTop + 10);
-
-      doc.fillColor(COLORS.textLight).fontSize(7);
-
-      doc.text("• Valid for selected plan period", 400, footerTop + 30);
-      doc.text("• Auto-renewal applicable", 400, footerTop + 45);
-      doc.text("• Subject to terms & conditions", 400, footerTop + 60);
-
-      // ================= FOOTER BOTTOM =================
-      const footerBottom = footerTop + 100;
-
-      doc
-        .moveTo(40, footerBottom)
-        .lineTo(555, footerBottom)
+        .moveTo(40, footerTop)
+        .lineTo(555, footerTop)
         .strokeColor(COLORS.primary)
         .stroke();
 
@@ -404,7 +442,20 @@ export const generatePartnerPlanInvoicePDF = async (
         .text(
           "Bonfire Luxury Stays - Computer Generated Partner Invoice",
           40,
-          footerBottom + 8,
+          footerTop + 8,
+          {
+            align: "center",
+            width: 515,
+          }
+        );
+
+      doc
+        .fontSize(6)
+        .fillColor(COLORS.textLight)
+        .text(
+          "This invoice is system generated and does not require physical signature.",
+          40,
+          footerTop + 20,
           {
             align: "center",
             width: 515,
