@@ -16,7 +16,6 @@ import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout
 import { createBookingInvoice } from "../../utils/invoive/createInvoice.js";
 import Review from "../../models/Listing/review.model.js";
 import Admin from "../../models/Admin/admin.model.js";
-import { sendBookingConfirmationEmail } from "../../utils/mail/emailTeamplates/sendBookingConfirmationEmail.js";
 
 const round = (num) => Math.round(num * 100) / 100;
 // utils/dateUtils.js
@@ -997,7 +996,7 @@ export const bookingWebhookController = asyncHandler(async (req, res, next) => {
   }
 
   const booking = await Booking.findOne({ "payment.razorpayOrderId": orderId })
-  .populate("userId", "email fullName") 
+  .populate("userId", "email fullName") // Get guest details
   .populate({
     path: "propertyId",
     select: "name ownerEmail" 
@@ -1041,11 +1040,10 @@ export const bookingWebhookController = asyncHandler(async (req, res, next) => {
           console.log("Invoice generation failed", error)
         );
       }
-      if (booking.paymentStatus === "paid") {
-         sendBookingConfirmationEmail(booking).catch(err => 
-        console.error("Failed to send confirmation email:", err)
-     );
-      }
+
+      sendBookingConfirmationEmail(booking).catch(err => 
+        console.error("Email failed:", err)
+      );
 
       break;
     }
