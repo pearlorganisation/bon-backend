@@ -12,7 +12,7 @@ if (FIREBASE_SERVICE_ACCOUNT) {
     const module = await import(
       "../../bornfire-4bed9-firebase-adminsdk-fbsvc-2e1940fe6e.json",
       {
-        with: { type: "json" },
+        assert: { type: "json" },
       }
     );
 

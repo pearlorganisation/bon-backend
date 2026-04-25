@@ -61,6 +61,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     name,
     capacity,
     pricePerNight,
+    weeklyPrice,
+    monthlyPrice,
     type,
     amenities,
     bedType,
@@ -98,8 +100,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "You are not authorized to create rooms for this property",
-        403,
-      ),
+        403
+      )
     );
   }
 
@@ -123,6 +125,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
   if (numberOfRooms) numberOfRooms = Number(numberOfRooms);
   if (capacity) capacity = Number(capacity);
   if (pricePerNight) pricePerNight = Number(pricePerNight);
+  if (weeklyPrice)weeklyPrice = Number(weeklyPrice);
+  if (monthlyPrice) monthlyPrice = Number(monthlyPrice);
   if (bedCount) bedCount = Number(bedCount);
   if (bathroomCount) bathroomCount = Number(bathroomCount);
   if (discount) discount = Number(discount);
@@ -154,8 +158,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "Name, pricePerNight, type, dimensions, bedType, and bathroomType are required",
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -173,8 +177,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "Invalid dimensions object. Must include numeric length, width, height, and a valid unit ('ft' or 'm').",
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -190,8 +194,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "Invalid distanceToBathroom object. Must include numeric value and unit ('ft' or 'm').",
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -210,24 +214,21 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `Invalid room type. Allowed: ${validTypes.join(", ")}`,
-        400,
-      ),
+        400
+      )
     );
   }
   if (!validBeds.includes(bedType.toLowerCase())) {
     return next(
-      new CustomError(
-        `Invalid bed type. Allowed: ${validBeds.join(", ")}`,
-        400,
-      ),
+      new CustomError(`Invalid bed type. Allowed: ${validBeds.join(", ")}`, 400)
     );
   }
   if (!validBathroom.includes(bathroomType.toLowerCase())) {
     return next(
       new CustomError(
         `Invalid bathroom type. Allowed: ${validBathroom.join(", ")}`,
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -237,7 +238,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
       servicesAndExtras = JSON.parse(req.body?.servicesAndExtras);
     } catch (error) {
       return next(
-        new CustomError("Invalid format for servicesAndExtras,", 400),
+        new CustomError("Invalid format for servicesAndExtras,", 400)
       );
     }
     if (
@@ -281,7 +282,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
 
     uploadedImages = await uploadFileToCloudinary(
       req.files.images,
-      "rooms/images",
+      "rooms/images"
     );
   }
 
@@ -291,7 +292,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
 
     uploadedVideos = await uploadFileToCloudinary(
       req.files.videos,
-      "rooms/videos",
+      "rooms/videos"
     );
   }
 
@@ -305,6 +306,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     name: name.trim(),
     capacity: capacity || 2,
     pricePerNight,
+    weeklyPrice,
+    monthlyPrice,
     typeOfRoom: type.toLowerCase(),
     // Parse arrays (handle single string vs array)
     amenities: parseArrayField(amenities).map((item) => item.trim()),
@@ -317,7 +320,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bathroomType: bathroomType.toLowerCase(),
     bathroomCount: bathroomCount || 1,
     bathroomAmenities: parseArrayField(bathroomAmenities).map((item) =>
-      item.trim(),
+      item.trim()
     ),
     images: uploadedImages,
     videos: uploadedVideos,
@@ -349,7 +352,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     res,
     201,
     `${numberOfRooms} rooms created successfully`,
-    createdRooms,
+    createdRooms
   );
 });
 
@@ -377,15 +380,15 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
       return next(
         new CustomError(
           "Sub-admin cannot update partner owned property room",
-          403,
-        ),
+          403
+        )
       );
     }
 
     // ❌ Sub-admin must own the property
     if (property.subAdminId.toString() !== userId.toString()) {
       return next(
-        new CustomError("You are not authorized to update this room", 403),
+        new CustomError("You are not authorized to update this room", 403)
       );
     }
   }
@@ -397,7 +400,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
       property.partnerId.toString() !== userId.toString()
     ) {
       return next(
-        new CustomError("You are not authorized to update this room", 403),
+        new CustomError("You are not authorized to update this room", 403)
       );
     }
   }
@@ -406,6 +409,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     name,
     capacity,
     pricePerNight,
+    weeklyPrice,
+    monthlyPrice,
     discount,
     type,
     amenities,
@@ -454,6 +459,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
   if (capacity) capacity = Number(capacity);
   if (pricePerNight) pricePerNight = Number(pricePerNight);
+   if (weeklyPrice) weeklyPrice = Number(weeklyPrice);
+   if (monthlyPrice) monthlyPrice = Number(monthlyPrice);
   if (discount) discount = Number(discount);
   if (bedCount) bedCount = Number(bedCount);
   if (bathroomCount) bathroomCount = Number(bathroomCount);
@@ -484,17 +491,14 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `Invalid room type. Allowed: ${validTypes.join(", ")}`,
-        400,
-      ),
+        400
+      )
     );
   }
 
   if (bedType && !validBeds.includes(bedType.toLowerCase())) {
     return next(
-      new CustomError(
-        `Invalid bed type. Allowed: ${validBeds.join(", ")}`,
-        400,
-      ),
+      new CustomError(`Invalid bed type. Allowed: ${validBeds.join(", ")}`, 400)
     );
   }
 
@@ -505,8 +509,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `Invalid bathroom type. Allowed: ${validBathroomTypes.join(", ")}`,
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -523,8 +527,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "Invalid dimensions object. Must include numeric length, width, height, and valid unit ('ft' or 'm').",
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -539,8 +543,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "Invalid distanceToBathroom object. Must include numeric value and valid unit ('ft' or 'm').",
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -551,7 +555,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
       servicesAndExtras = JSON.parse(req.body?.servicesAndExtras);
     } catch (error) {
       return next(
-        new CustomError("Invalid format for servicesAndExtras,", 400),
+        new CustomError("Invalid format for servicesAndExtras,", 400)
       );
     }
     if (
@@ -593,7 +597,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
     const newImages = await uploadFileToCloudinary(
       req.files.images,
-      "rooms/images",
+      "rooms/images"
     );
     room.images.push(...newImages);
   }
@@ -604,7 +608,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
     const newVideos = await uploadFileToCloudinary(
       req.files.videos,
-      "rooms/videos",
+      "rooms/videos"
     );
     room.videos.push(...newVideos);
   }
@@ -622,7 +626,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
     // Remove images from property (once)
     room.images = room.images.filter(
-      (img) => !publicIdsToDelete.includes(img.public_id),
+      (img) => !publicIdsToDelete.includes(img.public_id)
     );
 
     // Delete from Cloudinary (sequential & safe)
@@ -644,7 +648,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
 
     // Remove videos from property (once)
     room.videos = room.videos.filter(
-      (video) => !publicIdsToDelete.includes(video.public_id),
+      (video) => !publicIdsToDelete.includes(video.public_id)
     );
 
     // Delete from Cloudinary (sequential & safe)
@@ -658,6 +662,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (name) room.name = name.trim().toLowerCase();
   if (capacity) room.capacity = capacity;
   if (pricePerNight) room.pricePerNight = pricePerNight;
+   if (weeklyPrice) room.weeklyPrice =weeklyPrice;
+   if (monthlyPrice) room.monthlyPrice = monthlyPrice;
   if (discount) room.discount = discount;
   if (type) room.typeOfRoom = type.toLowerCase();
   if (amenities)
@@ -671,7 +677,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (distanceToBathroom) room.distanceToBathroom = distanceToBathroom;
   if (bathroomAmenities)
     room.bathroomAmenities = parseArrayField(bathroomAmenities).map((a) =>
-      a.toLowerCase(),
+      a.toLowerCase()
     );
 
   if (accessibility) room.accessibility = accessibility;
@@ -735,8 +741,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "You are not authorized to update rooms for this property",
-        403,
-      ),
+        403
+      )
     );
   }
 
@@ -780,7 +786,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
 
   if (!types || !Array.isArray(types) || types.length === 0) {
     return next(
-      new CustomError("Room types are required and must be an array", 400),
+      new CustomError("Room types are required and must be an array", 400)
     );
   }
 
@@ -792,10 +798,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   });
   if (!rooms.length) {
     return next(
-      new CustomError(
-        "No rooms found for the provided property and types",
-        404,
-      ),
+      new CustomError("No rooms found for the provided property and types", 404)
     );
   }
 
@@ -805,10 +808,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
 
   if (bedType && !validBeds.includes(bedType.toLowerCase())) {
     return next(
-      new CustomError(
-        `Invalid bed type. Allowed: ${validBeds.join(", ")}`,
-        400,
-      ),
+      new CustomError(`Invalid bed type. Allowed: ${validBeds.join(", ")}`, 400)
     );
   }
 
@@ -819,8 +819,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `Invalid bathroom type. Allowed: ${validBathroomTypes.join(", ")}`,
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -847,8 +847,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "Invalid dimensions object. Must include numeric length, width, height, and valid unit ('ft' or 'm').",
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -863,8 +863,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "Invalid distanceToBathroom object. Must include numeric value and valid unit ('ft' or 'm').",
-        400,
-      ),
+        400
+      )
     );
   }
 
@@ -921,7 +921,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
             $each: amenitiesAdd.map((a) => a.trim().toLowerCase()),
           },
         },
-      },
+      }
     );
   }
 
@@ -934,7 +934,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
             $in: amenitiesRemove.map((a) => a.trim().toLowerCase()),
           },
         },
-      },
+      }
     );
   }
 
@@ -947,7 +947,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
             $each: bathroomAmenitiesAdd.map((a) => a.trim().toLowerCase()),
           },
         },
-      },
+      }
     );
   }
 
@@ -960,7 +960,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
             $in: bathroomAmenitiesRemove.map((a) => a.trim().toLowerCase()),
           },
         },
-      },
+      }
     );
   }
 
@@ -1014,8 +1014,8 @@ export const getTypesOfRoomsInProperty = asyncHandler(
       return next(
         new CustomError(
           "You are not authorized to get Types rooms for this property",
-          403,
-        ),
+          403
+        )
       );
     }
 
@@ -1024,7 +1024,7 @@ export const getTypesOfRoomsInProperty = asyncHandler(
     });
 
     return successResponse(res, 200, "Room types fetched successfully", rooms);
-  },
+  }
 );
 export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
   const { propertyId } = req.params;
@@ -1034,7 +1034,7 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
 
   if (!types || !Array.isArray(types) || types.length === 0) {
     return next(
-      new CustomError("Room types are required and must be an array", 400),
+      new CustomError("Room types are required and must be an array", 400)
     );
   }
 
@@ -1060,8 +1060,8 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "You are not authorized to delete rooms for this property",
-        403,
-      ),
+        403
+      )
     );
   }
 
@@ -1077,8 +1077,8 @@ export const deleteRoomsByTypes = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         "No rooms found with specified types for this property",
-        404,
-      ),
+        404
+      )
     );
   }
 
@@ -1112,14 +1112,14 @@ export const deleteRoom = asyncHandler(async (req, res, next) => {
       return next(
         new CustomError(
           "Sub-admin cannot delete partner owned property room",
-          403,
-        ),
+          403
+        )
       );
     }
 
     if (property.subAdminId.toString() !== userId.toString()) {
       return next(
-        new CustomError("You are not authorized to delete this room", 403),
+        new CustomError("You are not authorized to delete this room", 403)
       );
     }
   }
@@ -1130,7 +1130,7 @@ export const deleteRoom = asyncHandler(async (req, res, next) => {
       property.partnerId.toString() !== userId.toString()
     ) {
       return next(
-        new CustomError("You are not authorized to delete this room", 403),
+        new CustomError("You are not authorized to delete this room", 403)
       );
     }
   }
