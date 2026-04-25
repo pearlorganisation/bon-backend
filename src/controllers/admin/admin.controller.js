@@ -82,7 +82,7 @@ export const getAllPartners = asyncHandler(async (req, res, next) => {
 
 export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
-  const { roomGSTSlabs, gstOnServices } = req.body;
+  const { roomGSTSlabs, gstOnServices,GSTIN } = req.body;
 
   //  Role check
   if (req.user.role !== "ADMIN") {
@@ -129,12 +129,19 @@ export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
       }
     }
   }
-
-  // 🛠 Build update object dynamically
+ 
+   if(GSTIN){
+    const gstinRegex =
+      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    const isValid = gstinRegex.test("27AAAAA0000A1Z5");
+    if(!isValid)return next(new CustomError("Invalid GSTIN Number", 400));
+   }
+   
   const updateData = {};
 
   if (roomGSTSlabs) updateData.roomGSTSlabs = roomGSTSlabs;
   if (gstOnServices !== undefined) updateData.gstOnServices = gstOnServices;
+  if(GSTIN!= undefined)updateData.GSTIN = GSTIN;
 
   const admin = await Admin.findOneAndUpdate({ userId }, updateData, {
     new: true,
@@ -245,7 +252,7 @@ export const updateSubscriptionPlan = asyncHandler(async (req, res, next) => {
 });
 
 export const getPlatformPlans = asyncHandler(async (req, res, next) => {
-  console.log(req.user, "check");
+  
   const result = await Admin.aggregate([
     {
       $lookup: {
@@ -260,7 +267,8 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
         commission: 1,
         subscriptions: 1,
         roomGSTSlabs: 1,
-        gstOnServices:1
+        gstOnServices:1,
+        GSTIN:1,
       },
     },
   ]);
@@ -274,6 +282,7 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
     subscriptions: [],
     roomGSTSlabs: result[0].roomGSTSlabs,
     gstOnServices: result[0].gstOnServices,
+    GSTIN:  result[0].GSTIN,
   };
 
   if (req.user.role === "PARTNER") {
