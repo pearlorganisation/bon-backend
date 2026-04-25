@@ -259,6 +259,8 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
       $project: {
         commission: 1,
         subscriptions: 1,
+        roomGSTSlabs: 1,
+        gstOnServices:1
       },
     },
   ]);
@@ -270,6 +272,8 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
   const platformPlans = {
     commission: result[0].commission,
     subscriptions: [],
+    roomGSTSlabs: result[0].roomGSTSlabs,
+    gstOnServices: result[0].gstOnServices,
   };
 
   if (req.user.role === "PARTNER") {

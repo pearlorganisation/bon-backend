@@ -114,7 +114,7 @@ route.post(
 );
 
 route.post(
-  "/confirm-admin-payout", // admin ko paise mil gaee h
+  "/confirm-admin-payout", // admin ko paise mil gae h
   authorizeRoles("ADMIN"),
   confirmAdminMonthlyPayout
 );
