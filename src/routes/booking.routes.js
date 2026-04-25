@@ -4,8 +4,10 @@ import {
   updateBooking,
   cancelBooking,
   createRazorpayOrder,
+  selectPayOnArrivalMode,
   getMyBooking,
   getBooking,
+  updateGuestBookingStatus,
 } from "../controllers/Booking/booking.controller.js";
 
 // Middleware to check authentication and roles (Placeholder names)df
@@ -18,23 +20,31 @@ router.post(
   "/update/:bookingId",
   protect,
   authorizeRoles("CUSTOMER"),
-  updateBooking
+  updateBooking,
+);
+router.post(
+  "/pay-on-arrival/:bookingId",
+  protect,
+  authorizeRoles("CUSTOMER"),
+  selectPayOnArrivalMode,
 );
 router.post(
   "/create-order/:bookingId",
   protect,
   authorizeRoles("CUSTOMER"),
-  createRazorpayOrder
+  createRazorpayOrder,
 );
 router.post(
   "/cancel/:bookingId",
   protect,
   authorizeRoles("CUSTOMER", "PARTNER"),
-  cancelBooking
+  cancelBooking,
 );
 //df
 router.get("/my-bookings", protect, authorizeRoles("CUSTOMER"), getMyBooking);
 
 router.get("/", protect, authorizeRoles("ADMIN", "PARTNER"), getBooking);
+
+router.post("/update-booking-status", protect,authorizeRoles("PARTNER"), updateGuestBookingStatus);
 
 export default router;

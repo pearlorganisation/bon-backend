@@ -4,9 +4,7 @@ import Conversation from "../../models/Chat/Conversation.model.js";
 import Message from "../../models/Chat/Message.model.js";
 import propertyModel from "../../models/Listing/property.model.js";
 import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
-import { uploadFileToCloudinary } from "../../utils/cloudinary.js";
-import onlineUsers from "../../socket/onlineUsers.js";
-import sendFirebaseNotification from "../../utils/sendFirebaseNotification.js";
+import Auth from "../../models/auth/auth.model.js";
 
 const EDIT_LIMIT_MINUTES = 5;
 const DELETE_LIMIT_MINUTES = 5;
@@ -45,6 +43,75 @@ export const getOrCreateConversation = asyncHandler(async (req, res, next) => {
   });
 });
 
+export const getOrCreateAdminConversation = asyncHandler(
+  async (req, res, next) => {
+    const senderId = req.user._id;
+    const senderRole = req.user.role;
+    let { receiverId } = req.body;
+
+    if (!["ADMIN", "SUB_ADMIN"].includes(senderRole)) {
+      return next(new CustomError("Access denied", 403));
+    }
+
+    if (!receiverId && senderRole === "SUB_ADMIN") {
+      const admin = await Auth.findOne({ role: "ADMIN" });
+      if (!admin) return next(new CustomError("Admin not found", 404));
+      receiverId = admin._id;
+    }
+
+    if (!receiverId) return next(new CustomError("Receiver ID required", 400));
+
+    let conversation = await Conversation.findOne({
+      isAdminChat: true,
+      $or: [
+        { customerId: senderId, partnerId: receiverId },
+        { customerId: receiverId, partnerId: senderId },
+      ],
+    });
+
+    if (!conversation) {
+      conversation = await Conversation.create({
+        isAdminChat: true,
+        customerId: senderId,
+        partnerId: receiverId,
+      });
+    }
+
+    res.status(200).json({ success: true, conversationId: conversation._id });
+  }
+);
+
+export const sendMessage = asyncHandler(async (req, res, next) => {
+  const { conversationId, text, attachments } = req.body;
+  const senderId = req.user._id;
+  const senderRole = req.user.role;
+
+  const conversation = await Conversation.findById(conversationId);
+  if (!conversation)
+    return next(new CustomError("Conversation not found", 404));
+
+  const message = await Message.create({
+    conversationId,
+    senderId,
+    senderRole,
+    text,
+    attachments,
+  });
+
+  conversation.lastMessage = text || "Attachment sent";
+  conversation.lastMessageAt = Date.now();
+
+  if (conversation.customerId.toString() === senderId.toString()) {
+    conversation.unreadCountPartner += 1;
+  } else {
+    conversation.unreadCountCustomer += 1;
+  }
+
+  await conversation.save();
+
+  res.status(201).json({ success: true, data: message });
+});
+
 export const getConversationMessages = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
   const { conversationId } = req.query;
@@ -60,7 +127,7 @@ export const getConversationMessages = asyncHandler(async (req, res, next) => {
   }
 
   const isAuthorized =
-    conversation.customerId.toString() === userId.toString() ||
+    conversation.customerId?.toString() === userId.toString() ||
     conversation.partnerId?.toString() === userId.toString();
 
   if (!isAuthorized) {
@@ -75,6 +142,40 @@ export const getConversationMessages = asyncHandler(async (req, res, next) => {
     success: true,
     conversationId,
     messages,
+  });
+});
+
+export const getAdminConversationList = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+
+  const conversations = await Conversation.find({
+    isAdminChat: true,
+    $or: [{ customerId: userId }, { partnerId: userId }],
+  })
+    .populate("customerId", "name email profileImage role")
+    .populate("partnerId", "name email profileImage role")
+    .sort({ updatedAt: -1 })
+    .lean();
+
+  res.status(200).json({
+    success: true,
+    count: conversations.length,
+    conversations: conversations.map((c) => {
+      const otherUser =
+        c.customerId._id.toString() === userId.toString()
+          ? c.partnerId
+          : c.customerId;
+      return {
+        conversationId: c._id,
+        chatWith: otherUser,
+        lastMessage: c.lastMessage,
+        lastMessageAt: c.lastMessageAt,
+        unreadCount:
+          c.customerId._id.toString() === userId.toString()
+            ? c.unreadCountCustomer
+            : c.unreadCountPartner,
+      };
+    }),
   });
 });
 

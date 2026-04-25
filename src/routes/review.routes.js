@@ -1,37 +1,22 @@
 import express from "express";
 import {
   createReview,
-  getAllReviews,
-  getReviewsByProperty,
-  getReviewsByRoom,
-  deleteReview,
+  updateReview,
+  getPropertyReviews,
 } from "../controllers/Review/review.controller.js";
 
-import multer from "multer";
-import { protect } from "../middleware/auth/auth.middleware.js";
+import { protect, authorizeRoles } from "../middleware/auth/auth.middleware.js";
 
 const router = express.Router();
-
-// Multer Setup
-const storage = multer.memoryStorage();
-const upload = multer({ storage });
-const uploadImages = upload.fields([{ name: "images", maxCount: 5 }]);
 
 // ================= ROUTES =================
 
 // Create a review (Requires Login)
-router.post("/create/:propertyId/:roomId", protect, uploadImages, createReview);
+router.post("/create", protect, authorizeRoles("CUSTOMER"), createReview);
 
-// Get All Reviews (Public or Admin)
-router.get("/all", getAllReviews);
+router.post("/update", protect, authorizeRoles("CUSTOMER"), updateReview);
 
 // Get Reviews specific to a Property (Public)
-router.get("/property/:propertyId", getReviewsByProperty);
-
-// Get Reviews specific to a Room (Public)
-// router.get("/room/:roomId", getReviewsByRoom);
-
-// Delete a review (Requires Login)
-router.delete("/delete/:reviewId", protect, deleteReview);
+router.get("/property/:propertyId", getPropertyReviews);
 
 export default router;

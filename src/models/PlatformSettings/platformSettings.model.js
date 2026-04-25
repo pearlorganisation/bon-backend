@@ -12,7 +12,11 @@ const platformSettingsSchema = new mongoose.Schema(
     homepageBannerText2: { type: String },
     homepageBannerSubText: {type: String},
     copyrightText: { type: String },
-
+    
+    GSTIN: {
+       type: String,
+    },
+   
     socialLinks: {
       facebook: String,
       instagram: String,

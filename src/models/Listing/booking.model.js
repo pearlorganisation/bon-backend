@@ -28,7 +28,12 @@ const bookingSchema = new mongoose.Schema(
           default: 1,
         },
         pricePerNight: { type: Number, default: 0 },
+        packagePrice: {type: Number,default: 0 },
         discount: { type: Number, default: 0 },
+        room_gst: {
+          gst_rate: Number,
+          gst_amount: Number,
+        },
         extraServices: [
           {
             name: String,
@@ -46,12 +51,17 @@ const bookingSchema = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    pricingType: {
+      type: String,
+      enum: ["NIGHT", "WEEK", "MONTH"],
+      default: "NIGHT",
+    },
     // Total number of guests (sum across all rooms, validated against capacities)
     numberOfGuests: {
       adults: { type: Number },
       children: [{ age: Number }],
     },
-    // Total price (sum of all room subtotals + taxes/fees)
+    // Total price (sum of all room subtotals + taxes/fees + gst)
     totalPrice: {
       type: Number,
       required: true,
@@ -61,11 +71,23 @@ const bookingSchema = new mongoose.Schema(
     priceBreakdown: {
       basePrice: { type: Number, default: 0 },
       discountAmount: { type: Number, default: 0 },
-      taxes: { type: Number, default: 0 },
+      // taxes: { type: Number, default: 0 },
       extraServicesFee: { type: Number, default: 0 }, // e.g., service fees, cleaning fees
-      platformFee: { type: Number },
-      childrenCharge: { type: Number },
+      childrenCharge: { type: Number, default: 0 },
+      partnerPlanId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "PartnerPlan",
+        required: true,
+      },
+      gst_amount: { type: Number, default: 0 },
     },
+    paymentMode: {
+      type: String,
+      enum: ["PAY_NOW", "PAY_ON_ARRIVAL"],
+      // required: true,
+      default: null,
+    },
+    //paymwnt object only  for PAY_NOW
     payment: {
       razorpayOrderId: { type: String, default: null },
       razorpayPaymentId: { type: String },
@@ -86,11 +108,18 @@ const bookingSchema = new mongoose.Schema(
       ],
       default: "pending",
     },
-
     // Booking status for lifecycle management
     status: {
       type: String,
-      enum: ["pending", "confirmed", "cancelled","expired"],
+      enum: [
+        "pending",
+        "confirmed",
+        "cancelled",
+        "expired",
+        "checkIn",
+        "no-show",
+        "auto_settled",
+      ],
       default: "pending",
     },
     // Cancellation details if applicable
@@ -101,7 +130,7 @@ const bookingSchema = new mongoose.Schema(
       },
       cancellationDate: { type: Date },
       refundAmount: { type: Number, default: 0 },
-      razorpayRefundId: {type:String},
+      razorpayRefundId: { type: String },
       reason: { type: String },
     },
     // Guest details (for multiple guests or additional info)
@@ -121,6 +150,11 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       unique: true,
       sparse: true, // allows null for pending bookings
+    },
+    invoiceId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Invoice",
+      default: null,
     },
   },
   { timestamps: true }

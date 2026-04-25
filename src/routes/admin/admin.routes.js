@@ -8,6 +8,7 @@ import {
   getPropertyApprovalRequests,
   approveRejectProperty,
   assignPropertyToPartner,
+  getPropertyDetailsById,
 } from "../../controllers/partner/property.controller.js";
 import {
   protect,
@@ -19,6 +20,20 @@ import {
   updateSubscriptionPlan,
   upsertCommissionRange,
   getPlatformPlans,
+  // releasePartnerMonthlyPayout,
+  getPartnerMonthlyPayouts,
+  getAdminMonthlyFinance,
+  confirmAdminMonthlyPayout,
+  getWeeklySalesFromBookings,
+  getTopPerformerHotels,
+  getMonthlyRefundsData,
+  getMonthlySubscriptionsData,
+  getYearly_Revenue_Tax_Data,
+  getMonthlyHotelsData,
+  getMonthlyCustomerData,
+  getMonthlyBookingsData,
+  confirmPartnerMonthlyPayout,
+  upsertGSTConfig,
 } from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
@@ -52,7 +67,14 @@ route.patch(
 );
 
 route.get("/get-all-partners", authorizeRoles("ADMIN"), getAllPartners);
+route.get(
+  "/get-property-by-id/:propertyId",
+  authorizeRoles("ADMIN"),
+  getPropertyDetailsById
+);
 
+
+// plan and subscription
 route.get(
   "/get-patform-plans",
   authorizeRoles("ADMIN", "PARTNER"),
@@ -73,4 +95,91 @@ route.put(
   authorizeRoles("ADMIN"),
  updateSubscriptionPlan
 );
+
+route.post("/upsert-gst-config",authorizeRoles("ADMIN"),upsertGSTConfig);
+
+
+//payout apis 
+
+// route.post(
+//   "/release-partner-payout",
+//   authorizeRoles("ADMIN"),
+//   releasePartnerMonthlyPayout
+// );
+
+route.post(
+  "/confirm-partner-payout",  //admin ne partner ko pasie pay kardiya h
+  authorizeRoles("ADMIN"),
+  confirmPartnerMonthlyPayout
+);
+
+route.post(
+  "/confirm-admin-payout", // admin ko paise mil gaee h
+  authorizeRoles("ADMIN"),
+  confirmAdminMonthlyPayout
+);
+
+
+
+// admin  Payment & Finance dashborad  api
+route.get(
+  "/get-partner-monthly-payout",
+  authorizeRoles("ADMIN"),
+  getPartnerMonthlyPayouts
+);
+route.get(
+  "/get-admin-monthly-finance",
+  authorizeRoles("ADMIN"),
+  getAdminMonthlyFinance
+);
+route.get(
+  "/get-weekly-sales",
+  authorizeRoles("ADMIN"),
+  getWeeklySalesFromBookings
+);
+
+route.get(
+  "/get-top-permormers",
+  authorizeRoles("ADMIN"),
+  getTopPerformerHotels
+);
+route.get(
+  "/get-monthly-refunds",
+  authorizeRoles("ADMIN"),
+  getMonthlyRefundsData
+);
+route.get(
+  "/get-monthly-subscriptions-data",
+  authorizeRoles("ADMIN"),
+  getMonthlySubscriptionsData
+);
+
+//Analytics & Reports
+
+route.get(
+  "/get-yearly-revenue-tax",
+  authorizeRoles("ADMIN"),
+  getYearly_Revenue_Tax_Data
+);
+
+route.get(
+  "/get-monthly-hotels-data",
+  authorizeRoles("ADMIN"),
+  getMonthlyHotelsData
+);
+
+route.get(
+  "/get-monthly-customer-data",
+  authorizeRoles("ADMIN"),
+  getMonthlyCustomerData
+);
+
+route.get(
+  "/get-monthly-bookings-data",
+  authorizeRoles("ADMIN"),
+  getMonthlyBookingsData
+);
+
+
+
 export default route;

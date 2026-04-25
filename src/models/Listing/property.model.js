@@ -41,8 +41,8 @@ const propertySchema = new mongoose.Schema(
     amenities: [String],
 
     policies: {
-      checkInTime: {type: String, default: "2:00 PM"},
-      checkOutTime:  {type: String, default: "12:00 PM"},
+      checkInTime: { type: String, default: "2:00 PM" },
+      checkOutTime: { type: String, default: "12:00 PM" },
       cancellationPolicy: [
         {
           daysBeforeCheckIn: {
@@ -94,31 +94,37 @@ const propertySchema = new mongoose.Schema(
       ],
     },
     //df
-    ratingsAverage: {
-      type: Number,
-      default: 4.5,
-      min: [1, "Rating must be above 1.0"],
-      max: [5, "Rating must be below 5.0"],
-      set: (val) => Math.round(val * 10) / 10,
-    },
-    ratingsQuantity: {
-      type: Number,
-      default: 0,
-    },
+    // ratingsAverage: {
+    //   type: Number,
+    //   default: 4.5,
+    //   min: [1, "Rating must be above 1.0"],
+    //   max: [5, "Rating must be below 5.0"],
+    //   set: (val) => Math.round(val * 10) / 10,
+    // },
+    // ratingsQuantity: {
+    //   type: Number,
+    //   default: 0,
+    // },
 
     childrenCharge: {
-      age: Number,
+      age: {type : Number,default: 17},
       charge: { type: Number, require: true, default: 0 },
     },
     Images: [{ secure_url: String, public_id: String }],
     Videos: [{ secure_url: String, public_id: String }],
+
+    paymentModes: {
+      PAY_NOW: { type: Boolean, default: true },
+      PAY_ON_ARRIVAL: { type: Boolean, default: true },
+    },
+
     status: { type: String, enum: ["active", "inactive"], default: "active" },
     verified: {
       type: String,
       enum: ["pending", "under_review", "approved", "rejected"], //admin"approved" approved
       default: "pending",
     },
-    AdminNote:{type:String},
+    AdminNote: { type: String },
     //     commissionPercentage: { type: Number, default: 10 },
   },
   { timestamps: true }

@@ -4,196 +4,274 @@ import Property from "../../models/Listing/property.model.js";
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
 import asyncHandler from "../../middleware/asyncHandler.js";
-import { validateFileSize } from "../../utils/validateFileSize.js";
-import {
-  uploadFileToCloudinary,
-  deleteFileFromCloudinary,
-} from "../../utils/cloudinary.js";
+import Booking from "../../models/Listing/booking.model.js";
+import mongoose from "mongoose";
 
-// @desc    Create a new review
-// @route   POST /api/reviews/:propertyId/:roomId
 export const createReview = asyncHandler(async (req, res, next) => {
-
-  const { propertyId, roomId } = req.params;
-
+  const { bookingId, review, rooms } = req.body;
   const userId = req.user._id;
-  
-  const { rating, comment } = req.body;
 
-  // 1. Check if Property and Room exist
-  const property = await Property.findById(propertyId);
-  const room = await Room.findById(roomId);
-
-  if (!property || !room) {
-    return next(new CustomError("Property or Room not found", 404));
-  }
-
-  // 2. Validate Rating
-  if (!rating || rating < 1 || rating > 5) {
-    return next(new CustomError("Rating must be between 1 and 5", 400));
-  }
-
-  // 3. Handle Image Uploads
-  let uploadedImages = [];
-  if (req.files?.images) {
-    const errMsg = validateFileSize(req.files.images, "image");
-    if (errMsg) return next(new CustomError(errMsg, 400));
-
-    uploadedImages = await uploadFileToCloudinary(
-      req.files.images,
-      "reviews/images"
+  /* ================= VALIDATION ================= */
+  if (!bookingId || !rooms || !Array.isArray(rooms) || rooms.length === 0) {
+    return next(
+      new CustomError("bookingId and rooms ratings are required", 400),
     );
   }
 
-  // 4. Create Review
-  const review = await Review.create({
-    userId,
-    propertyId,
-    roomId,
-    rating: Number(rating),
-    comment,
-    images: uploadedImages,
+  /* ================= FETCH BOOKING ================= */
+  const booking = await Booking.findById(bookingId);
+
+  if (!booking) {
+    return next(new CustomError("Booking not found", 404));
+  }
+
+  /* ================= USER VALIDATION ================= */
+  if (booking.userId.toString() !== userId.toString()) {
+    return next(
+      new CustomError("You are not allowed to review this booking", 403),
+    );
+  }
+
+  /* ================= STATUS VALIDATION ================= */
+  if (booking.status !== "checkIn") {
+    return next(new CustomError("Review allowed only after check-in", 400));
+  }
+
+  if (booking.paymentStatus !== "paid") {
+    return next(
+      new CustomError("Payment must be completed to submit review", 400),
+    );
+  }
+
+  /* ================= PREVENT DUPLICATE ================= */
+  const existingReview = await Review.findOne({ bookingId });
+
+  if (existingReview) {
+    return next(new CustomError("You have already reviewed this booking", 400));
+  }
+
+  /* ================= ROOM VALIDATION ================= */
+  const bookingRoomIds = booking.rooms.map((r) => r.roomId.toString());
+
+  const validatedRooms = [];
+
+  for (const r of rooms) {
+    if (!r.roomId || r.rating === undefined) {
+      return next(
+        new CustomError("Each room must have roomId and rating", 400),
+      );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(r.roomId)) {
+      return next(new CustomError("Invalid roomId", 400));
+    }
+
+    if (!bookingRoomIds.includes(r.roomId.toString())) {
+      return next(new CustomError("Room does not belong to this booking", 400));
+    }
+
+    if (r.rating < 1 || r.rating > 5) {
+      return next(new CustomError("Rating must be between 1 and 5", 400));
+    }
+
+    validatedRooms.push({
+      roomId: r.roomId,
+      rating: r.rating,
+    });
+  }
+
+  if (validatedRooms.length !== booking.rooms.length) {
+    return next(new CustomError("You must review all booked rooms", 400));
+  }
+
+  /* ================= CREATE REVIEW ================= */
+  const newReview = await Review.create({
+    bookingId,
+    propertyId: booking.propertyId,
+    review,
+    rooms: validatedRooms,
   });
 
-  return successResponse(res, 201, "Review submitted successfully", review);
-});
-
-// @desc    Get All Reviews (Admin or General Feed)
-// @route   GET /api/reviews/all
-export const getAllReviews = asyncHandler(async (req, res, next) => {
-  // Optional: Pagination
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const skip = (page - 1) * limit;
-
-  const reviews = await Review.find()
-    .populate("userId", "name avatar email") // Populate user details
-    .populate("propertyId", "name")
-    .populate("roomId", "name type")
-    .sort({ createdAt: -1 })
-    .skip(skip)
-    .limit(limit);
-
-  const total = await Review.countDocuments();
-
-  return successResponse(res, 200, "All reviews fetched successfully", {
-    reviews,
-    total,
-    page,
-    pages: Math.ceil(total / limit),
-  });
-});
-
-// @desc    Get Reviews by Property
-// @route   GET /api/reviews/property/:propertyId
-export const getReviewsByProperty = asyncHandler(async (req, res, next) => {
-  const { propertyId } = req.params;
-
-  const reviews = await Review.find({ propertyId })
-    .populate("userId", "name avatar") // Only show name and avatar for privacy
-    .populate("roomId", "name type") // Show which room they stayed in
-    .sort({ createdAt: -1 }); // Newest first
-
-  // Calculate quick stats for response
-  const totalReviews = reviews.length;
-  const avgRating =
-    totalReviews > 0
-      ? reviews.reduce((acc, item) => acc + item.rating, 0) / totalReviews
-      : 0;
-
-  return successResponse(res, 200, "Property reviews fetched successfully", {
-    stats: {
-      totalReviews,
-      averageRating: avgRating.toFixed(1),
-    },
-    reviews,
-  });
-});
-
-// @desc    Get Reviews by Room (Specific Room Type)
-// @route   GET /api/reviews/room/:roomId
-export const getReviewsByRoom = asyncHandler(async (req, res, next) => {
-  const { roomId } = req.params;
-
-  const reviews = await Review.find({ roomId })
-    .populate("userId", "name avatar")
-    .sort({ createdAt: -1 });
-
-  const totalReviews = reviews.length;
-  const avgRating =
-    totalReviews > 0
-      ? reviews.reduce((acc, item) => acc + item.rating, 0) / totalReviews
-      : 0;
-
-  return successResponse(res, 200, "Room reviews fetched successfully", {
-    stats: {
-      totalReviews,
-      averageRating: avgRating.toFixed(1),
-    },
-    reviews,
+  /* ================= RESPONSE ================= */
+  successResponse(res, 201, "Review submitted successfully", {
+    review: newReview,
   });
 });
 
-// @desc    Delete Review
-// @route   DELETE /api/reviews/:reviewId
+export const updateReview = asyncHandler(async (req, res, next) => {
+  const { bookingId, review, rooms } = req.body;
+  const userId = req.user._id;
+
+  /* ================= VALIDATION ================= */
+  if (!bookingId || !rooms || !Array.isArray(rooms) || rooms.length === 0) {
+    return next(
+      new CustomError("bookingId and rooms ratings are required", 400),
+    );
+  }
+
+  /* ================= FETCH REVIEW ================= */
+  const existingReview = await Review.findOne({ bookingId });
+
+  if (!existingReview) {
+    return next(new CustomError("Review not found", 404));
+  }
+
+  /* ================= FETCH BOOKING ================= */
+  const booking = await Booking.findById(bookingId);
+
+  /* ================= USER VALIDATION ================= */
+  if (booking.userId.toString() !== userId.toString()) {
+    return next(
+      new CustomError("You are not allowed to update this review", 403),
+    );
+  }
+
+  const daysDiff =
+    (Date.now() - new Date(existingReview.createdAt)) / (1000 * 60 * 60 * 24);
+
+  if (daysDiff > 7) {
+    return next(
+      new CustomError("Review can only be updated within 7 days", 400),
+    );
+  }
+
+  /* ================= ROOM VALIDATION ================= */
+  const bookingRoomIds = booking.rooms.map((r) => r.roomId.toString());
+
+  const validatedRooms = [];
+
+  for (const r of rooms) {
+    if (!r.roomId || r.rating === undefined) {
+      return next(
+        new CustomError("Each room must have roomId and rating", 400),
+      );
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(r.roomId)) {
+      return next(new CustomError("Invalid roomId", 400));
+    }
+
+    if (!bookingRoomIds.includes(r.roomId.toString())) {
+      return next(new CustomError("Room does not belong to this booking", 400));
+    }
+
+    if (r.rating < 1 || r.rating > 5) {
+      return next(new CustomError("Rating must be between 1 and 5", 400));
+    }
+
+    validatedRooms.push({
+      roomId: r.roomId,
+      rating: r.rating,
+    });
+  }
+
+  /* ================= OPTIONAL STRICT CHECK ================= */
+  if (validatedRooms.length !== booking.rooms.length) {
+    return next(new CustomError("You must review all booked rooms", 400));
+  }
+
+  /* ================= UPDATE REVIEW ================= */
+  existingReview.review = review || existingReview.review;
+  existingReview.rooms = validatedRooms;
+
+  await existingReview.save(); // triggers pre-save (recalculate overallRating)
+
+  /* ================= RESPONSE ================= */
+  successResponse(res, 200, "Review updated successfully", {
+    review: existingReview,
+  });
+});
+
 // export const deleteReview = asyncHandler(async (req, res, next) => {
-//   const { reviewId } = req.params;
+
+//   const { bookingId } = req.params; // better in params for delete
 //   const userId = req.user._id;
 
-//   const review = await Review.findById(reviewId);
+//   /* ================= VALIDATION ================= */
+//   if (!bookingId) {
+//     return next(new CustomError("bookingId is required", 400));
+//   }
+
+//   /* ================= FETCH REVIEW ================= */
+//   const review = await Review.findOne({ bookingId });
 
 //   if (!review) {
 //     return next(new CustomError("Review not found", 404));
 //   }
 
-//   // Allow deletion if user owns the review OR if user is an Admin (add admin check if needed)
-//   if (review.userId.toString() !== userId.toString()) {
-//     // You might also check if req.user.role === 'admin' here
+//   /* ================= FETCH BOOKING ================= */
+//   const booking = await Booking.findById(bookingId);
+
+//   if (!booking) {
+//     return next(new CustomError("Booking not found", 404));
+//   }
+
+//   /* ================= USER VALIDATION ================= */
+//   if (booking.userId.toString() !== userId.toString()) {
 //     return next(
-//       new CustomError("You are not authorized to delete this review", 403)
+//       new CustomError("You are not allowed to delete this review", 403)
 //     );
 //   }
 
-//   // Delete images from Cloudinary
-//   if (review.images && review.images.length > 0) {
-//     for (const img of review.images) {
-//       await deleteFileFromCloudinary(img.public_id, "image");
-//     }
-//   }
+//   /* ================= DELETE ================= */
+//   await review.deleteOne();
 
-//   await Review.findByIdAndDelete(reviewId);
-
-//   return successResponse(res, 200, "Review deleted successfully", {});
+//   /* ================= RESPONSE ================= */
+//   successResponse(res, 200, "Review deleted successfully", {});
 // });
 
-export const deleteReview = asyncHandler(async (req, res, next) => {
-  const { reviewId } = req.params;
-  const { _id: userId, role } = req.user;
+export const getPropertyReviews = asyncHandler(async (req, res, next) => {
+  const { propertyId } = req.params;
 
-  const review = await Review.findById(reviewId);
+  const { page = 1, limit = 10 } = req.query;
 
-  if (!review) {
-    return next(new CustomError("Review not found", 404));
+  if (!propertyId) {
+    return next(new CustomError("propertyId is required", 400));
   }
 
-  // ✅ Authorization logic
-  const isOwner = review.userId.toString() === userId.toString();
-  const isAdmin = role === "ADMIN";
+  const skip = (Number(page) - 1) * Number(limit);
 
-  if (!isOwner && !isAdmin) {
-    return next(
-      new CustomError("You are not authorized to delete this review", 403)
-    );
-  }
+  /* ================= AGGREGATE STATS ================= */
+  const stats = await Review.aggregate([
+    {
+      $match: {
+        propertyId: new mongoose.Types.ObjectId(propertyId),
+      },
+    },
+    {
+      $group: {
+        _id: "$propertyId",
+        avgRating: { $avg: "$overallRating" },
+        totalReviews: { $sum: 1 },
+      },
+    },
+  ]);
 
-  // 🖼️ Delete images from Cloudinary
-  if (review.images?.length > 0) {
-    for (const img of review.images) {
-      await deleteFileFromCloudinary(img.public_id, "image");
-    }
-  }
+  const avgRating = stats[0]?.avgRating || 0;
+  const totalReviews = stats[0]?.totalReviews || 0;
 
-  await Review.findByIdAndDelete(reviewId);
+  /* ================= FETCH REVIEWS ================= */
+  const reviews = await Review.find({ propertyId })
+    .populate({
+      path: "bookingId",
+      populate: {
+        path: "userId",
+        select: "name email", // fields from user
+      },
+    })
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(Number(limit));
 
-  return successResponse(res, 200, "Review deleted successfully", {});
+  const total = await Review.countDocuments({ propertyId });
+
+  /* ================= RESPONSE ================= */
+  successResponse(res, 200, "Property reviews fetched successfully", {
+    avgRating: Number(avgRating.toFixed(1)), // rounded
+    totalReviews,
+    page: Number(page),
+    limit: Number(limit),
+    totalPages: Math.ceil(total / limit),
+    reviews,
+  });
 });

@@ -16,6 +16,26 @@ const parseArrayField = (field) => {
   return [field];
 };
 
+const parseNestedNumbers = (obj) => {
+  if (!obj || typeof obj !== "object") return obj;
+
+  const parsed = Array.isArray(obj) ? [] : {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === "object") {
+      parsed[key] = parseNestedNumbers(value);
+    } else {
+      // Don't convert units or strings to numbers
+      if (key === "unit" || isNaN(value) || value === "") {
+        parsed[key] = value;
+      } else {
+        parsed[key] = Number(value);
+      }
+    }
+  }
+  return parsed;
+};
+
 export const createRooms = asyncHandler(async (req, res, next) => {
   const { propertyId } = req.params;
   const { _id: userId, role } = req.user;
@@ -45,7 +65,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     amenities,
     bedType,
     bedCount,
-    blockedDates,
+    // blockedDates,
     dimensions,
     discount,
     bathroomType,
@@ -62,6 +82,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     frontDeskServices,
     commonAreas,
     kidsAndFamily,
+    foodAndDrinksAmenities,
+    roomSpecifications,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -273,6 +295,11 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     );
   }
 
+  let parsedSpecs = {};
+  if (roomSpecifications) {
+    parsedSpecs = parseNestedNumbers(roomSpecifications);
+  }
+
   const baseRoomData = {
     propertyId,
     name: name.trim(),
@@ -283,7 +310,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     amenities: parseArrayField(amenities).map((item) => item.trim()),
     bedType: bedType.toLowerCase(),
     bedCount: bedCount || 1,
-    blockedDates: blockedDates || [],
+    // blockedDates: blockedDates || [],
     dimensions,
     distanceToBathroom,
     discount: discount || 0,
@@ -305,6 +332,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     frontDeskServices,
     commonAreas,
     kidsAndFamily,
+    foodAndDrinksAmenities,
+    roomSpecifications: parsedSpecs,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -382,7 +411,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     amenities,
     bedType,
     bedCount,
-    blockedDates,
+    // blockedDates,
     dimensions,
     bathroomType,
     bathroomCount,
@@ -398,6 +427,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     frontDeskServices,
     commonAreas,
     kidsAndFamily,
+    foodAndDrinksAmenities,
+    roomSpecifications,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -426,7 +457,9 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (discount) discount = Number(discount);
   if (bedCount) bedCount = Number(bedCount);
   if (bathroomCount) bathroomCount = Number(bathroomCount);
-
+  if (roomSpecifications) {
+    room.roomSpecifications = parseNestedNumbers(roomSpecifications);
+  }
   if (buildingInfo && typeof buildingInfo === "object") {
     if (buildingInfo.totalFloors)
       buildingInfo.totalFloors = Number(buildingInfo.totalFloors);
@@ -631,7 +664,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     room.amenities = parseArrayField(amenities).map((a) => a.toLowerCase());
   if (bedType) room.bedType = bedType.toLowerCase();
   if (bedCount) room.bedCount = bedCount;
-  if (blockedDates) room.blockedDates = blockedDates;
+  // if (blockedDates) room.blockedDates = blockedDates;
   if (dimensions) room.dimensions = dimensions;
   if (bathroomType) room.bathroomType = bathroomType.toLowerCase();
   if (bathroomCount) room.bathroomCount = bathroomCount;
@@ -651,6 +684,8 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   if (frontDeskServices) room.frontDeskServices = frontDeskServices;
   if (commonAreas) room.commonAreas = commonAreas;
   if (kidsAndFamily) room.kidsAndFamily = kidsAndFamily;
+  if (foodAndDrinksAmenities)
+    room.foodAndDrinksAmenities = foodAndDrinksAmenities;
   if (buildingInfo) room.buildingInfo = buildingInfo;
   if (selfCheckIn) room.selfCheckIn = selfCheckIn;
   if (beddingAndComfort) room.beddingAndComfort = beddingAndComfort;
@@ -709,8 +744,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     types,
     pricePerNight,
     discount,
-    blockedDatesAdd,
-    blockedDatesRemove,
+    // blockedDatesAdd,
+    // blockedDatesRemove,
     amenitiesAdd,
     amenitiesRemove,
     capacity,
@@ -733,6 +768,7 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     frontDeskServices,
     commonAreas,
     kidsAndFamily,
+    foodAndDrinksAmenities,
     buildingInfo,
     selfCheckIn,
     beddingAndComfort,
@@ -861,6 +897,8 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
   if (frontDeskServices) updateFields.frontDeskServices = frontDeskServices;
   if (commonAreas) updateFields.commonAreas = commonAreas;
   if (kidsAndFamily) updateFields.kidsAndFamily = kidsAndFamily;
+  if (foodAndDrinksAmenities)
+    updateFields.foodAndDrinksAmenities = foodAndDrinksAmenities;
   if (buildingInfo) updateFields.buildingInfo = buildingInfo;
   if (selfCheckIn) updateFields.selfCheckIn = selfCheckIn;
   if (beddingAndComfort) updateFields.beddingAndComfort = beddingAndComfort;
@@ -926,36 +964,36 @@ export const updateRoomsInBulk = asyncHandler(async (req, res, next) => {
     );
   }
 
-  if (blockedDatesAdd && Array.isArray(blockedDatesAdd)) {
-    await Room.updateMany(
-      { _id: { $in: roomIds } },
-      {
-        $addToSet: { blockedDates: { $each: blockedDatesAdd } },
-      },
-    );
-  }
+  // if (blockedDatesAdd && Array.isArray(blockedDatesAdd)) {
+  //   await Room.updateMany(
+  //     { _id: { $in: roomIds } },
+  //     {
+  //       $addToSet: { blockedDates: { $each: blockedDatesAdd } },
+  //     },
+  //   );
+  // }
 
-  if (blockedDatesRemove && Array.isArray(blockedDatesRemove)) {
-    await Room.updateMany(
-      { _id: { $in: roomIds } },
-      {
-        $pull: {
-          blockedDates: {
-            $or: blockedDatesRemove.map((d) => ({
-              startDate: d.startDate,
-              endDate: d.endDate,
-            })),
-          },
-        },
-      },
-    );
-  }
+  // if (blockedDatesRemove && Array.isArray(blockedDatesRemove)) {
+  //   await Room.updateMany(
+  //     { _id: { $in: roomIds } },
+  //     {
+  //       $pull: {
+  //         blockedDates: {
+  //           $or: blockedDatesRemove.map((d) => ({
+  //             startDate: d.startDate,
+  //             endDate: d.endDate,
+  //           })),
+  //         },
+  //       },
+  //     },
+  //   );
+  // }
 
   return successResponse(res, 200, "Bulk update successful", {
     updatedRooms: rooms.length,
     updatedFields: updateFields,
-    blockedDatesAdded: blockedDatesAdd || null,
-    blockedDatesRemoved: blockedDatesRemove || null,
+    // blockedDatesAdded: blockedDatesAdd || null,
+    // blockedDatesRemoved: blockedDatesRemove || null,
     amenitiesAdded: amenitiesAdd || null,
     amenitiesRemoved: amenitiesRemove || null,
     bathroomAmenitiesAdded: bathroomAmenitiesAdd || null,
