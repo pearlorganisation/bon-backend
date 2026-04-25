@@ -14,15 +14,10 @@ export const getPlatformSettings = async (req, res) => {
 export const updatePlatformSettings = async (req, res) => {
   try {
     const {
-      websiteName,
       supportEmail,
       supportPhone,
       addressLine1,
       addressLine2,
-      homepageBannerText1,
-      homepageBannerText2,
-      homepageBannerSubText,
-      copyrightText,
       facebook,
       instagram,
       twitter,
@@ -32,19 +27,11 @@ export const updatePlatformSettings = async (req, res) => {
     let settings = await PlatformSettings.findOne();
     if (!settings) settings = new PlatformSettings();
 
-    settings.websiteName = websiteName ?? settings.websiteName;
+    // Update Text Fields
     settings.supportEmail = supportEmail ?? settings.supportEmail;
     settings.supportPhone = supportPhone ?? settings.supportPhone;
     settings.addressLine1 = addressLine1 ?? settings.addressLine1;
     settings.addressLine2 = addressLine2 ?? settings.addressLine2;
-    settings.homepageBannerText1 =
-      homepageBannerText1 ?? settings.homepageBannerText1;
-    settings.homepageBannerText2 =
-      homepageBannerText2 ?? settings.homepageBannerText2;
-    settings.homepageBannerSubText =
-      homepageBannerSubText ?? settings.homepageBannerSubText;
-    settings.copyrightText =
-      copyrightText ?? settings.copyrightText;
 
     settings.socialLinks = {
       facebook: facebook ?? settings.socialLinks?.facebook,
@@ -53,12 +40,29 @@ export const updatePlatformSettings = async (req, res) => {
       linkedin: linkedin ?? settings.socialLinks?.linkedin,
     };
 
-    await settings.save();
+    // FIX: Handle Logo Upload for "brandLogo" object
+    if (req.files && req.files['logo'] && req.files['logo'][0]) {
+      const logoFile = req.files['logo'][0];
+      
+      try {
+        const uploadResult = await cloudinary.uploader.upload(logoFile.path, {
+          folder: "platform/logo", // Matching your existing path
+        });
 
-    res.status(200).json({
-      message: "Platform settings updated successfully",
-      settings,
-    });
+        // The JSON shows your DB uses "brandLogo" as an object
+        settings.brandLogo = {
+          url: uploadResult.secure_url,
+          publicId: uploadResult.public_id
+        };
+
+        if (fs.existsSync(logoFile.path)) fs.unlinkSync(logoFile.path);
+      } catch (err) {
+        console.error("Cloudinary Error:", err);
+      }
+    }
+
+    await settings.save();
+    res.status(200).json({ message: "Platform settings updated successfully", settings });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
