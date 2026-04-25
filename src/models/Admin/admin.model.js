@@ -28,6 +28,9 @@ const AdminSchema = new mongoose.Schema(
       default: 18,
     },
   },
+  GSTIN: {
+    type:String,default: "N/A",
+  }
   { timestamps: true }
 );
 
