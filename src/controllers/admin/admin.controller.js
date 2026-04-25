@@ -267,7 +267,7 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
         commission: 1,
         subscriptions: 1,
         roomGSTSlabs: 1,
-        gstOnServices:1
+        gstOnServices:1,
         GSTIN:1,
       },
     },
