@@ -20,7 +20,7 @@ const invoiceSchema = new mongoose.Schema(
 
     /* ---------------- DOCUMENT ---------------- */
 
-    pdfUrl: String,
+    pdfUrl: String, 
     pdfUrl2: {
       type: String,
       validate: {
