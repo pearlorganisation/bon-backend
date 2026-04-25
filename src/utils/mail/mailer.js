@@ -1,8 +1,8 @@
 import nodemailer from "nodemailer";
 import dotenv from "dotenv";
 
-dotenv.config();
 
+dotenv.config();
 /* -------------------------------------------------------------------------- */
 /*                            Nodemailer Transporter                           */
 /* -------------------------------------------------------------------------- */
@@ -16,10 +16,10 @@ const transporter = nodemailer.createTransport({
     pass: process.env.NODEMAILER_EMAIL_PASS,
   },
 });
-
 /* -------------------------------------------------------------------------- */
 /*                       Support Mail (Reusable)  send to both sender and reciever                            */
 /* -------------------------------------------------------------------------- */
+
 export const sendSupportMail = async ({
   from,
   to,
@@ -108,7 +108,6 @@ export const supportMailToAdmin = async ({ customerEmail, message }) => {
     cc: customerEmail,
   });
 };
-
 /* -------------------------------------------------------------------------- */
 /*                           Generic Email Sender                              */
 /* -------------------------------------------------------------------------- */
@@ -128,36 +127,48 @@ export const sendEmail = async (to, subject, html) => {
     throw new Error(error.message);
   }
 };
-
 /* -------------------------------------------------------------------------- */
 /*                               OTP Email                                     */
 /* -------------------------------------------------------------------------- */
 export const sendOtpEmail = async (name, email, otp, type = "REGISTER") => {
-  const subject =
-    type === "REGISTER"
-      ? "Verify your email"
-      : "Password reset verification code";
+  const subject = type === "REGISTER" ? "Verify your Email - Bonfire Escapes" : "Password Reset - Bonfire Escapes";
+  
+  // Brand color constant
+  const brandColor = "#f05a28"; 
 
   const html = `
-    <div style="font-family:Arial;padding:20px;">
-      <h2>Hi ${name},</h2>
-      <p>Your ${
-        type === "REGISTER" ? "registration" : "password reset"
-      } OTP is:</p>
-      <h1 style="letter-spacing:5px;color:#4F46E5;">${otp}</h1>
-      <p>This OTP is valid for 5 minutes.</p>
-      <p style="font-size:12px;color:#666;">
-        If you didn’t request this, please ignore this email.
-      </p>
-      <br/>
-      <p>Best regards,<br/>Team Bonfire</p>
+    <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: auto; border: 1px solid #eee; border-radius: 10px; overflow: hidden;">
+      <!-- Header with Logo -->
+      <div style="background-color: #ffffff; padding: 20px; text-align: center; border-bottom: 3px solid ${brandColor};">
+        <img src="https://bonfireescapes.com/logoo.jpeg" alt="Bonfire Escapes" style="max-width: 150px;" />
+      </div>
+
+      <!-- Body -->
+      <div style="padding: 30px; color: #333;">
+        <h2 style="color: #333;">Hi ${name},</h2>
+        <p>Thanks for choosing <strong>Bonfire Escapes</strong>. To complete your ${
+          type === "REGISTER" ? "registration" : "password reset"
+        }, please use the OTP below:</p>
+        
+        <div style="text-align: center; margin: 30px 0;">
+          <h1 style="letter-spacing: 8px; color: ${brandColor}; font-size: 40px; margin: 0;">${otp}</h1>
+        </div>
+        
+        <p style="font-size: 14px;">This code is valid for <strong>5 minutes</strong>. If you did not request this, please ignore this email or contact our support team.</p>
+      </div>
+
+      <!-- Footer -->
+      <div style="background-color: #f9f9f9; padding: 20px; font-size: 12px; color: #777; text-align: center; border-top: 1px solid #eee;">
+        <p style="margin: 5px 0;"><strong>Bonfire Escapes</strong></p>
+        <p style="margin: 5px 0;">Dehradun, Uttarakhand, India | Rishikesh, India</p>
+        <p style="margin: 5px 0;">Need help? <a href="mailto:support@bonfireescapes.com" style="color: ${brandColor};">support@bonfireescapes.com</a> | +91 9259682285</p>
+        <p style="margin-top: 15px;">&copy; ${new Date().getFullYear()} Bonfire Escapes. All rights reserved.</p>
+      </div>
     </div>
   `;
 
   return sendEmail(email, subject, html);
 };
-
-
 /* -------------------------------------------------------------------------- */
 /*                 SUB ADMIN ACCOUNT CREATED (WITH PASSWORD)                   */
 /* -------------------------------------------------------------------------- */
@@ -236,3 +247,5 @@ export const sendSubAdminCreatedEmail = async (
 
   return sendEmail(email, subject, html);
 };
+
+
