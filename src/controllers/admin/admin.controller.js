@@ -133,7 +133,7 @@ export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
    if(GSTIN){
     const gstinRegex =
       /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
-    const isValid = gstinRegex.test("27AAAAA0000A1Z5");
+    const isValid = gstinRegex.test(GSTIN);
     if(!isValid)return next(new CustomError("Invalid GSTIN Number", 400));
    }
    

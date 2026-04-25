@@ -601,9 +601,9 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
     await inactivePlan.save();
 
-    createParterPlanInvoice(inactivePlan._id).catch((error) =>
-      console.log("Invoice generation failed", error),
-    );
+    // createParterPlanInvoice(inactivePlan._id).catch((error) =>
+    //   console.log("Invoice generation failed", error),
+    // );
 
     successResponse(res, 201, "order created", {
       orderId: order.id,

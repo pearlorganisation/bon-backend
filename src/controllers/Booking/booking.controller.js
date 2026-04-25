@@ -150,17 +150,17 @@ const calculateRefundPercentage = ({
 
 const getGST = async (amount) => {
   const admin = await Admin.findOne();
-
+ console.log(admin);
   if (!admin || !admin.roomGSTSlabs) {
     throw new Error("no Room GST Slabs set by Admin");
   }
-  const slabs = admin.roomGSTSlabs;
+  const slabs = admin.roomGSTSlabs.sort((a, b) => a.upto - b.upto);
+
   let gstRate = 0;
 
   for (let slab of slabs) {
-    if (amount <= slab.upto) {
+    if (amount >= slab.upto) {
       gstRate = slab.rate;
-      break;
     }
   }
 
@@ -426,17 +426,18 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
     const effectiveAdults = numberOfGuests.adults + ChildTreatAsAdultCount;
 
-    if (effectiveAdults > totalCapacity) {
+    const totalGuests = effectiveAdults + remainingChildren;
+
+    if (totalGuests > totalCapacity + 10) {
       throw new CustomError(
-        `Number of guests exceeds room capacity. (${ChildTreatAsAdultCount}) child's age  exceeds the property's maximum age policy. ${childConfig?.age}`,
+        `Number of guests including childrens exceeds room MAX_TOTAL_GUESTS  capacity .`,
         400
       );
     }
+    const overflow = Math.max(0, effectiveAdults - totalCapacity);
 
-    const totalGuests = effectiveAdults + remainingChildren;
-    const overflow = Math.max(0, totalGuests - totalCapacity);
-
-    const childrenCharge = overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
+    const childrenCharge =
+      overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
 
     // 6️ calculate gst
     let totalPrice =
@@ -740,17 +741,18 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 
     const effectiveAdults = numberOfGuests.adults + ChildTreatAsAdultCount;
 
-    if (effectiveAdults > totalCapacity) {
+    const totalGuests = effectiveAdults + remainingChildren;
+
+    if (totalGuests > totalCapacity + 10) {
       throw new CustomError(
-        `Number of guests exceeds room capacity. (${ChildTreatAsAdultCount}) child's age  exceeds the property's maximum age policy. ${childConfig?.age}`,
+        `Number of guests including childrens exceeds room MAX_TOTAL_GUESTS  capacity .`,
         400
       );
     }
+    const overflow = Math.max(0, effectiveAdults - totalCapacity);
 
-    const totalGuests = effectiveAdults + remainingChildren;
-    const overflow = Math.max(0, totalGuests - totalCapacity);
-
-    const childrenCharge = overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
+    const childrenCharge =
+      overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
 
     // 8️⃣ Final total (same as createBooking)
     const totalPrice =

@@ -13,6 +13,8 @@ import path from "path";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import Admin from "../../models/Admin/admin.model.js";
 import { generatePartnerPlanInvoicePDF } from "./generatePartnerPlanInvoicePDF.js";
+import { generatePartnerPayoutInvoicePDF } from "./generatePartnerPayoutInvoicePDF.js";
+import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 
 // const booking = {
 //   confirmationCode: "BNF-987654",
@@ -109,9 +111,8 @@ export const createParterPlanInvoice = async (planId) => {
     if (!plan) {
       throw new Error("no plan found");
     }
-     const commissionData = await Admin.find().select("commission");
 
-    const url = await generatePartnerPlanInvoicePDF(plan,commissionData,invoiceNumber);
+    const url = await generatePartnerPlanInvoicePDF(plan,invoiceNumber);
      console.log(url);
     const invoice = await Invoice.create({
       invoiceNumber,
@@ -124,50 +125,71 @@ export const createParterPlanInvoice = async (planId) => {
 
     return invoice;
 
-    // create
+    
   } catch (error) {
     console.error(" partner plan Invoice generation failed:", error);
     throw error;
   }
 };
-// createParterPlanInvoice("69e0bfb72a751495ee4706b8");
+//createParterPlanInvoice("69e0bfb72a751495ee4706b8");
 // createParterPlanInvoice("69d35f0fecc687c0a6235796");
 
 
-export const createParterMonthlyPayoutInvoice = async (planId) => {
+export const createParterMonthlyPayoutInvoice = async (payoutId) => {
   try {
     const invoiceNumber = await generateInvoiceNumber();
 
-    const plan = await PartnerPlan.findById(planId)
-      .populate("partnerId")
-      .populate("subscriptionPlanId");
+    const payout = await PartnerMonthlyPayoutModel.findById(payoutId)
+      .populate({
+        path: "bookings.bookingId",
+        populate: {
+          path: "propertyId", // The field inside the Booking document to populate
+          model: "Property", 
+        },
+      })
+      .populate("partnerId");  
 
-    if (!plan) {
-      throw new Error("no plan found");
+    if (!payout) {
+      throw new Error("no payout found");
     }
-    const commissionData = await Admin.find().select("commission");
 
-    const url = await generatePartnerPlanInvoicePDF(
-      plan,
-      commissionData,
+    const admin = await Admin.findOne().select("GSTIN");
+    const gstin = admin?.GSTIN || "N/A";
+
+    const url = await generatePartnerPayoutInvoicePDF(
+      payout,
+      gstin,
       invoiceNumber
     );
     console.log(url);
-    const invoice = await Invoice.create({
-      invoiceNumber,
-      invoiceType: "PARTNER_PLAN_INVOICE",
-      pdfUrl: url,
-    });
-    console.log(invoice);
-    plan.invoiceId = invoice._id;
-    await plan.save();
 
-    return invoice;
+    // const invoice = await Invoice.create({
+    //   invoiceNumber,
+    //   invoiceType: "PAYOUT_STATEMENT_INVOICE",
+    //   pdfUrl: url,
+    // });
 
-    // create
+    // payout.partnerWallet.invoiceId = invoice._id;
+    // await payout.save();
+
+    // return invoice;
   } catch (error) {
-    console.error(" partner plan Invoice generation failed:", error);
+    console.error("Partner payout invoice generation failed:", error);
     throw error;
   }
 };
 
+
+// (async () => {
+
+//   // optional small delay if you still want it
+//   setTimeout(async () => {
+//     try {
+//       await createParterMonthlyPayoutInvoice("69d378252af7459f82373c40");
+//     } catch (err) {
+//       console.error(err);
+//     }
+//   }, 5000);
+// })();
+
+ 
