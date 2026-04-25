@@ -54,7 +54,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
             "x-client-id": process.env.CASHFREE_CLIENT_ID,
             "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
           },
-        }
+        },
       ),
       axios.post(
         process.env.GSTIN_PAN_API_URL,
@@ -65,7 +65,7 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
             "x-client-id": process.env.CASHFREE_CLIENT_ID,
             "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
           },
-        }
+        },
       ),
     ]);
 
@@ -149,7 +149,7 @@ export const getPartnerKYC = asyncHandler(async (req, res, next) => {
   }
 
   const partner = await Partner.findOne(partnerQuery).select(
-    "panDetails gstinList isPanVerified"
+    "panDetails gstinList isPanVerified",
   );
 
   if (!partner) {
@@ -211,7 +211,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
           "x-client-id": process.env.CASHFREE_CLIENT_ID,
           "x-client-secret": process.env.CASHFREE_CLIENT_SECRET,
         },
-      }
+      },
     );
 
     const gstinInfo = response.data;
@@ -227,7 +227,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
 
     // 4️⃣ Check if GSTIN is linked to PAN
     const isLinkedWithPAN = partner?.gstinList?.some(
-      (g) => g.gstin?.toUpperCase() === gstinInfo.GSTIN?.toUpperCase()
+      (g) => g.gstin?.toUpperCase() === gstinInfo.GSTIN?.toUpperCase(),
     );
 
     const message = isLinkedWithPAN
@@ -259,7 +259,7 @@ export const verify_property_GSTIN = asyncHandler(async (req, res, next) => {
     });
   } catch (error) {
     console.log("GSTIN Verification Error", error?.response?.data || error);
-  
+
     let message = error?.response?.data
       ? error?.response?.data?.message
       : "Internal server error";
@@ -349,8 +349,8 @@ export const createPartnerFundAccount = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         error?.error?.description || error.message || "Fund setup failed",
-        error.status || 500
-      )
+        error.status || 500,
+      ),
     );
   }
 });
@@ -366,7 +366,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!accountHolderName || !accountNumber || !ifscCode) {
       throw new CustomError(
         "accountHolderName, accountNumber and ifscCode are required",
-        400
+        400,
       );
     }
 
@@ -387,7 +387,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!partner?.razorpay?.contactId) {
       throw new CustomError(
         "Payout contact not found. Setup payout first.",
-        400
+        400,
       );
     }
 
@@ -430,8 +430,8 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         error?.error?.description || error.message || "Bank update failed",
-        error.status || 500
-      )
+        error.status || 500,
+      ),
     );
   }
 });
@@ -474,7 +474,7 @@ export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
 
   if (commissionPercentage < min || commissionPercentage > max) {
     return next(
-      new CustomError("commission percentage is outside platform range", 400)
+      new CustomError("commission percentage is outside platform range", 400),
     );
   }
 
@@ -497,8 +497,8 @@ export const buyNewCommissionPlan = asyncHandler(async (req, res, next) => {
     endDate,
   });
 
-     createParterPlanInvoice(plan._id).catch((error) =>
-    console.log("Invoice generation failed", error)
+  createParterPlanInvoice(plan._id).catch((error) =>
+    console.log("Invoice generation failed", error),
   );
 
   successResponse(res, 201, "commission plan created", plan);
@@ -601,9 +601,9 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
     await inactivePlan.save();
 
-      createParterPlanInvoice(inactivePlan._id).catch((error) =>
-        console.log("Invoice generation failed", error)
-      );
+    createParterPlanInvoice(inactivePlan._id).catch((error) =>
+      console.log("Invoice generation failed", error),
+    );
 
     successResponse(res, 201, "order created", {
       orderId: order.id,
@@ -622,8 +622,8 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         err?.error?.description || "payment gateway error",
-        err.statusCode || 502
-      )
+        err.statusCode || 502,
+      ),
     );
   }
 });
@@ -662,12 +662,12 @@ export const subscriptionWebhookController = asyncHandler(
     plan.planStatus = activePlan ? "UPCOMING" : "ACTIVE";
 
     await plan.save();
-      createParterPlanInvoice(plan._id).catch((error) =>
-      console.log("Invoice generation failed", error)
+    createParterPlanInvoice(plan._id).catch((error) =>
+      console.log("Invoice generation failed", error),
     );
 
     return res.status(200).json({ success: true });
-  }
+  },
 );
 
 export const getMyPlans = asyncHandler(async (req, res, next) => {
@@ -678,7 +678,8 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
     planStatus: { $in: ["ACTIVE", "UPCOMING"] },
   })
     .sort({ createdAt: 1 })
-    .populate("subscriptionPlanId");
+    .populate("subscriptionPlanId")
+    .populate("invoiceId");
 
   successResponse(res, 200, "successfully fetched current plans", { plans });
 });
@@ -686,11 +687,11 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
 export const getPlanById = asyncHandler(async (req, res, next) => {
   const partnerId = req.user._id;
   const planId = req.params.planId;
-  if (planId) {
+  if (!planId) {
     throw new Error("PlanId required");
   }
   const plan = await PartnerPlan.findOne({ _id: planId, partnerId }).populate(
-    "subscriptionPlanId"
+    "subscriptionPlanId",
   );
 
   successResponse(res, 200, "successfully fetched current plans", { plan });
@@ -732,7 +733,7 @@ export const blockRoom = asyncHandler(async (req, res, next) => {
   if (!rooms || rooms <= 0)
     throw new CustomError(
       " number of rooms are required and must be greater than 0 ",
-      400
+      400,
     );
 
   const session = await mongoose.startSession();
@@ -767,7 +768,7 @@ export const blockRoom = asyncHandler(async (req, res, next) => {
       if (booked + rooms > total) {
         throw new CustomError(
           `Not enough rooms to block on ${key.slice(0, 10)}`,
-          400
+          400,
         );
       }
     }
@@ -785,7 +786,7 @@ export const blockRoom = asyncHandler(async (req, res, next) => {
           },
           $inc: { bookedRooms: rooms },
         },
-        { upsert: true, session }
+        { upsert: true, session },
       );
     }
 
@@ -802,7 +803,7 @@ export const blockRoom = asyncHandler(async (req, res, next) => {
           notes,
         },
       ],
-      { session }
+      { session },
     );
 
     await session.commitTransaction();
@@ -825,7 +826,7 @@ export const releaseBlock = asyncHandler(async (req, res) => {
 
   try {
     const block = await ManualRoomBlock.findOne({ _id: id, partnerId }).session(
-      session
+      session,
     );
 
     if (!block)
@@ -847,7 +848,7 @@ export const releaseBlock = asyncHandler(async (req, res) => {
       await RoomInventoryModel.findOneAndUpdate(
         { roomId: block.roomId, date },
         { $inc: { bookedRooms: -block.rooms } },
-        { session }
+        { session },
       );
     }
 
@@ -940,7 +941,7 @@ export const getPartnerRoomCalendar = asyncHandler(async (req, res) => {
 
       bookings.forEach((b) => {
         const roomItem = b.rooms.find(
-          (r) => r.roomId.toString() === room._id.toString()
+          (r) => r.roomId.toString() === room._id.toString(),
         );
 
         if (!roomItem) return;
@@ -1171,7 +1172,7 @@ export const getPartnerMonthlyFinance = asyncHandler(async (req, res, next) => {
     res,
     200,
     `Partner finance report for ${payoutMonth}/${payoutYear}`,
-    data
+    data,
   );
 });
 
@@ -1300,7 +1301,7 @@ export const getPartnerYearlyAnalysis = asyncHandler(async (req, res, next) => {
     res,
     200,
     `Yearly analysis for ${selectedYear}`,
-    months
+    months,
   );
 });
 
@@ -1333,7 +1334,7 @@ export const getRecentBookingByID = asyncHandler(async (req, res, next) => {
     res,
     200,
     "Recent bookings fetched successfully",
-    bookings
+    bookings,
   );
 });
 
@@ -1467,9 +1468,9 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
       res,
       200,
       `Monthly booking report for ${payoutMonth}/${payoutYear}`,
-      data
+      data,
     );
-  }
+  },
 );
 
 export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
@@ -1497,8 +1498,8 @@ export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `No payout data found for ${payoutMonth}/${payoutYear}`,
-        404
-      )
+        404,
+      ),
     );
   }
 

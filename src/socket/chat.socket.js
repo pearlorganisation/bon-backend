@@ -1,7 +1,7 @@
 import Conversation from "../models/Chat/Conversation.model.js";
 import Message from "../models/Chat/Message.model.js";
 import User from "../models/auth/auth.model.js";
-import sendFirebaseNotification from "../utils/sendFirebaseNotification.js";
+// import sendFirebaseNotification from "../utils/sendFirebaseNotification.js";
 import onlineUsers from "./onlineUsers.js";
 
 const registerChatHandlers = (io, socket) => {
@@ -84,12 +84,12 @@ const registerChatHandlers = (io, socket) => {
         let notificationBody = text?.substring(0, 40);
 
 
-        await sendFirebaseNotification({
-          token: receiver.fcmToken,
-          title: "New Message",
-          body: notificationBody,
-          data: { conversationId },
-        });
+        // await sendFirebaseNotification({
+        //   token: receiver.fcmToken,
+        //   title: "New Message",
+        //   body: notificationBody,
+        //   data: { conversationId },
+        // });
       }
     } catch (error) {
       console.error("send_message error:", error);
