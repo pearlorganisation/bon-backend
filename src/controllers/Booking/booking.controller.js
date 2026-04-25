@@ -16,6 +16,7 @@ import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout
 import { createBookingInvoice } from "../../utils/invoive/createInvoice.js";
 import Review from "../../models/Listing/review.model.js";
 import Admin from "../../models/Admin/admin.model.js";
+import { sendBookingConfirmationEmail } from "../../utils/mail/emailTeamplates/sendBookingConfirmationEmail.js";
 
 const round = (num) => Math.round(num * 100) / 100;
 // utils/dateUtils.js
@@ -995,7 +996,12 @@ export const bookingWebhookController = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Order ID missing in webhook", 400));
   }
 
-  const booking = await Booking.findOne({ "payment.razorpayOrderId": orderId });
+  const booking = await Booking.findOne({ "payment.razorpayOrderId": orderId })
+  .populate("userId", "email fullName") 
+  .populate({
+    path: "propertyId",
+    select: "name ownerEmail" 
+  });
 
   if (
     booking.paymentStatus === "paid" &&
@@ -1034,6 +1040,11 @@ export const bookingWebhookController = asyncHandler(async (req, res, next) => {
         createBookingInvoice(booking._id).catch((error) =>
           console.log("Invoice generation failed", error)
         );
+      }
+      if (booking.paymentStatus === "paid") {
+         sendBookingConfirmationEmail(booking).catch(err => 
+        console.error("Failed to send confirmation email:", err)
+     );
       }
 
       break;
