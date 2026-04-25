@@ -678,7 +678,8 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
     planStatus: { $in: ["ACTIVE", "UPCOMING"] },
   })
     .sort({ createdAt: 1 })
-    .populate("subscriptionPlanId");
+    .populate("subscriptionPlanId")
+    .populate("invoiceId");
 
   successResponse(res, 200, "successfully fetched current plans", { plans });
 });
