@@ -13,7 +13,7 @@ import jwt from "jsonwebtoken";
 import dayjs from "dayjs";
 import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.model.js";
 import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
-export const register = asyncHandler(async (req, res, next) => {
+export const register = asyncHandler(async (req, res, next) => {         
   const { email, name, phoneNumber, password, role } = req?.body;
 
   const Roles = ["CUSTOMER", "PARTNER"];
@@ -69,11 +69,11 @@ export const register = asyncHandler(async (req, res, next) => {
   let newUser = null;
   try {
     // A. Create OTP Record first
-     await OTP.findOneAndReplace(
-       { email, type: "REGISTER" },
-       { otp, email, type: "REGISTER" },
-       { upsert: true, new: true }
-     );
+    await OTP.findOneAndReplace(
+      { email, type: "REGISTER" },
+      { otp, email, type: "REGISTER" },
+      { upsert: true, new: true }
+    );
 
     // B. Create User (Force isVerified: false)
     newUser = await Auth.create({
@@ -81,18 +81,20 @@ export const register = asyncHandler(async (req, res, next) => {
       isVerified: false,
     });
 
-    if (role === "CUSTOMER") {
-      await Customer.create({
-        userId: newUser._id,
-      });
-    } else {
-      await Partner.create({
-        userId: newUser._id,
-      });
-    }
+    // if (role === "CUSTOMER") {
+    //   await Customer.create({
+    //     userId: newUser._id,
+    //   });
+    // } else {
+    //   await Partner.create({
+    //     userId: newUser._id,
+    //   });
+    // }
 
     // C. Send OTP via email
-    await sendOtpEmail(name, email, otp, "REGISTER");
+  sendOtpEmail(name, email, otp, "REGISTER").catch((err) =>
+    console.error("Email failed:", err)
+  );
 
     return successResponse(
       res,
@@ -228,6 +230,16 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
     // If somehow verified but OTP existed, just clean up
     await OTP.deleteOne({ email, type: "REGISTER" });
     return next(new CustomError("User already verified", 400));
+  }
+ console.log(user);
+  if (user.role === "CUSTOMER") {
+    await Customer.create({
+      userId: user._id,
+    });
+  } else {
+    await Partner.create({
+      userId: user._id,
+    });
   }
 
   user.isVerified = true;
