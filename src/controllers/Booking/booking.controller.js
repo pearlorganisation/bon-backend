@@ -173,6 +173,7 @@ const getGST = async (amount) => {
 };
 
 //controllers
+ 
 
 export const createBooking = asyncHandler(async (req, res, next) => {
   const session = await mongoose.startSession();
@@ -261,6 +262,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     const dates = getDatesBetween(checkIn, checkOut);
     console.log(dates, "dates");
     // 4️ Loop rooms
+    let roomMap = new Map();
     for (const item of rooms) {
       if (!item.roomId) throw new CustomError("Room ID is required", 400);
       if (!item.quantity || item.quantity < 1)
@@ -278,6 +280,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       //     400
       //   );
       // }
+    
 
       //  Date-wise availability
       const inventories = await RoomInventory.find({
@@ -325,7 +328,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
           throw new CustomError(`Overbooking detected for ${room.name}`, 400);
         }
       }
-
+     
       //  Pricing
       totalCapacity += room.capacity * item.quantity;
       let roomPrice = 0;
@@ -409,7 +412,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
           }
         }
       }
-
+      roomMap.set(String(room._id), room.name);
       roomsData.push(roomDetails);
     }
 
@@ -428,7 +431,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
     const totalGuests = effectiveAdults + remainingChildren;
 
-    if (totalGuests > totalCapacity + 10) {
+    if (totalGuests > totalCapacity + 5) {
       throw new CustomError(
         `Number of guests including childrens exceeds room MAX_TOTAL_GUESTS  capacity .`,
         400
@@ -474,8 +477,12 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
+    let Booking = booking[0].toObject();
+    Booking.rooms.forEach((room)=>{
+       room.name =name;
+    });
 
-    successResponse(res, 201, "Booking created successfully", booking);
+    successResponse(res, 201, "Booking created successfully", Booking);
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
@@ -586,7 +593,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     const roomsData = [];
 
     const newDates = getDatesBetween(checkIn, checkOut);
-
+    let roomMap = new Map();
     for (const item of rooms) {
       if (!item.roomId || item.quantity < 1) {
         throw new CustomError("Invalid room data", 400);
@@ -724,7 +731,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
           }
         }
       }
-
+      roomMap.set(String(room._id), room.name);
       roomsData.push(roomDetails);
     }
 
@@ -743,7 +750,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 
     const totalGuests = effectiveAdults + remainingChildren;
 
-    if (totalGuests > totalCapacity + 10) {
+    if (totalGuests > totalCapacity + 5) {
       throw new CustomError(
         `Number of guests including childrens exceeds room MAX_TOTAL_GUESTS  capacity .`,
         400
@@ -783,8 +790,11 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 
     await session.commitTransaction();
     session.endSession();
-
-    successResponse(res, 200, "Booking updated successfully", booking);
+   let Booking = booking[0].toObject();
+   Booking.rooms.forEach((room) => {
+     room.name = name;
+   });
+    successResponse(res, 200, "Booking updated successfully", Booking);
   } catch (err) {
     await session.abortTransaction();
     session.endSession();

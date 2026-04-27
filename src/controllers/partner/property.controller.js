@@ -1099,8 +1099,9 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   
     const effectiveAdults = Number(adults || 0) + ChildTreatAsAdultCount; 
     const totalCapacity = room.capacity * rooms;
+    const TOTAL_GUESTS = effectiveAdults + ( parsedChildren.length - ChildTreatAsAdultCount);
     // filter
-    if (effectiveAdults > totalCapacity) continue; //means total person is  more than rooms capacity
+    if (TOTAL_GUESTS > totalCapacity+5) continue; //means total person is  more than rooms capacity + 5
 
     if (!propertyRoomMap[room.propertyId]) {
       propertyRoomMap[room.propertyId] = [];
