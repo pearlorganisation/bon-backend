@@ -53,55 +53,18 @@ export const updateUserProfile = asyncHandler(async (req, res, next) => {
 });
 
 export const getUserProfile = asyncHandler(async (req, res, next) => {
+  // 1. Get the user ID from the protect middleware
   const authId = req.user._id;
-  const role = req.user.role;
 
-  if (!["PARTNER", "ADMIN", "SUB_ADMIN", "CUSTOMER"].includes(role)) {
-    return next(new CustomError("Invalid or missing role", 400));
-  }
+  // 2. Fetch the user directly from the Auth collection
+  // We exclude password and refresh_token for security
+  const user = await Auth.findById(authId).select("-password -refresh_token -__v");
 
-  const collectionMap = {
-    PARTNER: "partners",
-    ADMIN: "admins",
-    SUB_ADMIN: "sub_admins",
-    CUSTOMER: "customers",
-  };
-
-  const collection = collectionMap[role];
-
-  const result = await Auth.aggregate([
-    { $match: { _id: authId } },
-    {
-      $lookup: {
-        from: collection,
-        localField: "_id",
-        foreignField: "userId", 
-        as: "profile",
-      },
-    },
-    { $unwind: { path: "$profile", preserveNullAndEmptyArrays: true } },
-    {
-      $project: {
-        password: 0,
-        refresh_token: 0,
-        __v: 0,
-        "profile.__v": 0,
-        "profile.createdAt": 0,
-        "profile.updatedAt": 0,
-      },
-    },
-  ]);
-
-  if (result.length === 0) {
+  if (!user) {
     return next(new CustomError("User not found", 404));
   }
 
-  const user = result[0];
-
-  if (!user.profile) {
-    return next(new CustomError(`No ${role} profile found`, 404));
-  }
-
+  // 3. Return the user object
   successResponse(res, 200, "Profile fetched successfully", user);
 });
 
