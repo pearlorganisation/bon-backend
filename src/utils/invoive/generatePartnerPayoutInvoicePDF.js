@@ -552,12 +552,11 @@ export const generatePartnerPayoutInvoicePDF = async (
       };
 
       drawSumRow("Partner Amount (excl. GST)", totalPartnerAmt, rowY);
-      drawSumRow("Partner GST", totalPartnerGST, rowY + 14);
-      drawSumRow("Admin Commission", totalAdminAmt, rowY + 28);
-      drawSumRow("Admin GST", totalAdminGST, rowY + 42);
+      drawSumRow("Admin Commission", totalAdminAmt, rowY + 14);
+      drawSumRow("Admin GST", totalAdminGST, rowY + 28);
       drawSumRow(
         "Total Booking Value",
-        totalPartnerAmt + totalPartnerGST + totalAdminAmt + totalAdminGST,
+        totalPartnerAmt  + totalAdminAmt + totalAdminGST,
         rowY + 56
       );
 

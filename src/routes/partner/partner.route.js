@@ -75,10 +75,10 @@ router.get(
 );
 
 router.post(
-  "/create-fund-account",
+  "/update--partner-bank-account",
   protect,
   authorizeRoles("PARTNER"),
-  createPartnerFundAccount,
+  updatePartnerBankAccount
 );
 
 router.post(

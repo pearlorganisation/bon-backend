@@ -366,7 +366,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!accountHolderName || !accountNumber || !ifscCode) {
       throw new CustomError(
         "accountHolderName, accountNumber and ifscCode are required",
-        400,
+        400
       );
     }
 
@@ -384,35 +384,34 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
       throw new CustomError("Partner not found", 404);
     }
 
-    if (!partner?.razorpay?.contactId) {
-      throw new CustomError(
-        "Payout contact not found. Setup payout first.",
-        400,
-      );
-    }
+    // if (!partner?.razorpay?.contactId) {
+    //   throw new CustomError(
+    //     "Payout contact not found. Setup payout first.",
+    //     400,
+    //   );
+    // }
 
     /* ---------- CREATE NEW FUND ACCOUNT IN RAZORPAY ---------- */
 
-    const newFundAccount = await razorpay.fundAccounts.create({
-      contact_id: partner.razorpay.contactId,
-      account_type: "bank_account",
-      bank_account: {
-        name: accountHolderName,
-        ifsc: ifscCode,
-        account_number: accountNumber,
-      },
-    });
+    // const newFundAccount = await razorpay.fundAccounts.create({
+    //   contact_id: partner.razorpay.contactId,
+    //   account_type: "bank_account",
+    //   bank_account: {
+    //     name: accountHolderName,
+    //     ifsc: ifscCode,
+    //     account_number: accountNumber,
+    //   },
+    // });
 
     /* ---------- SAVE NEW FUND ACCOUNT ---------- */
 
-    partner.razorpay.fundAccountId = newFundAccount.id;
+    // partner.razorpay.fundAccountId = newFundAccount.id;
 
     partner.bankDetails = {
       accountHolderName,
       accountNumber, // ideally encrypt
       ifscCode,
-      bankName: bankName || null,
-      updatedAt: new Date(),
+      bankName: bankName,
     };
 
     await partner.save({ session });
@@ -420,9 +419,10 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    return successResponse(res, 200, "Bank account updated successfully", {
-      newFundAccountId: newFundAccount.id,
-    });
+    // return successResponse(res, 200, "Bank account updated successfully", {
+    //   newFundAccountId: newFundAccount.id,
+    // });
+    return successResponse(res, 200, "Bank account updated successfully", partner);
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
