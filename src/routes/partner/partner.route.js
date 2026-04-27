@@ -37,6 +37,7 @@ import {
   getMyMonthlyPayout,
   getRecentBookingByID,
   getPlanById,
+  updatePartnerBankAccount,
 } from "../../controllers/partner/parnter.controller.js";
 import {
   authorizeRoles,
