@@ -13,9 +13,10 @@ const getAllowedOrigins = () => {
       "http://localhost:3001",
       "https://bon-frontend.vercel.app",
       "https://bonfireescapes.com",
+      "https://www.bonfireescapes.com"
     ];
   } else {
-    return ["https://bonfireescapes.com"];
+    return ["https://bonfireescapes.com", "https://www.bonfireescapes.com"];
   }
 };
 
