@@ -412,7 +412,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
           }
         }
       }
-      roomMap.set(String(room._id), room.name);
+      roomMap.set(String(item.roomId), room.name);
       roomsData.push(roomDetails);
     }
 
@@ -475,14 +475,17 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       { session }
     );
 
+       let BookingData = booking[0].toObject();
+       BookingData.rooms.forEach((room) => {
+         room.name = roomMap.get(String(room.roomId));
+       });
+      
+       
     await session.commitTransaction();
     session.endSession();
-    let Booking = booking[0].toObject();
-    Booking.rooms.forEach((room)=>{
-       room.name =name;
-    });
+  
 
-    successResponse(res, 201, "Booking created successfully", Booking);
+    successResponse(res, 201, "Booking created successfully", BookingData);
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
@@ -731,7 +734,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
           }
         }
       }
-      roomMap.set(String(room._id), room.name);
+      roomMap.set(String(item.roomId), room.name);
       roomsData.push(roomDetails);
     }
 
@@ -787,14 +790,14 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     booking.totalPrice = round(totalPrice);
 
     await booking.save({ session });
+       let BookingData = booking[0].toObject();
+       BookingData.rooms.forEach((room) => {
+         room.name = roomMap.get(String(room.roomId));
+       });
 
     await session.commitTransaction();
     session.endSession();
-   let Booking = booking[0].toObject();
-   Booking.rooms.forEach((room) => {
-     room.name = name;
-   });
-    successResponse(res, 200, "Booking updated successfully", Booking);
+    successResponse(res, 200, "Booking updated successfully", BookingData);
   } catch (err) {
     await session.abortTransaction();
     session.endSession();

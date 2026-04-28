@@ -1229,13 +1229,8 @@ export const generatePartnerPayoutInvoicePDF = async (
       );
       drawSumRow("Admin Commission", totalAdminAmt, rowY + 42);
       drawSumRow("Admin GST", totalAdminGST, rowY + 56);
-      drawSumRow(
-        "Total Booking Value",
-        totalPartnerAmt + totalPartnerGST + totalAdminAmt + totalAdminGST,
-        rowY + 70
-      );
 
-      rowY += 88;
+      rowY += 74;
 
       // Grand total pill
       doc.roundedRect(sumX - 8, rowY, cardW, 28, 5).fill(COLORS.primary);
