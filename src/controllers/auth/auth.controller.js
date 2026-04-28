@@ -133,7 +133,7 @@ export const login = asyncHandler(async (req, res, next) => {
 
   const isPasswordValid = await user.isPasswordCorrect(password);
   if (!isPasswordValid) {
-    throw new CustomError("Invalid credentials", 401);
+    throw new CustomError("Invalid credentials", 404);
   }
 
   const accessToken = user.generateAccessToken();

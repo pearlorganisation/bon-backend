@@ -25,7 +25,30 @@ const roomSchema = new mongoose.Schema(
     },
     typeOfRoom: {
       type: String,
-      enum: ["single", "double", "deluxe", "suite", "triple", "family"],
+      enum: [
+        "single",
+        "double",
+        "twin", // 2 separate beds
+        "triple",
+        "quad", // 4 people
+        "queen", // queen bed
+        "king", // king bed
+        "deluxe",
+        "super_deluxe",
+        "executive",
+        "suite",
+        "junior_suite",
+        "family",
+        "studio",
+        "apartment",
+        "villa",
+        "bungalow",
+        "penthouse",
+        "dormitory", // hostel style
+        "shared",
+        "accessible", // for differently-abled guests
+        "connecting", // connected rooms
+      ],
       default: "single",
       required: true,
     },
@@ -34,7 +57,18 @@ const roomSchema = new mongoose.Schema(
 
     bedType: {
       type: String,
-      enum: ["single", "double", "queen", "king", "twin", "sofa-bed"],
+      enum: [
+        "single",
+        "double",
+        "queen",
+        "king",
+        "twin", // two single beds
+        "sofa_bed",
+        "bunk_bed", // common in hostels/family rooms
+        "futon", // budget / Japanese style
+        "murphy_bed", // foldable wall bed
+        "rollaway", // extra temporary bed
+      ],
       required: true,
       default: "single",
     },
@@ -54,8 +88,13 @@ const roomSchema = new mongoose.Schema(
     // ✅ Bathroom Basic Info
     bathroomType: {
       type: String,
-      enum: ["private", "shared", "ensuite", "external"],
-      default: "private",
+      enum: [
+        "ensuite", // attached to room (best standard term)
+        "private_external", // private but outside the room
+        "shared", // shared with other rooms
+        "common", // shared at floor/hostel level
+      ],
+      default: "ensuite",
     },
     bathroomCount: { type: Number, default: 1 },
     distanceToBathroom: {

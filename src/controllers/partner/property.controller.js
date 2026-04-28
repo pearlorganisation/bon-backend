@@ -926,6 +926,8 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     propertyId,
     adults = 1,
     childrens,
+    min,
+    max
   } = req.query;
 
   if (!checkIn || !checkOut) {
@@ -1073,18 +1075,7 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const propertyRoomMap = {};
 
   for (const room of roomsList) {
-    let maxBooked = 0;
 
-    for (const date of dates) {
-      const booked =
-        inventoryMap[room._id.toString()]?.[date.toISOString()] || 0;
-      maxBooked = Math.max(maxBooked, booked);
-      console.log(maxBooked, date.toISOString());
-    }
-
-    const availableRooms = room.numberOfRooms - maxBooked;
-    /// console.log(availableRooms);
-    if (availableRooms < rooms) continue;
 
     const propertyChildConfig = childConfigMap[room.propertyId];
 
@@ -1102,7 +1093,25 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     const TOTAL_GUESTS = effectiveAdults + ( parsedChildren.length - ChildTreatAsAdultCount);
     // filter
     if (TOTAL_GUESTS > totalCapacity+5) continue; //means total person is  more than rooms capacity + 5
+ 
 
+   if(min && Number(min)> room.pricePerNight)continue;
+   if(max && Number(max)< room.pricePerNight)continue;
+
+  // room capacity logic 
+    let maxBooked = 0;
+    for (const date of dates) {
+      const booked =
+        inventoryMap[room._id.toString()]?.[date.toISOString()] || 0;
+      maxBooked = Math.max(maxBooked, booked);
+      console.log(maxBooked, date.toISOString());
+    }
+    const availableRooms = room.numberOfRooms - maxBooked;
+    /// console.log(availableRooms);
+    if (availableRooms < rooms) continue;
+
+
+    //add room to its property
     if (!propertyRoomMap[room.propertyId]) {
       propertyRoomMap[room.propertyId] = [];
     }
