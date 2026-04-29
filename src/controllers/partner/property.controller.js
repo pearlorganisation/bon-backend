@@ -67,9 +67,9 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     propertyType,
     status,
     PartnerEmail,
-    policies, 
+    policies,
     childrenCharge,
-    guestExperience
+    guestExperience,
   } = req.body;
 
   // ✅ Required fields
@@ -83,7 +83,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   // ✅ Parse JSON fields
   if (amenities) amenities = JSON.parse(amenities);
   if (policies) policies = JSON.parse(policies);
-  if(guestExperience)guestExperience =JSON.parse(guestExperience);
+  if (guestExperience) guestExperience = JSON.parse(guestExperience);
   // ✅ Upload images & videos
   let Images = [];
   let Videos = [];
@@ -184,7 +184,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     Images,
     Videos,
     policies,
-    guestExperience
+    guestExperience,
   };
 
   if (role === "PARTNER") {
@@ -274,9 +274,9 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   if (req.body?.amenities) {
     property.amenities = JSON.parse(req.body.amenities); // { type: "Point", coordinates: [lng, lat] }
   }
-   if (req.body?.guestExperience) {
-     property.guestExperience = JSON.parse(req.body.guestExperience); // { type: "Point", coordinates: [lng, lat] }
-   }
+  if (req.body?.guestExperience) {
+    property.guestExperience = JSON.parse(req.body.guestExperience); // { type: "Point", coordinates: [lng, lat] }
+  }
 
   if (req.body?.policies) {
     let policies = {};
@@ -936,9 +936,12 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     max,
     roomType,
     amenities,
-    mealPlans, 
+    mealPlans,
     policies, // ["free-cancellation","instant-booking","pay-at-hotel","pet-friendly"]
     guestExperience, //["family", "group", "workation", "digital_nomad", "solo","couple"]
+    distance, // "0-1","1-3","3-5","5+"
+    lat,
+    lng,
   } = req.query;
 
   if (!checkIn || !checkOut) {
@@ -952,37 +955,37 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
   const dates = getDatesBetween(checkInDate, checkOutDate);
   console.log("dates", dates);
-  let parsedGuestExperince =[];
-  let parsedPolices = [];
- let policiesObj = {};
+  let parsedGuestExperince = [];
+  let parsedPolicies = [];
+  let policiesObj = {};
 
- try {
-   const parsedPolicies = policies ? JSON.parse(policies) : [];
+  try {
+     parsedPolicies = policies ? JSON.parse(policies) : [];
 
-   if (parsedPolicies.includes("free-cancellation")) {
-     policiesObj["policies.cancellationPolicy"] = {
-       $elemMatch: { refundPercentage: { $gt: 0 } },
-     };
-   }
+    if (parsedPolicies.includes("free-cancellation")) {
+      policiesObj["policies.cancellationPolicy"] = {
+        $elemMatch: { refundPercentage: { $gt: 0 } },
+      };
+    }
 
-   if (parsedPolicies.includes("pet-friendly")) {
-     policiesObj["policies.petPolicy"] = { $exists: true, $ne: "" };
-   }
+    if (parsedPolicies.includes("pet-friendly")) {
+      policiesObj["policies.petPolicy"] = { $exists: true, $ne: "" };
+    }
 
-   if (parsedPolicies.includes("instant-booking")) {
-     policiesObj["paymentModes.PAY_NOW"] = true;
-   }
+    if (parsedPolicies.includes("instant-booking")) {
+      policiesObj["paymentModes.PAY_NOW"] = true;
+    }
 
-   if (parsedPolicies.includes("pay-at-hotel")) {
-     policiesObj["paymentModes.PAY_ON_ARRIVAL"] = true;
-   }
- } catch (err) {
-   throw new CustomError("Invalid policies format", 400);
- }
+    if (parsedPolicies.includes("pay-at-hotel")) {
+      policiesObj["paymentModes.PAY_ON_ARRIVAL"] = true;
+    }
+  } catch (err) {
+    throw new CustomError("Invalid policies format", 400);
+  }
 
-  try{
-    parsedGuestExperince = guestExperience ? JSON.parse(guestExperience): [];
-  }catch(error){
+  try {
+    parsedGuestExperince = guestExperience ? JSON.parse(guestExperience) : [];
+  } catch (error) {
     throw new CustomError("Invalid guest Experience format", 400);
   }
   let response = {};
@@ -999,7 +1002,38 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const northEast = response?.viewport ? response.viewport.northeast : 0;
   const southWest = response?.viewport ? response.viewport.southwest : 0;
   // 1️ Find properties
-  const propertyPipeline = [
+
+  // ✅ GEO stage (optional)
+  let geoStage = null;
+
+  if (lat && lng && distance) {
+    const distanceMap = {
+      "0-1": [0, 1000],
+      "1-3": [1000, 3000],
+      "3-5": [3000, 5000],
+      "5+": [5000, null],
+    };
+
+    const selected = distanceMap[distance];
+
+    if (selected) {
+      const [min, max] = selected;
+
+      geoStage = {
+        $geoNear: {
+          near: {
+            type: "Point",
+            coordinates: [Number(lng), Number(lat)],
+          },
+          distanceField: "distance",
+          spherical: true,
+          ...(min && { minDistance: min }),
+          ...(max && { maxDistance: max }),
+        },
+      };
+    }
+  }
+  const restPipeline = [
     {
       $match: {
         status: "active",
@@ -1007,17 +1041,20 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
         ...(propertyType && { propertyType }),
         ...(propertyId && { _id: new mongoose.Types.ObjectId(propertyId) }),
         ...policiesObj,
-        ...(guestExperience && {guestExperience: { $in: parsedGuestExperince}}),
-        ...(placeId && {
-          geoLocation: {
-            $geoWithin: {
-              $box: [
-                [southWest.lng, southWest.lat], // bottom-left
-                [northEast.lng, northEast.lat], // top-right
-              ],
-            },
-          },
+        ...(parsedGuestExperince?.length && {
+          guestExperience: { $in: parsedGuestExperince },
         }),
+        ...(placeId &&
+          !distance && {
+            geoLocation: {
+              $geoWithin: {
+                $box: [
+                  [southWest.lng, southWest.lat], // bottom-left
+                  [northEast.lng, northEast.lat], // top-right
+                ],
+              },
+            },
+          }),
       },
     },
     // 2 Join Partner
@@ -1069,6 +1106,10 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     },
   ];
 
+  const propertyPipeline = [
+    ...(geoStage ? [geoStage] : []), // only if exists
+    ...restPipeline,
+  ];
   const properties = await Property.aggregate(propertyPipeline);
   if (!properties.length) {
     return successResponse(res, 200, "No properties found", []);
@@ -1077,9 +1118,9 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const propertyIds = properties.map((p) => p._id);
 
   let parsedChildren = [];
-  let parsedAmenities =[];
+  let parsedAmenities = [];
   let parsedMealPlans = [];
-  
+
   try {
     parsedChildren = childrens ? JSON.parse(childrens) : [];
   } catch (err) {
@@ -1097,11 +1138,11 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   } catch (err) {
     throw new CustomError("Invalid amenities format", 400);
   }
-   try {
-     parsedMealPlans = mealPlans ? JSON.parse(mealPlans) : [];
-   } catch (err) {
-     throw new CustomError("Invalid meael Plans format", 400);
-   }
+  try {
+    parsedMealPlans = mealPlans ? JSON.parse(mealPlans) : [];
+  } catch (err) {
+    throw new CustomError("Invalid meael Plans format", 400);
+  }
 
   // 2️ Get rooms
   const roomsList = await Room.find({
@@ -1135,8 +1176,6 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const propertyRoomMap = {};
 
   for (const room of roomsList) {
-
-
     const propertyChildConfig = childConfigMap[room.propertyId];
 
     let ChildTreatAsAdultCount = 0;
@@ -1147,18 +1186,17 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
       ).length;
     }
 
-  
-    const effectiveAdults = Number(adults || 0) + ChildTreatAsAdultCount; 
+    const effectiveAdults = Number(adults || 0) + ChildTreatAsAdultCount;
     const totalCapacity = room.capacity * rooms;
-    const TOTAL_GUESTS = effectiveAdults + ( parsedChildren.length - ChildTreatAsAdultCount);
+    const TOTAL_GUESTS =
+      effectiveAdults + (parsedChildren.length - ChildTreatAsAdultCount);
     // filter
-    if (TOTAL_GUESTS > totalCapacity+5) continue; //means total person is  more than rooms capacity + 5
- 
+    if (TOTAL_GUESTS > totalCapacity + 5) continue; //means total person is  more than rooms capacity + 5
 
-   if(min && Number(min)> room.pricePerNight)continue;
-   if(max && Number(max)< room.pricePerNight)continue;
+    if (min && Number(min) > room.pricePerNight) continue;
+    if (max && Number(max) < room.pricePerNight) continue;
 
-  // room capacity logic 
+    // room capacity logic
     let maxBooked = 0;
     for (const date of dates) {
       const booked =
@@ -1169,7 +1207,6 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     const availableRooms = room.numberOfRooms - maxBooked;
     /// console.log(availableRooms);
     if (availableRooms < rooms) continue;
-
 
     //add room to its property
     if (!propertyRoomMap[room.propertyId]) {
