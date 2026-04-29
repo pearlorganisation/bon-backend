@@ -14,7 +14,6 @@ const reviewSchema = new mongoose.Schema(
       ref: "Property",
       required: true,
     },
-
     overallRating: {
       type: Number,
       min: 1,
