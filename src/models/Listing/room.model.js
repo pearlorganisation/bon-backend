@@ -88,13 +88,8 @@ const roomSchema = new mongoose.Schema(
     // ✅ Bathroom Basic Info
     bathroomType: {
       type: String,
-      enum: [
-        "ensuite", // attached to room (best standard term)
-        "private_external", // private but outside the room
-        "shared", // shared with other rooms
-        "common", // shared at floor/hostel level
-      ],
-      default: "ensuite",
+      enum: ["private", "shared", "ensuite", "external"],
+      default: "private",
     },
     bathroomCount: { type: Number, default: 1 },
     distanceToBathroom: {
@@ -176,6 +171,20 @@ const roomSchema = new mongoose.Schema(
       ironingService: { type: Boolean, default: false },
       laundry: { type: Boolean, default: false },
     },
+
+    mealPlans: [
+      {
+        type: String,
+        enum: [
+          "RO", // Room Only
+          "BB", // Bed & Breakfast
+          "HB", // Half Board
+          "MAP", // Modified American Plan
+          "FB", // Full Board
+          "AP", // American Plan
+        ],
+      },
+    ],
 
     // 9. Front Desk & Services
     frontDeskServices: {

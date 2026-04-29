@@ -67,8 +67,9 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     propertyType,
     status,
     PartnerEmail,
-    policies,
+    policies, 
     childrenCharge,
+    guestExperience
   } = req.body;
 
   // ✅ Required fields
@@ -82,6 +83,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   // ✅ Parse JSON fields
   if (amenities) amenities = JSON.parse(amenities);
   if (policies) policies = JSON.parse(policies);
+  if(guestExperience)guestExperience =JSON.parse(guestExperience);
   // ✅ Upload images & videos
   let Images = [];
   let Videos = [];
@@ -182,6 +184,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     Images,
     Videos,
     policies,
+    guestExperience
   };
 
   if (role === "PARTNER") {
@@ -271,6 +274,9 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   if (req.body?.amenities) {
     property.amenities = JSON.parse(req.body.amenities); // { type: "Point", coordinates: [lng, lat] }
   }
+   if (req.body?.guestExperience) {
+     property.guestExperience = JSON.parse(req.body.guestExperience); // { type: "Point", coordinates: [lng, lat] }
+   }
 
   if (req.body?.policies) {
     let policies = {};
@@ -927,7 +933,12 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     adults = 1,
     childrens,
     min,
-    max
+    max,
+    roomType,
+    amenities,
+    mealPlans, 
+    policies, // ["free-cancellation","instant-booking","pay-at-hotel","pet-friendly"]
+    guestExperience, //["family", "group", "workation", "digital_nomad", "solo","couple"]
   } = req.query;
 
   if (!checkIn || !checkOut) {
@@ -941,6 +952,39 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
   const dates = getDatesBetween(checkInDate, checkOutDate);
   console.log("dates", dates);
+  let parsedGuestExperince =[];
+  let parsedPolices = [];
+ let policiesObj = {};
+
+ try {
+   const parsedPolicies = policies ? JSON.parse(policies) : [];
+
+   if (parsedPolicies.includes("free-cancellation")) {
+     policiesObj["policies.cancellationPolicy"] = {
+       $elemMatch: { refundPercentage: { $gt: 0 } },
+     };
+   }
+
+   if (parsedPolicies.includes("pet-friendly")) {
+     policiesObj["policies.petPolicy"] = { $exists: true, $ne: "" };
+   }
+
+   if (parsedPolicies.includes("instant-booking")) {
+     policiesObj["paymentModes.PAY_NOW"] = true;
+   }
+
+   if (parsedPolicies.includes("pay-at-hotel")) {
+     policiesObj["paymentModes.PAY_ON_ARRIVAL"] = true;
+   }
+ } catch (err) {
+   throw new CustomError("Invalid policies format", 400);
+ }
+
+  try{
+    parsedGuestExperince = guestExperience ? JSON.parse(guestExperience): [];
+  }catch(error){
+    throw new CustomError("Invalid guest Experience format", 400);
+  }
   let response = {};
   if (placeId) {
     response = await getPlaceGeometry(placeId);
@@ -962,6 +1006,8 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
         verified: "approved",
         ...(propertyType && { propertyType }),
         ...(propertyId && { _id: new mongoose.Types.ObjectId(propertyId) }),
+        ...policiesObj,
+        ...(guestExperience && {guestExperience: { $in: parsedGuestExperince}}),
         ...(placeId && {
           geoLocation: {
             $geoWithin: {
@@ -1031,14 +1077,14 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const propertyIds = properties.map((p) => p._id);
 
   let parsedChildren = [];
-
+  let parsedAmenities =[];
+  let parsedMealPlans = [];
+  
   try {
     parsedChildren = childrens ? JSON.parse(childrens) : [];
   } catch (err) {
     throw new CustomError("Invalid childrens format", 400);
   }
-
-  const totalChildren = parsedChildren.length;
 
   const childConfigMap = {}; // propertyId → config
 
@@ -1046,9 +1092,23 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     childConfigMap[p._id] = p.childrenCharge;
   });
 
+  try {
+    parsedAmenities = amenities ? JSON.parse(amenities) : [];
+  } catch (err) {
+    throw new CustomError("Invalid amenities format", 400);
+  }
+   try {
+     parsedMealPlans = mealPlans ? JSON.parse(mealPlans) : [];
+   } catch (err) {
+     throw new CustomError("Invalid meael Plans format", 400);
+   }
+
   // 2️ Get rooms
   const roomsList = await Room.find({
     propertyId: { $in: propertyIds },
+    ...(roomType && { typeOfRoom: roomType }),
+    ...(parsedAmenities?.length && { amenities: { $all: parsedAmenities } }),
+    ...(parsedMealPlans?.length && { mealPlans: { $all: parsedMealPlans } }),
   }).lean();
 
   if (!roomsList.length) {

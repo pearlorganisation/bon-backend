@@ -92,6 +92,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     bathroomFeatures,
     roomFacilities,
     mediaAndTechnology,
+    mealPlans
   } = req.body;
 
   const property = await Property.findOne(ownershipFilter);
@@ -202,10 +203,26 @@ export const createRooms = asyncHandler(async (req, res, next) => {
   const validTypes = [
     "single",
     "double",
-    "deluxe",
-    "suite",
+    "twin", // 2 separate beds
     "triple",
+    "quad", // 4 people
+    "queen", // queen bed
+    "king", // king bed
+    "deluxe",
+    "super_deluxe",
+    "executive",
+    "suite",
+    "junior_suite",
     "family",
+    "studio",
+    "apartment",
+    "villa",
+    "bungalow",
+    "penthouse",
+    "dormitory", // hostel style
+    "shared",
+    "accessible", // for differently-abled guests
+    "connecting", // connected rooms
   ];
   const validBeds = ["single", "double", "queen", "king", "twin", "sofa-bed"];
   const validBathroom = ["private", "shared", "ensuite", "external"];
@@ -300,6 +317,8 @@ export const createRooms = asyncHandler(async (req, res, next) => {
   if (roomSpecifications) {
     parsedSpecs = parseNestedNumbers(roomSpecifications);
   }
+ 
+  
 
   const baseRoomData = {
     propertyId,
@@ -310,7 +329,9 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     monthlyPrice,
     typeOfRoom: type.toLowerCase(),
     // Parse arrays (handle single string vs array)
-    amenities: parseArrayField(amenities).map((item) => item.trim()),
+    amenities: amenities ? JSON.parse(amenities) : [],
+    bathroomAmenities: bathroomAmenities ? JSON.parse(bathroomAmenities) : [],
+    mealPlans: mealPlans ? JSON.parse(mealPlans) : [],
     bedType: bedType.toLowerCase(),
     bedCount: bedCount || 1,
     // blockedDates: blockedDates || [],
@@ -344,6 +365,7 @@ export const createRooms = asyncHandler(async (req, res, next) => {
     roomFacilities,
     mediaAndTechnology,
     numberOfRooms,
+   
   };
 
   const createdRooms = await Room.create(baseRoomData);
@@ -441,6 +463,7 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
     roomFacilities,
     mediaAndTechnology,
     numberOfRooms,
+    mealPlans
   } = req.body;
 
   // =================================================================
@@ -478,10 +501,26 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
   const validTypes = [
     "single",
     "double",
-    "deluxe",
-    "suite",
+    "twin", // 2 separate beds
     "triple",
+    "quad", // 4 people
+    "queen", // queen bed
+    "king", // king bed
+    "deluxe",
+    "super_deluxe",
+    "executive",
+    "suite",
+    "junior_suite",
     "family",
+    "studio",
+    "apartment",
+    "villa",
+    "bungalow",
+    "penthouse",
+    "dormitory", // hostel style
+    "shared",
+    "accessible", // for differently-abled guests
+    "connecting",
   ];
   const validBeds = ["single", "double", "queen", "king", "twin", "sofa-bed"];
   const validUnits = ["ft", "m"];
@@ -666,20 +705,17 @@ export const updateRoomById = asyncHandler(async (req, res, next) => {
    if (monthlyPrice) room.monthlyPrice = monthlyPrice;
   if (discount) room.discount = discount;
   if (type) room.typeOfRoom = type.toLowerCase();
-  if (amenities)
-    room.amenities = parseArrayField(amenities).map((a) => a.toLowerCase());
-  if (bedType) room.bedType = bedType.toLowerCase();
+  if (amenities) room.amenities = JSON.parse(amenities);
+  if (mealPlans) room.mealPlans = JSON.parse(mealPlans);
+  if (amenities) room.amenities = JSON.parse(amenities);
+  if (bathroomAmenities) room.bathroomAmenities = JSON.parse(bathroomAmenities);
+  if(bedType) room.bedType = bedType.toLowerCase();
   if (bedCount) room.bedCount = bedCount;
   // if (blockedDates) room.blockedDates = blockedDates;
   if (dimensions) room.dimensions = dimensions;
   if (bathroomType) room.bathroomType = bathroomType.toLowerCase();
   if (bathroomCount) room.bathroomCount = bathroomCount;
   if (distanceToBathroom) room.distanceToBathroom = distanceToBathroom;
-  if (bathroomAmenities)
-    room.bathroomAmenities = parseArrayField(bathroomAmenities).map((a) =>
-      a.toLowerCase()
-    );
-
   if (accessibility) room.accessibility = accessibility;
   if (safetyAndSecurity) room.safetyAndSecurity = safetyAndSecurity;
   if (activitiesAndSports) room.activitiesAndSports = activitiesAndSports;

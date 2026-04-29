@@ -57,9 +57,23 @@ const propertySchema = new mongoose.Schema(
           },
         },
       ],
+
       petPolicy: String,
       otherPolicies: String,
     },
+    guestExperience: [
+      {
+        type: String,
+        enum: [
+          "family",
+          "group",
+          "workation",
+          "digital_nomad",
+          "solo",
+          "couple",
+        ],
+      },
+    ],
 
     PartnerEmail: {
       type: String,
@@ -107,7 +121,7 @@ const propertySchema = new mongoose.Schema(
     // },
 
     childrenCharge: {
-      age: {type : Number,default: 17},
+      age: { type: Number, default: 17 },
       charge: { type: Number, require: true, default: 0 },
     },
     Images: [{ secure_url: String, public_id: String }],
