@@ -1168,6 +1168,9 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const inventoryMap = {};
   for (const inv of inventories) {
     const roomKey = inv.roomId.toString();
+    if (!inventoryMap[roomKey]) {
+      inventoryMap[roomKey] = {};
+    }
    inventoryMap[roomKey][inv.date.toISOString()] = {
      booked: inv.bookedRooms,
      total: inv.totalRooms,
@@ -1199,7 +1202,7 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     if (max && Number(max) < room.pricePerNight) continue;
 
     // room capacity logic
-    
+
    let availableRooms = Infinity;
 
    for (const date of dates) {
