@@ -25,7 +25,30 @@ const roomSchema = new mongoose.Schema(
     },
     typeOfRoom: {
       type: String,
-      enum: ["single", "double", "deluxe", "suite", "triple", "family"],
+      enum: [
+        "single",
+        "double",
+        "twin", // 2 separate beds
+        "triple",
+        "quad", // 4 people
+        "queen", // queen bed
+        "king", // king bed
+        "deluxe",
+        "super_deluxe",
+        "executive",
+        "suite",
+        "junior_suite",
+        "family",
+        "studio",
+        "apartment",
+        "villa",
+        "bungalow",
+        "penthouse",
+        "dormitory", // hostel style
+        "shared",
+        "accessible", // for differently-abled guests
+        "connecting", // connected rooms
+      ],
       default: "single",
       required: true,
     },
@@ -34,7 +57,18 @@ const roomSchema = new mongoose.Schema(
 
     bedType: {
       type: String,
-      enum: ["single", "double", "queen", "king", "twin", "sofa-bed"],
+      enum: [
+        "single",
+        "double",
+        "queen",
+        "king",
+        "twin", // two single beds
+        "sofa_bed",
+        "bunk_bed", // common in hostels/family rooms
+        "futon", // budget / Japanese style
+        "murphy_bed", // foldable wall bed
+        "rollaway", // extra temporary bed
+      ],
       required: true,
       default: "single",
     },
@@ -137,6 +171,20 @@ const roomSchema = new mongoose.Schema(
       ironingService: { type: Boolean, default: false },
       laundry: { type: Boolean, default: false },
     },
+
+    mealPlans: [
+      {
+        type: String,
+        enum: [
+          "RO", // Room Only
+          "BB", // Bed & Breakfast
+          "HB", // Half Board
+          "MAP", // Modified American Plan
+          "FB", // Full Board
+          "AP", // American Plan
+        ],
+      },
+    ],
 
     // 9. Front Desk & Services
     frontDeskServices: {

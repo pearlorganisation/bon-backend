@@ -10,15 +10,8 @@ const CustomerSchema = new mongoose.Schema(
       ref: "Auth",
       required: true,
       unique:true
-    },
-    
+    }, 
 
-    bookings: [
-      {
-        bookingId: { type: mongoose.Schema.Types.ObjectId, ref: "Booking" },
-        status: { type: String, enum: ["CONFIRMED", "CANCELLED"], default: "CONFIRMED" },
-      },
-    ],
   },
   { timestamps: true }
 );

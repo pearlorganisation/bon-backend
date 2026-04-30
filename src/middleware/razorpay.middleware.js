@@ -3,14 +3,22 @@ import crypto from "crypto";
 import CustomError from "../utils/error/customError.js";
 import { bookingWebhookController } from "../controllers/Booking/booking.controller.js";
 import { subscriptionWebhookController } from "../controllers/partner/parnter.controller.js";
+import { getRazorpayInstance } from "../config/razorpayConfig.js";
 
 
-export const verifyRazorpaySignature = (req, res, next) => {
-  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+export const verifyRazorpaySignature = async(req, res, next) => {
+  //const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const signature = req.headers["x-razorpay-signature"];
 
   if (!signature) {
     return next(new CustomError("Missing Razorpay signature", 400));
+  }
+
+    const { webhookSecret } = await getRazorpayInstance();
+
+  if (!webhookSecret) {
+    console.error("Webhook secret missing");
+    return res.status(200).json({ success: true });
   }
 
   const expectedSignature = crypto

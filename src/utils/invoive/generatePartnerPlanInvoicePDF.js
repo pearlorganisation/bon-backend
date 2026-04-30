@@ -37,7 +37,6 @@ const formatCurrency = (amount, sign = "") => {
 
 export const generatePartnerPlanInvoicePDF = async (
   plan,
-  commissionData,
   invoiceNumber
 ) => {
   return new Promise(async (resolve, reject) => {

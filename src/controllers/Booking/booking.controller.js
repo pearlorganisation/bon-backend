@@ -9,7 +9,7 @@ import CustomError from "../../utils/error/customError.js";
 import mongoose from "mongoose";
 import { check } from "express-validator";
 import successResponse from "../../utils/error/successResponse.js";
-import { razorpay } from "../../config/razorpayConfig.js";
+import { razorpay,getRazorpayInstance } from "../../config/razorpayConfig.js";
 import crypto from "crypto";
 import { isGeneratorFunction } from "util/types";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
@@ -150,17 +150,17 @@ const calculateRefundPercentage = ({
 
 const getGST = async (amount) => {
   const admin = await Admin.findOne();
-
+ console.log(admin);
   if (!admin || !admin.roomGSTSlabs) {
     throw new Error("no Room GST Slabs set by Admin");
   }
-  const slabs = admin.roomGSTSlabs;
+  const slabs = admin.roomGSTSlabs.sort((a, b) => a.upto - b.upto);
+
   let gstRate = 0;
 
   for (let slab of slabs) {
-    if (amount <= slab.upto) {
+    if (amount >= slab.upto) {
       gstRate = slab.rate;
-      break;
     }
   }
 
@@ -173,6 +173,7 @@ const getGST = async (amount) => {
 };
 
 //controllers
+ 
 
 export const createBooking = asyncHandler(async (req, res, next) => {
   const session = await mongoose.startSession();
@@ -261,6 +262,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
     const dates = getDatesBetween(checkIn, checkOut);
     console.log(dates, "dates");
     // 4️ Loop rooms
+    let roomMap = new Map();
     for (const item of rooms) {
       if (!item.roomId) throw new CustomError("Room ID is required", 400);
       if (!item.quantity || item.quantity < 1)
@@ -278,6 +280,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       //     400
       //   );
       // }
+    
 
       //  Date-wise availability
       const inventories = await RoomInventory.find({
@@ -295,14 +298,15 @@ export const createBooking = asyncHandler(async (req, res, next) => {
         const key = normalizeDate(date).toISOString();
         const inv = inventoryMap.get(key);
         const booked = inv?.bookedRooms || 0;
-        const total = inv?.totalRooms;
+       let total = inv?.totalRooms || 0;
+       total = Math.max(total, room.numberOfRooms);
 
-        if (booked + item.quantity > total) {
-          throw new CustomError(
-            `Not enough availability for ${room.name} on ${key.slice(0, 10)}`,
-            400
-          );
-        }
+       if (booked + item.quantity > total) {
+         throw new CustomError(
+           `Not enough availability for ${room.name} on ${key.slice(0, 10)}`,
+           400
+         );
+       }
       }
 
       // 🔐 Reserve inventory
@@ -314,6 +318,8 @@ export const createBooking = asyncHandler(async (req, res, next) => {
               propertyId,
               roomId: item.roomId,
               date,
+            },
+            $max: {
               totalRooms: room.numberOfRooms,
             },
             $inc: { bookedRooms: item.quantity },
@@ -325,7 +331,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
           throw new CustomError(`Overbooking detected for ${room.name}`, 400);
         }
       }
-
+     
       //  Pricing
       totalCapacity += room.capacity * item.quantity;
       let roomPrice = 0;
@@ -409,7 +415,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
           }
         }
       }
-
+      roomMap.set(String(item.roomId), room.name);
       roomsData.push(roomDetails);
     }
 
@@ -426,17 +432,18 @@ export const createBooking = asyncHandler(async (req, res, next) => {
 
     const effectiveAdults = numberOfGuests.adults + ChildTreatAsAdultCount;
 
-    if (effectiveAdults > totalCapacity) {
+    const totalGuests = effectiveAdults + remainingChildren;
+
+    if (totalGuests > totalCapacity + 5) {
       throw new CustomError(
-        `Number of guests exceeds room capacity. (${ChildTreatAsAdultCount}) child's age  exceeds the property's maximum age policy. ${childConfig?.age}`,
+        `Number of guests including childrens exceeds room MAX_TOTAL_GUESTS  capacity .`,
         400
       );
     }
+    const overflow = Math.max(0, effectiveAdults - totalCapacity);
 
-    const totalGuests = effectiveAdults + remainingChildren;
-    const overflow = Math.max(0, totalGuests - totalCapacity);
-
-    const childrenCharge = overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
+    const childrenCharge =
+      overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
 
     // 6️ calculate gst
     let totalPrice =
@@ -471,10 +478,17 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       { session }
     );
 
+       let BookingData = booking[0].toObject();
+       BookingData.rooms.forEach((room) => {
+         room.name = roomMap.get(String(room.roomId));
+       });
+      
+       
     await session.commitTransaction();
     session.endSession();
+  
 
-    successResponse(res, 201, "Booking created successfully", booking);
+    successResponse(res, 201, "Booking created successfully", BookingData);
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
@@ -585,7 +599,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     const roomsData = [];
 
     const newDates = getDatesBetween(checkIn, checkOut);
-
+    let roomMap = new Map();
     for (const item of rooms) {
       if (!item.roomId || item.quantity < 1) {
         throw new CustomError("Invalid room data", 400);
@@ -618,7 +632,8 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         const key = normalizeDate(date).toISOString();
         const inv = inventoryMap.get(key);
         const booked = inv?.bookedRooms || 0;
-        const total = inv?.totalRooms || room.numberOfRooms;
+        let total = inv?.totalRooms || 0;
+        total = Math.max(total, room.numberOfRooms);
 
         if (booked + item.quantity > total) {
           throw new CustomError(
@@ -637,6 +652,8 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
               propertyId: booking.propertyId,
               roomId: item.roomId,
               date,
+            },
+            $max: {
               totalRooms: room.numberOfRooms,
             },
             $inc: { bookedRooms: item.quantity },
@@ -723,7 +740,7 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
           }
         }
       }
-
+      roomMap.set(String(item.roomId), room.name);
       roomsData.push(roomDetails);
     }
 
@@ -740,17 +757,18 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
 
     const effectiveAdults = numberOfGuests.adults + ChildTreatAsAdultCount;
 
-    if (effectiveAdults > totalCapacity) {
+    const totalGuests = effectiveAdults + remainingChildren;
+
+    if (totalGuests > totalCapacity + 5) {
       throw new CustomError(
-        `Number of guests exceeds room capacity. (${ChildTreatAsAdultCount}) child's age  exceeds the property's maximum age policy. ${childConfig?.age}`,
+        `Number of guests including childrens exceeds room MAX_TOTAL_GUESTS  capacity .`,
         400
       );
     }
+    const overflow = Math.max(0, effectiveAdults - totalCapacity);
 
-    const totalGuests = effectiveAdults + remainingChildren;
-    const overflow = Math.max(0, totalGuests - totalCapacity);
-
-    const childrenCharge = overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
+    const childrenCharge =
+      overflow > 0 && childConfig ? childConfig.charge * overflow * nights : 0;
 
     // 8️⃣ Final total (same as createBooking)
     const totalPrice =
@@ -778,11 +796,14 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     booking.totalPrice = round(totalPrice);
 
     await booking.save({ session });
+       let BookingData = booking[0].toObject();
+       BookingData.rooms.forEach((room) => {
+         room.name = roomMap.get(String(room.roomId));
+       });
 
     await session.commitTransaction();
     session.endSession();
-
-    successResponse(res, 200, "Booking updated successfully", booking);
+    successResponse(res, 200, "Booking updated successfully", BookingData);
   } catch (err) {
     await session.abortTransaction();
     session.endSession();
@@ -947,6 +968,8 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
         bookingId: booking._id.toString(),
       },
     };
+     
+    const {razorpay} = await getRazorpayInstance();
 
     const order = await razorpay.orders.create(options);
 
@@ -965,6 +988,11 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
 
     successResponse(res, 201, "successfully created booking", data);
   } catch (error) {
+    // If it's already a CustomError, pass it directly
+    if (error instanceof CustomError) {
+      return next(error);
+    }
+
     if (error?.error) {
       return next(
         new CustomError(
@@ -1181,6 +1209,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
     // 5️ Initiate refund (OUTSIDE transaction)
     if (refundAmount > 0 && wasPaid) {
       try {
+         const {razorpay} = await getRazorpayInstance();
         const refund = await razorpay.payments.refund(
           booking.payment.razorpayPaymentId,
           {
@@ -1199,6 +1228,20 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
 
         booking.paymentStatus = "refund_failed";
         await booking.save();
+
+         if (error instanceof CustomError) {
+           return next(error);
+         }
+
+         if (error?.error) {
+           return next(
+             new CustomError(
+               error?.error?.description ||
+                 "Unable to initiate payment. Please try again.",
+               error.statusCode || 502
+             )
+           );
+         }
 
         throw new CustomError(
           "Cancellation successful but refund initiation failed. Support will contact you.",
@@ -1219,12 +1262,19 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
 });
 
 export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
-  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  // const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const razorpaySignature = req.headers["x-razorpay-signature"];
   console.log("refund");
   if (!razorpaySignature) {
     return res.status(200).json({ success: true });
   }
+
+    const { webhookSecret } = await getRazorpayInstance();
+
+    if (!webhookSecret) {
+      console.error("Webhook secret missing");
+      return res.status(200).json({ success: true });
+    }
 
   const expectedSignature = crypto
     .createHmac("sha256", webhookSecret)

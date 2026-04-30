@@ -5,7 +5,7 @@ import Partner from "../../models/Partner/partner.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import successResponse from "../../utils/error/successResponse.js";
-import { razorpay } from "../../config/razorpayConfig.js";
+import { razorpay,getRazorpayInstance } from "../../config/razorpayConfig.js";
 import axios from "axios";
 import { configDotenv } from "dotenv";
 import Admin from "../../models/Admin/admin.model.js";
@@ -366,7 +366,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!accountHolderName || !accountNumber || !ifscCode) {
       throw new CustomError(
         "accountHolderName, accountNumber and ifscCode are required",
-        400,
+        400
       );
     }
 
@@ -384,35 +384,34 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
       throw new CustomError("Partner not found", 404);
     }
 
-    if (!partner?.razorpay?.contactId) {
-      throw new CustomError(
-        "Payout contact not found. Setup payout first.",
-        400,
-      );
-    }
+    // if (!partner?.razorpay?.contactId) {
+    //   throw new CustomError(
+    //     "Payout contact not found. Setup payout first.",
+    //     400,
+    //   );
+    // }
 
     /* ---------- CREATE NEW FUND ACCOUNT IN RAZORPAY ---------- */
 
-    const newFundAccount = await razorpay.fundAccounts.create({
-      contact_id: partner.razorpay.contactId,
-      account_type: "bank_account",
-      bank_account: {
-        name: accountHolderName,
-        ifsc: ifscCode,
-        account_number: accountNumber,
-      },
-    });
+    // const newFundAccount = await razorpay.fundAccounts.create({
+    //   contact_id: partner.razorpay.contactId,
+    //   account_type: "bank_account",
+    //   bank_account: {
+    //     name: accountHolderName,
+    //     ifsc: ifscCode,
+    //     account_number: accountNumber,
+    //   },
+    // });
 
     /* ---------- SAVE NEW FUND ACCOUNT ---------- */
 
-    partner.razorpay.fundAccountId = newFundAccount.id;
+    // partner.razorpay.fundAccountId = newFundAccount.id;
 
     partner.bankDetails = {
       accountHolderName,
       accountNumber, // ideally encrypt
       ifscCode,
-      bankName: bankName || null,
-      updatedAt: new Date(),
+      bankName: bankName,
     };
 
     await partner.save({ session });
@@ -420,9 +419,10 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     await session.commitTransaction();
     session.endSession();
 
-    return successResponse(res, 200, "Bank account updated successfully", {
-      newFundAccountId: newFundAccount.id,
-    });
+    // return successResponse(res, 200, "Bank account updated successfully", {
+    //   newFundAccountId: newFundAccount.id,
+    // });
+    return successResponse(res, 200, "Bank account updated successfully", partner);
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -581,6 +581,7 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
   // 6. create razorpay order
   try {
+     const {razorpay} = await getRazorpayInstance();
     const order = await razorpay.orders.create({
       amount: Math.round(totalAmount * 100),
       currency: "INR",
@@ -601,9 +602,9 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
     await inactivePlan.save();
 
-    createParterPlanInvoice(inactivePlan._id).catch((error) =>
-      console.log("Invoice generation failed", error),
-    );
+    // createParterPlanInvoice(inactivePlan._id).catch((error) =>
+    //   console.log("Invoice generation failed", error),
+    // );
 
     successResponse(res, 201, "order created", {
       orderId: order.id,
@@ -618,13 +619,25 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
       currency: "INR",
     });
-  } catch (err) {
-    return next(
-      new CustomError(
-        err?.error?.description || "payment gateway error",
-        err.statusCode || 502,
-      ),
-    );
+  } catch (error) {
+    
+       if (error instanceof CustomError) {
+         return next(error);
+       }
+
+       if (error?.error) {
+       return next(
+         new CustomError(
+           err?.error?.description || "payment gateway error",
+           err.statusCode || 502
+         )
+       );
+       }
+
+       throw new CustomError(
+         "internal server error ",
+         500
+       );
   }
 });
 

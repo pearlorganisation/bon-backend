@@ -32,6 +32,11 @@ const AdminSchema = new mongoose.Schema(
       type: String,
       default: "N/A",
     },
+    RAZORPAY_CONFIG: {
+      RAZORPAY_KEY_ID: String,
+      RAZORPAY_KEY_SECRET : String,
+      RAZORPAY_WEBHOOK_SECRET: String,
+    },
   },
   { timestamps: true }
 );
