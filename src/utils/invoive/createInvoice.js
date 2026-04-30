@@ -15,6 +15,7 @@ import Admin from "../../models/Admin/admin.model.js";
 import { generatePartnerPlanInvoicePDF } from "./generatePartnerPlanInvoicePDF.js";
 import { generatePartnerPayoutInvoicePDF } from "./generatePartnerPayoutInvoicePDF.js";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
+import { sendCustomerBookingConfirmation, sendPartnerBookingNotification } from "../mail/EmailTemplates/bookingEmailTemplate.js";
 
 // const booking = {
 //   confirmationCode: "BNF-987654",
@@ -79,16 +80,26 @@ export const createBookingInvoice = async (bookingId) => {
       generateCustomerInvoicePDF(booking, invoiceNumber),
       generatePartnerInvoicePDF(booking, invoiceNumber),
     ]);
-    console.log(customerPdfUrl, partnerPdfUrl);
+
+    console.log("Customer PDF:", customerPdfUrl);
+    console.log("Partner PDF:", partnerPdfUrl);
+
     const invoice = await Invoice.create({
       invoiceNumber,
       invoiceType: "BOOKING_INVOICE",
       pdfUrl: customerPdfUrl,
       pdfUrl2: partnerPdfUrl,
     });
-    console.log(invoice);
+
+    console.log("Invoice created:", invoice);
     booking.invoiceId = invoice._id;
     await booking.save();
+
+    // Send email to customer with invoice
+    await sendCustomerBookingConfirmation(booking, customerPdfUrl);
+
+    // Send email to partner with invoice
+    await sendPartnerBookingNotification(booking, partnerPdfUrl);
 
     return invoice;
   } catch (error) {
@@ -97,7 +108,7 @@ export const createBookingInvoice = async (bookingId) => {
   }
 };
 
-const id = "69d357c5017b8f918d833454";
+const id = "69f1fa9d1f0e08e6d5ca1a5e";
 //createBookingInvoice(id);
 
 export const createParterPlanInvoice = async (planId) => {
