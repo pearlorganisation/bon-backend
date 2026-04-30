@@ -5,7 +5,7 @@ import Partner from "../../models/Partner/partner.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import successResponse from "../../utils/error/successResponse.js";
-import { razorpay } from "../../config/razorpayConfig.js";
+import { razorpay,getRazorpayInstance } from "../../config/razorpayConfig.js";
 import axios from "axios";
 import { configDotenv } from "dotenv";
 import Admin from "../../models/Admin/admin.model.js";
@@ -581,6 +581,7 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
   // 6. create razorpay order
   try {
+     const {razorpay} = await getRazorpayInstance();
     const order = await razorpay.orders.create({
       amount: Math.round(totalAmount * 100),
       currency: "INR",
@@ -618,13 +619,25 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
       currency: "INR",
     });
-  } catch (err) {
-    return next(
-      new CustomError(
-        err?.error?.description || "payment gateway error",
-        err.statusCode || 502,
-      ),
-    );
+  } catch (error) {
+    
+       if (error instanceof CustomError) {
+         return next(error);
+       }
+
+       if (error?.error) {
+       return next(
+         new CustomError(
+           err?.error?.description || "payment gateway error",
+           err.statusCode || 502
+         )
+       );
+       }
+
+       throw new CustomError(
+         "internal server error ",
+         500
+       );
   }
 });
 

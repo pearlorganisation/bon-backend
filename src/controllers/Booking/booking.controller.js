@@ -9,7 +9,7 @@ import CustomError from "../../utils/error/customError.js";
 import mongoose from "mongoose";
 import { check } from "express-validator";
 import successResponse from "../../utils/error/successResponse.js";
-import { razorpay } from "../../config/razorpayConfig.js";
+import { razorpay,getRazorpayInstance } from "../../config/razorpayConfig.js";
 import crypto from "crypto";
 import { isGeneratorFunction } from "util/types";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
@@ -298,14 +298,15 @@ export const createBooking = asyncHandler(async (req, res, next) => {
         const key = normalizeDate(date).toISOString();
         const inv = inventoryMap.get(key);
         const booked = inv?.bookedRooms || 0;
-        const total = inv?.totalRooms;
+       let total = inv?.totalRooms || 0;
+       total = Math.max(total, room.numberOfRooms);
 
-        if (booked + item.quantity > total) {
-          throw new CustomError(
-            `Not enough availability for ${room.name} on ${key.slice(0, 10)}`,
-            400
-          );
-        }
+       if (booked + item.quantity > total) {
+         throw new CustomError(
+           `Not enough availability for ${room.name} on ${key.slice(0, 10)}`,
+           400
+         );
+       }
       }
 
       // 🔐 Reserve inventory
@@ -317,6 +318,8 @@ export const createBooking = asyncHandler(async (req, res, next) => {
               propertyId,
               roomId: item.roomId,
               date,
+            },
+            $max: {
               totalRooms: room.numberOfRooms,
             },
             $inc: { bookedRooms: item.quantity },
@@ -629,7 +632,8 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
         const key = normalizeDate(date).toISOString();
         const inv = inventoryMap.get(key);
         const booked = inv?.bookedRooms || 0;
-        const total = inv?.totalRooms || room.numberOfRooms;
+        let total = inv?.totalRooms || 0;
+        total = Math.max(total, room.numberOfRooms);
 
         if (booked + item.quantity > total) {
           throw new CustomError(
@@ -648,6 +652,8 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
               propertyId: booking.propertyId,
               roomId: item.roomId,
               date,
+            },
+            $max: {
               totalRooms: room.numberOfRooms,
             },
             $inc: { bookedRooms: item.quantity },
@@ -962,6 +968,8 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
         bookingId: booking._id.toString(),
       },
     };
+     
+    const {razorpay} = await getRazorpayInstance();
 
     const order = await razorpay.orders.create(options);
 
@@ -980,6 +988,11 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
 
     successResponse(res, 201, "successfully created booking", data);
   } catch (error) {
+    // If it's already a CustomError, pass it directly
+    if (error instanceof CustomError) {
+      return next(error);
+    }
+
     if (error?.error) {
       return next(
         new CustomError(
@@ -1196,6 +1209,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
     // 5️ Initiate refund (OUTSIDE transaction)
     if (refundAmount > 0 && wasPaid) {
       try {
+         const {razorpay} = await getRazorpayInstance();
         const refund = await razorpay.payments.refund(
           booking.payment.razorpayPaymentId,
           {
@@ -1214,6 +1228,20 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
 
         booking.paymentStatus = "refund_failed";
         await booking.save();
+
+         if (error instanceof CustomError) {
+           return next(error);
+         }
+
+         if (error?.error) {
+           return next(
+             new CustomError(
+               error?.error?.description ||
+                 "Unable to initiate payment. Please try again.",
+               error.statusCode || 502
+             )
+           );
+         }
 
         throw new CustomError(
           "Cancellation successful but refund initiation failed. Support will contact you.",
@@ -1234,12 +1262,19 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
 });
 
 export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
-  const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  // const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET;
   const razorpaySignature = req.headers["x-razorpay-signature"];
   console.log("refund");
   if (!razorpaySignature) {
     return res.status(200).json({ success: true });
   }
+
+    const { webhookSecret } = await getRazorpayInstance();
+
+    if (!webhookSecret) {
+      console.error("Webhook secret missing");
+      return res.status(200).json({ success: true });
+    }
 
   const expectedSignature = crypto
     .createHmac("sha256", webhookSecret)
