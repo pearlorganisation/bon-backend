@@ -151,6 +151,45 @@ export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "GST configuration updated successfully", admin);
 });
 
+export const upsertRazorpayConfig = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+  const { razorpayconfig } = req.body;
+
+  if (req.user.role !== "ADMIN") {
+    return next(new CustomError("Permission denied", 403));
+  }
+
+  if (!razorpayconfig) {
+    return next(new CustomError("Razorpay config is required", 400));
+  }
+
+  const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET } =
+    razorpayconfig;
+
+
+  //  Find admin
+  const admin = await Admin.findOne({ userId });
+
+  if (!admin) {
+    return next(new CustomError("Admin not found", 404));
+  }
+
+  //  Update only provided fields (no overwrite)
+  admin.RAZORPAY_CONFIG = {
+    ...(RAZORPAY_KEY_ID && { RAZORPAY_KEY_ID }),
+    ...(RAZORPAY_KEY_SECRET && { RAZORPAY_KEY_SECRET }),
+    ...(RAZORPAY_WEBHOOK_SECRET && { RAZORPAY_WEBHOOK_SECRET }),
+  };
+
+  await admin.save();
+
+  //  Never send secrets back
+  return res.status(200).json({
+    success: true,
+    message: "Razorpay config updated successfully",
+  });
+});
+
 // platform  subscription and commision plan
 
 export const upsertCommissionRange = asyncHandler(async (req, res, next) => {
@@ -269,6 +308,7 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
         roomGSTSlabs: 1,
         gstOnServices:1,
         GSTIN:1,
+        RAZORPAY_CONFIG: 1,
       },
     },
   ]);
@@ -280,9 +320,6 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
   const platformPlans = {
     commission: result[0].commission,
     subscriptions: [],
-    roomGSTSlabs: result[0].roomGSTSlabs,
-    gstOnServices: result[0].gstOnServices,
-    GSTIN:  result[0].GSTIN,
   };
 
   if (req.user.role === "PARTNER") {
@@ -290,7 +327,11 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
       (sub) => sub.isActive === true
     );
   } else {
-    platformPlans.subscriptions = result[0].subscriptions;
+     platformPlans.subscriptions = result[0].subscriptions;
+     platformPlans.roomGSTSlabs= result[0].roomGSTSlabs;
+     platformPlans.gstOnServices= result[0].gstOnServices;
+     platformPlans.GSTIN=  result[0].GSTIN;
+     platformPlans.RAZORPAY_CONFIG= result[0].RAZORPAY_CONFIG;
   }
 
   successResponse(res, 200, "Plans fetched successfully", platformPlans);
@@ -538,6 +579,10 @@ export const confirmPartnerMonthlyPayout = asyncHandler(
 
     payout.partnerWallet.status = "paid";
     payout.partnerWallet.paidAt = new Date();
+
+      createParterMonthlyPayoutInvoice(payout._id).catch((err)=>{
+        console.log(err);
+      })
 
     await payout.save();
 

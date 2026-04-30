@@ -34,6 +34,7 @@ import {
   getMonthlyBookingsData,
   confirmPartnerMonthlyPayout,
   upsertGSTConfig,
+  upsertRazorpayConfig,
 } from "../../controllers/admin/admin.controller.js";
 
 route.use(protect);
@@ -97,6 +98,10 @@ route.put(
 );
 
 route.post("/upsert-gst-config",authorizeRoles("ADMIN"),upsertGSTConfig);
+route.post(
+  "/upsert-razorpay-config",
+  authorizeRoles("ADMIN", upsertRazorpayConfig)
+);
 
 
 //payout apis 

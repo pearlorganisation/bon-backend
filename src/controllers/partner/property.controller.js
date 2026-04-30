@@ -1168,8 +1168,10 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const inventoryMap = {};
   for (const inv of inventories) {
     const roomKey = inv.roomId.toString();
-    if (!inventoryMap[roomKey]) inventoryMap[roomKey] = {};
-    inventoryMap[roomKey][inv.date.toISOString()] = inv.bookedRooms;
+   inventoryMap[roomKey][inv.date.toISOString()] = {
+     booked: inv.bookedRooms,
+     total: inv.totalRooms,
+   };
   }
 
   // 5️ Filter rooms
@@ -1197,14 +1199,19 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     if (max && Number(max) < room.pricePerNight) continue;
 
     // room capacity logic
-    let maxBooked = 0;
-    for (const date of dates) {
-      const booked =
-        inventoryMap[room._id.toString()]?.[date.toISOString()] || 0;
-      maxBooked = Math.max(maxBooked, booked);
-      console.log(maxBooked, date.toISOString());
-    }
-    const availableRooms = room.numberOfRooms - maxBooked;
+    
+   let availableRooms = Infinity;
+
+   for (const date of dates) {
+     const inv = inventoryMap[room._id.toString()]?.[date.toISOString()] || {};
+
+     const booked = inv.booked || 0;
+     const total = Math.max(inv.total || 0, room.numberOfRooms);
+
+     const available = total - booked;
+
+     availableRooms = Math.min(availableRooms, available);
+   }
     /// console.log(availableRooms);
     if (availableRooms < rooms) continue;
 
