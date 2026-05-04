@@ -22,6 +22,9 @@ const platformSettingsSchema = new mongoose.Schema(
       instagram: String,
       twitter: String,
       linkedin: String,
+      whatsapp: String,
+    
+      pinterest: String,
     },
 
     brandLogo: {
