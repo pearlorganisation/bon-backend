@@ -47,7 +47,7 @@ export const updateUserProfile = asyncHandler(async (req, res, next) => {
     user.profileImageUrl = image[0];
   }
 
-  await user.save();
+   await user.save();
 
   successResponse(res, 200, "profile updated successfully");
 });
