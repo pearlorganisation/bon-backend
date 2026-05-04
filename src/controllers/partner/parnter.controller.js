@@ -366,7 +366,7 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     if (!accountHolderName || !accountNumber || !ifscCode) {
       throw new CustomError(
         "accountHolderName, accountNumber and ifscCode are required",
-        400
+        400,
       );
     }
 
@@ -422,7 +422,12 @@ export const updatePartnerBankAccount = asyncHandler(async (req, res, next) => {
     // return successResponse(res, 200, "Bank account updated successfully", {
     //   newFundAccountId: newFundAccount.id,
     // });
-    return successResponse(res, 200, "Bank account updated successfully", partner);
+    return successResponse(
+      res,
+      200,
+      "Bank account updated successfully",
+      partner,
+    );
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
@@ -1350,7 +1355,7 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
       return next(new CustomError("Invalid partnerId", 400));
     }
 
-    if (!mongoose.Types.ObjectId.isValid(propertyId)) {
+    if (propertyId && !mongoose.Types.ObjectId.isValid(propertyId)) {
       return next(new CustomError("Invalid propertyId", 400));
     }
 
@@ -1391,7 +1396,9 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
       /* ---------- FILTER PROPERTY ---------- */
       {
         $match: {
-          "booking.propertyId": new mongoose.Types.ObjectId(propertyId),
+          ...(propertyId && {
+            "booking.propertyId": new mongoose.Types.ObjectId(propertyId),
+          }),
           "booking.paymentStatus": "paid",
         },
       },
