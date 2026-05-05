@@ -26,7 +26,7 @@ export const sendSupportMail = async ({
   subject,
   html,
   replyTo,
-  cc, 
+  cc,
 }) => {
   try {
     const info = await transporter.sendMail({
@@ -66,6 +66,53 @@ export const sendEmail = async (to, subject, html) => {
   }
 };
 
+// import { Resend } from "resend";
+
+// const resend = new Resend("re_CX67wd6v_HK8NCs9LUsbxznVqiRbFVXoP");
+// const RESEND_FROM_EMAIL = "rohit-singh@pearlorganisation.com";
+// export const sendSupportMail = async ({
+//   from,
+//   to,
+//   subject,
+//   html,
+//   replyTo,
+//   cc,
+// }) => {
+//   try {
+//     const response = await resend.emails.send({
+//       from: from || `"Bonfire" <${RESEND_FROM_EMAIL}>`,
+//       to,
+//       cc,
+//       reply_to: replyTo,
+//       subject,
+//       html,
+//     });
+
+//     console.log("📧 Support mail sent:", response.id);
+//     return response;
+//   } catch (error) {
+//     console.error("❌ Support mail failed:", error);
+//     throw new Error(error.message);
+//   }
+// };
+
+// export const sendEmail = async (to, subject, html) => {
+//   try {
+//     const response = await resend.emails.send({
+//       from: `"Bonfire" <${RESEND_FROM_EMAIL}>`,
+//       to,
+//       subject,
+//       html,
+//     });
+
+//     console.log("📧 Email sent:", response.id);
+//     return response;
+//   } catch (error) {
+//     console.error("❌ Email sending failed:", error);
+//     throw new Error(error.message);
+//   }
+// };
+
 /* -------------------------------------------------------------------------- */
 /*                               OTP Email                                     */
 /* -------------------------------------------------------------------------- */
@@ -94,15 +141,10 @@ export const sendOtpEmail = async (name, email, otp, type = "REGISTER") => {
   return sendEmail(email, subject, html);
 };
 
-
 /* -------------------------------------------------------------------------- */
 /*                 SUB ADMIN ACCOUNT CREATED (WITH PASSWORD)                   */
 /* -------------------------------------------------------------------------- */
-export const sendSubAdminCreatedEmail = async (
-  name,
-  email,
-  Password
-) => {
+export const sendSubAdminCreatedEmail = async (name, email, Password) => {
   const subject = "Your Bonfire Sub-Admin Account Details";
 
   const html = `
