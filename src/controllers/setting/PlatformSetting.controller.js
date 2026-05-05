@@ -20,8 +20,11 @@ export const updatePlatformSettings = async (req, res) => {
       addressLine2,
       facebook,
       instagram,
-      twitter,
+      
       linkedin,
+      whatsapp,
+      twitter,
+      pinterest,
     } = req.body;
 
     let settings = await PlatformSettings.findOne();
@@ -38,6 +41,9 @@ export const updatePlatformSettings = async (req, res) => {
       instagram: instagram ?? settings.socialLinks?.instagram,
       twitter: twitter ?? settings.socialLinks?.twitter,
       linkedin: linkedin ?? settings.socialLinks?.linkedin,
+      whatsapp: whatsapp ?? settings.socialLinks?.whatsapp,
+      pinterest: pinterest ?? settings.socialLinks?.pinterest,
+      
     };
 
     // FIX: Handle Logo Upload for "brandLogo" object
