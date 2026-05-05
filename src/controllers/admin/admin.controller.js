@@ -12,9 +12,10 @@ import Booking from "../../models/Listing/booking.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import mongoose from "mongoose";
 import Property from "../../models/Listing/property.model.js";
+import { createParterMonthlyPayoutInvoice } from "../../utils/invoive/createInvoice.js";
 
 configDotenv();
-
+const round = (num) => Math.round(num * 100) / 100;
 export const getAllPartners = asyncHandler(async (req, res, next) => {
   if (req.user.role !== "ADMIN") {
     return next(new CustomError("only admin is allowed", 401));
@@ -82,7 +83,7 @@ export const getAllPartners = asyncHandler(async (req, res, next) => {
 
 export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
-  const { roomGSTSlabs, gstOnServices,GSTIN } = req.body;
+  const { roomGSTSlabs, gstOnServices, GSTIN } = req.body;
 
   //  Role check
   if (req.user.role !== "ADMIN") {
@@ -129,19 +130,19 @@ export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
       }
     }
   }
- 
-   if(GSTIN){
+
+  if (GSTIN) {
     const gstinRegex =
       /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     const isValid = gstinRegex.test(GSTIN);
-    if(!isValid)return next(new CustomError("Invalid GSTIN Number", 400));
-   }
-   
+    if (!isValid) return next(new CustomError("Invalid GSTIN Number", 400));
+  }
+
   const updateData = {};
 
   if (roomGSTSlabs) updateData.roomGSTSlabs = roomGSTSlabs;
   if (gstOnServices !== undefined) updateData.gstOnServices = gstOnServices;
-  if(GSTIN!= undefined)updateData.GSTIN = GSTIN;
+  if (GSTIN != undefined) updateData.GSTIN = GSTIN;
 
   const admin = await Admin.findOneAndUpdate({ userId }, updateData, {
     new: true,
@@ -165,7 +166,6 @@ export const upsertRazorpayConfig = asyncHandler(async (req, res, next) => {
 
   const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET } =
     razorpayconfig;
-
 
   //  Find admin
   const admin = await Admin.findOne({ userId });
@@ -291,7 +291,6 @@ export const updateSubscriptionPlan = asyncHandler(async (req, res, next) => {
 });
 
 export const getPlatformPlans = asyncHandler(async (req, res, next) => {
-  
   const result = await Admin.aggregate([
     {
       $lookup: {
@@ -306,8 +305,8 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
         commission: 1,
         subscriptions: 1,
         roomGSTSlabs: 1,
-        gstOnServices:1,
-        GSTIN:1,
+        gstOnServices: 1,
+        GSTIN: 1,
         RAZORPAY_CONFIG: 1,
       },
     },
@@ -327,11 +326,11 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
       (sub) => sub.isActive === true
     );
   } else {
-     platformPlans.subscriptions = result[0].subscriptions;
-     platformPlans.roomGSTSlabs= result[0].roomGSTSlabs;
-     platformPlans.gstOnServices= result[0].gstOnServices;
-     platformPlans.GSTIN=  result[0].GSTIN;
-     platformPlans.RAZORPAY_CONFIG= result[0].RAZORPAY_CONFIG;
+    platformPlans.subscriptions = result[0].subscriptions;
+    platformPlans.roomGSTSlabs = result[0].roomGSTSlabs;
+    platformPlans.gstOnServices = result[0].gstOnServices;
+    platformPlans.GSTIN = result[0].GSTIN;
+    platformPlans.RAZORPAY_CONFIG = result[0].RAZORPAY_CONFIG;
   }
 
   successResponse(res, 200, "Plans fetched successfully", platformPlans);
@@ -523,7 +522,7 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
 export const confirmPartnerMonthlyPayout = asyncHandler(
   async (req, res, next) => {
     const { partnerId, date } = req.query;
-  
+
     /* ---------- VALIDATE PARTNER ---------- */
     if (!mongoose.Types.ObjectId.isValid(partnerId)) {
       return next(new CustomError("Invalid partnerId", 400));
@@ -580,13 +579,11 @@ export const confirmPartnerMonthlyPayout = asyncHandler(
     payout.partnerWallet.status = "paid";
     payout.partnerWallet.paidAt = new Date();
 
-      createParterMonthlyPayoutInvoice(payout._id).catch((err)=>{
-        console.log(err);
-      })
+    createParterMonthlyPayoutInvoice(payout._id).catch((err) => {
+      console.log(err);
+    });
 
     await payout.save();
-
-     
 
     /* ---------- RESPONSE ---------- */
     return successResponse(res, 200, "Partner payout marked as paid manually", {
@@ -733,6 +730,30 @@ export const getPartnerMonthlyPayouts = asyncHandler(async (req, res, next) => {
         preserveNullAndEmptyArrays: true,
       },
     },
+  {
+  $lookup: {
+    from: "invoices",
+    let: {
+      invoiceId: "$partnerMonthlyPayout.partnerWallet.invoiceId",
+    },
+    pipeline: [
+      {
+        $match: {
+          $expr: {
+            $eq: ["$_id", "$$invoiceId"],
+          },
+        },
+      },
+    ],
+    as: "invoice",
+  },
+},
+{
+  $unwind: {
+    path: "$invoice",
+    preserveNullAndEmptyArrays: true,
+  },
+},
     {
       $project: {
         password: 0,
@@ -933,19 +954,19 @@ export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
 
   const data = {
     /* Booking */
-    totalRevenue: totalRevenue.totalRevenue || 0,
+    totalRevenue: round(totalRevenue.totalRevenue) || 0,
 
     // totalAdminAmount: bookingStats.totalAdminAmount || 0,
-    totalBookings: bookingStats.totalBookings || 0,
+    totalBookings: round(bookingStats.totalBookings) || 0,
 
     /* Partner */
-    partnerPaidAmount: partnerPayout.totalPaid || 0,
-    partnerPendingAmount: partnerPayout.totalPending || 0,
+    partnerPaidAmount: round(partnerPayout.totalPaid) || 0,
+    partnerPendingAmount: round(partnerPayout.totalPending) || 0,
 
     /* Admin */
-    totalGrossAmount: adminProfit.totalGrossAmount || 0,
-    totalNetProfit: adminProfit.totalProfit || 0,
-    currentAdminGST: adminProfit.currentGST || 0,
+    totalGrossAmount: round(adminProfit.totalGrossAmount) || 0,
+    totalNetProfit: round(adminProfit.totalProfit) || 0,
+    currentAdminGST: round(adminProfit.currentGST) || 0,
   };
 
   return successResponse(res, 200, `Finance report for ${month}/${year}`, data);
@@ -970,7 +991,7 @@ export const getWeeklySalesFromBookings = asyncHandler(
     const result = await Booking.aggregate([
       {
         $match: {
-        paymentStatus: "paid",
+          paymentStatus: "paid",
           createdAt: {
             $gte: startDate,
             $lt: endDate,
@@ -1017,8 +1038,8 @@ export const getWeeklySalesFromBookings = asyncHandler(
 
       return {
         day,
-        totalRevenue: found ? found.totalRevenue : 0,
-        totalBookings: found ? found.totalBookings : 0,
+        totalRevenue: found ? round(found.totalRevenue) : 0,
+        totalBookings: found ? round(found.totalBookings) : 0,
       };
     });
 
@@ -1278,6 +1299,20 @@ export const getMonthlySubscriptionsData = asyncHandler(
         },
       },
       { $unwind: "$subscriptionPlan" },
+      {
+        $lookup: {
+          from: "invoices",
+          localField: "invoiceId",
+          foreignField: "_id",
+          as: "invoice",
+        },
+      },
+      {
+        $unwind: {
+          path: "$invoice",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
 
       /* ---------------- FACET ---------------- */
       {
@@ -1316,10 +1351,11 @@ export const getMonthlySubscriptionsData = asyncHandler(
                 planName: "$subscriptionPlan.name",
                 price: "$subscriptionPlan.price",
                 durationDays: "$subscriptionPlan.durationDays",
-                subscriptionPayment:1,
+                subscriptionPayment: 1,
                 planStatus: 1,
                 startDate: 1,
                 endDate: 1,
+                invoice: 1,
               },
             },
           ],
@@ -1329,7 +1365,7 @@ export const getMonthlySubscriptionsData = asyncHandler(
 
     /* ---------------- SAFE EXTRACTION ---------------- */
     const totalAmount = result[0]?.totalSubscriptionAmount[0]?.total || 0;
-     const totalGST = result[0]?.totalSubscriptionGST[0]?.total || 0;
+    const totalGST = result[0]?.totalSubscriptionGST[0]?.total || 0;
     const partnerDetails = result[0]?.partnerDetails || [];
 
     return successResponse(res, 200, `Subscription data for ${month}/${year}`, {
@@ -1461,7 +1497,7 @@ export const getYearly_Revenue_Tax_Data = asyncHandler(
 
       return {
         month,
-        monthName : monthNames[i],
+        monthName: monthNames[i],
         totalProfit: found?.totalProfit || 0,
         totalGST: found?.totalGST || 0,
       };

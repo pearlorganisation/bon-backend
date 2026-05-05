@@ -228,7 +228,7 @@ export const sendPartnerBookingNotification = async (booking, invoiceUrl) => {
       <p style="color: ${
         COLORS.textLight
       }; font-size: 15px; line-height: 1.5; margin: 16px 0; text-align: center;">
-        Hello ${booking.propertyId?.name || "Partner"},
+        Hello ${booking.propertyId?.partnerId?.name || "Partner"},
       </p>
       
       <p style="color: ${

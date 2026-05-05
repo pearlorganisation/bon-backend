@@ -33,9 +33,9 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
   if (!panNumber) {
     return next(new CustomError("PAN number is required", 400));
   }
-
+  const auth = await Auth.findById(userId);
   const partner = await Partner.findOne({ userId });
-  if (!partner) {
+  if (!auth || !partner) {
     return next(new CustomError("Partner not found", 404));
   }
 
@@ -100,6 +100,10 @@ export const partner_KYC = asyncHandler(async (req, res, next) => {
     partner.gstinList = gstinList;
     partner.isPanVerified = true;
     partner.isVerified = true;
+
+    sendAccountVerificationSuccess(auth.name, auth.email, auth.role)
+      .then(console.log("mail sent successfully"))
+      .catch((err) => console.log(err));
 
     // Save the document
     await partner.save();
@@ -684,14 +688,17 @@ export const subscriptionWebhookController = asyncHandler(
 );
 
 export const getMyPlans = asyncHandler(async (req, res, next) => {
-  const partnerId = req.user._id;
-
+  let partnerId = req.user._id;
+  if(req.user.role=="ADMIN"){
+    partnerId = req.query.partnerId;
+  }
+  console.log(partnerId);
   const plans = await PartnerPlan.find({
     partnerId,
     planStatus: { $in: ["ACTIVE", "UPCOMING"] },
   })
     .sort({ createdAt: 1 })
-    .populate("subscriptionPlanId")
+    .populate("subscriptionPlanId","name")
     .populate("invoiceId");
 
   successResponse(res, 200, "successfully fetched current plans", { plans });
@@ -1505,7 +1512,7 @@ export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
     partnerId,
     payoutMonth,
     payoutYear,
-  }).lean();
+  }).populate("partnerWallet.invoiceId").lean();
 
   if (!payout) {
     return next(

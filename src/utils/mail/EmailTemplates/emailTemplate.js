@@ -358,7 +358,9 @@ export const sendAccountVerificationSuccess = async (name, email, role) => {
         </p>
         <p style="color: ${COLORS.textLight}; font-size: 13px; margin: 0;">
           You can now ${
-            role === "PARTNER" ? "list your properties" : "book luxury stays"
+            role === "PARTNER"
+              ? "List your properties and get them verified on our platform "
+              : "book luxury stays"
           } and access all features.
         </p>
       </div>
@@ -492,9 +494,9 @@ export const sendSubAdminCreatedEmail = async (name, email, password) => {
   return sendEmail(email, subject, html);
 };
 
-
-
-//  sendWelcomeEmail("rohit","rohit-singh@pearlorganisation.com","PARTNER").then(res=>console.log("done")).catch(error=>console.log(error));
+// sendWelcomeEmail("rohit", "rohit-singh@pearlorganisation.com", "PARTNER")
+//   .then((res) => console.log("done"))
+//   .catch((error) => console.log(error));
 
 // sendSubAdminCreatedEmail(
 //   "durga",
