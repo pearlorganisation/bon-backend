@@ -1049,7 +1049,7 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         paymentY += 15;
         doc.text(
           `Amount: ${formatCurrency(
-            booking.payment?.amount || booking.totalPrice
+            booking.totalPrice
           )}`,
           paymentX + 8,
           paymentY

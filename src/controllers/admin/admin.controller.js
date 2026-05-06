@@ -12,9 +12,10 @@ import Booking from "../../models/Listing/booking.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import mongoose from "mongoose";
 import Property from "../../models/Listing/property.model.js";
+import { createParterMonthlyPayoutInvoice } from "../../utils/invoive/createInvoice.js";
 
 configDotenv();
-
+const round = (num) => Math.round(num * 100) / 100;
 export const getAllPartners = asyncHandler(async (req, res, next) => {
   if (req.user.role !== "ADMIN") {
     return next(new CustomError("only admin is allowed", 401));
@@ -165,13 +166,6 @@ export const upsertRazorpayConfig = asyncHandler(async (req, res, next) => {
 
   const { RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET } =
     razorpayconfig;
-
-  console.log(
-    " RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET, RAZORPAY_WEBHOOK_SECRET",
-    RAZORPAY_KEY_ID,
-    RAZORPAY_KEY_SECRET,
-    RAZORPAY_WEBHOOK_SECRET
-  );
 
   //  Find admin
   const admin = await Admin.findOne({ userId });
@@ -736,6 +730,30 @@ export const getPartnerMonthlyPayouts = asyncHandler(async (req, res, next) => {
         preserveNullAndEmptyArrays: true,
       },
     },
+  {
+  $lookup: {
+    from: "invoices",
+    let: {
+      invoiceId: "$partnerMonthlyPayout.partnerWallet.invoiceId",
+    },
+    pipeline: [
+      {
+        $match: {
+          $expr: {
+            $eq: ["$_id", "$$invoiceId"],
+          },
+        },
+      },
+    ],
+    as: "invoice",
+  },
+},
+{
+  $unwind: {
+    path: "$invoice",
+    preserveNullAndEmptyArrays: true,
+  },
+},
     {
       $project: {
         password: 0,
@@ -936,19 +954,19 @@ export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
 
   const data = {
     /* Booking */
-    totalRevenue: totalRevenue.totalRevenue || 0,
+    totalRevenue: round(totalRevenue.totalRevenue) || 0,
 
     // totalAdminAmount: bookingStats.totalAdminAmount || 0,
-    totalBookings: bookingStats.totalBookings || 0,
+    totalBookings: round(bookingStats.totalBookings) || 0,
 
     /* Partner */
-    partnerPaidAmount: partnerPayout.totalPaid || 0,
-    partnerPendingAmount: partnerPayout.totalPending || 0,
+    partnerPaidAmount: round(partnerPayout.totalPaid) || 0,
+    partnerPendingAmount: round(partnerPayout.totalPending) || 0,
 
     /* Admin */
-    totalGrossAmount: adminProfit.totalGrossAmount || 0,
-    totalNetProfit: adminProfit.totalProfit || 0,
-    currentAdminGST: adminProfit.currentGST || 0,
+    totalGrossAmount: round(adminProfit.totalGrossAmount) || 0,
+    totalNetProfit: round(adminProfit.totalProfit) || 0,
+    currentAdminGST: round(adminProfit.currentGST) || 0,
   };
 
   return successResponse(res, 200, `Finance report for ${month}/${year}`, data);
@@ -1020,8 +1038,8 @@ export const getWeeklySalesFromBookings = asyncHandler(
 
       return {
         day,
-        totalRevenue: found ? found.totalRevenue : 0,
-        totalBookings: found ? found.totalBookings : 0,
+        totalRevenue: found ? round(found.totalRevenue) : 0,
+        totalBookings: found ? round(found.totalBookings) : 0,
       };
     });
 
@@ -1281,6 +1299,20 @@ export const getMonthlySubscriptionsData = asyncHandler(
         },
       },
       { $unwind: "$subscriptionPlan" },
+      {
+        $lookup: {
+          from: "invoices",
+          localField: "invoiceId",
+          foreignField: "_id",
+          as: "invoice",
+        },
+      },
+      {
+        $unwind: {
+          path: "$invoice",
+          preserveNullAndEmptyArrays: true,
+        },
+      },
 
       /* ---------------- FACET ---------------- */
       {
@@ -1323,6 +1355,7 @@ export const getMonthlySubscriptionsData = asyncHandler(
                 planStatus: 1,
                 startDate: 1,
                 endDate: 1,
+                invoice: 1,
               },
             },
           ],

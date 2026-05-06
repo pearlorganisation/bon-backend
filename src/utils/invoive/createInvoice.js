@@ -15,6 +15,11 @@ import Admin from "../../models/Admin/admin.model.js";
 import { generatePartnerPlanInvoicePDF } from "./generatePartnerPlanInvoicePDF.js";
 import { generatePartnerPayoutInvoicePDF } from "./generatePartnerPayoutInvoicePDF.js";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
+import {
+  sendCustomerBookingConfirmation,
+  sendPartnerBookingNotification,
+} from "../mail/EmailTemplates/bookingEmailTemplate.js";
+import { errorMonitor } from "events";
 
 // const booking = {
 //   confirmationCode: "BNF-987654",
@@ -68,7 +73,13 @@ export const createBookingInvoice = async (bookingId) => {
     const invoiceNumber = await generateInvoiceNumber();
 
     const booking = await Booking.findById(bookingId)
-      .populate("propertyId")
+      .populate({
+        path: "propertyId",
+        populate: {
+          path: "partnerId", // The field inside the Booking document to populate
+          model: "Auth",
+        },
+      })
       .populate("rooms.roomId");
 
     if (!booking) {
@@ -79,16 +90,30 @@ export const createBookingInvoice = async (bookingId) => {
       generateCustomerInvoicePDF(booking, invoiceNumber),
       generatePartnerInvoicePDF(booking, invoiceNumber),
     ]);
-    console.log(customerPdfUrl, partnerPdfUrl);
+
+    console.log("Customer PDF:", customerPdfUrl);
+    console.log("Partner PDF:", partnerPdfUrl);
+
     const invoice = await Invoice.create({
       invoiceNumber,
       invoiceType: "BOOKING_INVOICE",
       pdfUrl: customerPdfUrl,
       pdfUrl2: partnerPdfUrl,
     });
-    console.log(invoice);
+
+    console.log("Invoice created:", invoice);
     booking.invoiceId = invoice._id;
     await booking.save();
+
+    // Send email to customer with invoice
+    sendCustomerBookingConfirmation(booking, customerPdfUrl)
+      .then(console.log("done customer"))
+      .catch((err) => console.log(err));
+
+    // Send email to partner with invoice
+    sendPartnerBookingNotification(booking, partnerPdfUrl)
+      .then(console.log("done partner"))
+      .catch((err) => console.log(err));
 
     return invoice;
   } catch (error) {
@@ -97,8 +122,8 @@ export const createBookingInvoice = async (bookingId) => {
   }
 };
 
-const id = "69d357c5017b8f918d833454";
-//createBookingInvoice(id);
+const id = "69f1fecb0cf86230391bffe0";
+// createBookingInvoice(id);
 
 export const createParterPlanInvoice = async (planId) => {
   try {
@@ -112,8 +137,8 @@ export const createParterPlanInvoice = async (planId) => {
       throw new Error("no plan found");
     }
 
-    const url = await generatePartnerPlanInvoicePDF(plan,invoiceNumber);
-     console.log(url);
+    const url = await generatePartnerPlanInvoicePDF(plan, invoiceNumber);
+    console.log(url);
     const invoice = await Invoice.create({
       invoiceNumber,
       invoiceType: "PARTNER_PLAN_INVOICE",
@@ -124,8 +149,6 @@ export const createParterPlanInvoice = async (planId) => {
     await plan.save();
 
     return invoice;
-
-    
   } catch (error) {
     console.error(" partner plan Invoice generation failed:", error);
     throw error;
@@ -133,7 +156,6 @@ export const createParterPlanInvoice = async (planId) => {
 };
 //createParterPlanInvoice("69e0bfb72a751495ee4706b8");
 // createParterPlanInvoice("69d35f0fecc687c0a6235796");
-
 
 export const createParterMonthlyPayoutInvoice = async (payoutId) => {
   try {
@@ -144,15 +166,14 @@ export const createParterMonthlyPayoutInvoice = async (payoutId) => {
         path: "bookings.bookingId",
         populate: {
           path: "propertyId", // The field inside the Booking document to populate
-          model: "Property", 
+          model: "Property",
         },
       })
-      .populate("partnerId");  
-
+      .populate("partnerId").lean();
+ 
     if (!payout) {
       throw new Error("no payout found");
     }
-
     const admin = await Admin.findOne().select("GSTIN");
     const gstin = admin?.GSTIN || "N/A";
 
@@ -163,22 +184,21 @@ export const createParterMonthlyPayoutInvoice = async (payoutId) => {
     );
     console.log(url);
 
-    // const invoice = await Invoice.create({
-    //   invoiceNumber,
-    //   invoiceType: "PAYOUT_STATEMENT_INVOICE",
-    //   pdfUrl: url,
-    // });
+    const invoice = await Invoice.create({
+      invoiceNumber,
+      invoiceType: "PAYOUT_STATEMENT_INVOICE",
+      pdfUrl: url,
+    });
 
-    // payout.partnerWallet.invoiceId = invoice._id;
-    // await payout.save();
+    payout.partnerWallet.invoiceId = invoice._id;
+    await payout.save();
 
-    // return invoice;
+    return invoice;
   } catch (error) {
     console.error("Partner payout invoice generation failed:", error);
     throw error;
   }
 };
-
 
 // (async () => {
 
@@ -191,5 +211,3 @@ export const createParterMonthlyPayoutInvoice = async (payoutId) => {
 //     }
 //   }, 5000);
 // })();
-
- 

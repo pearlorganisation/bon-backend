@@ -1,10 +1,14 @@
 import PlatformSettings from "../../models/PlatformSettings/platformSettings.model.js";
 import fs from "fs";
 import { v2 as cloudinary } from "cloudinary"; 
+import Admin from "../../models/Admin/admin.model.js";
 
 export const getPlatformSettings = async (req, res) => {
   try {
-    const settings = await PlatformSettings.findOne();
+    const settings = await PlatformSettings.findOne().lean();
+     const admin  = await Admin.findOne();
+     settings.razorpayID = admin?.RAZORPAY_CONFIG?.RAZORPAY_KEY_ID || null;
+     
     res.status(200).json(settings || {}); 
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -20,8 +24,11 @@ export const updatePlatformSettings = async (req, res) => {
       addressLine2,
       facebook,
       instagram,
-      twitter,
+      
       linkedin,
+      whatsapp,
+      twitter,
+      pinterest,
     } = req.body;
 
     let settings = await PlatformSettings.findOne();
@@ -38,6 +45,9 @@ export const updatePlatformSettings = async (req, res) => {
       instagram: instagram ?? settings.socialLinks?.instagram,
       twitter: twitter ?? settings.socialLinks?.twitter,
       linkedin: linkedin ?? settings.socialLinks?.linkedin,
+      whatsapp: whatsapp ?? settings.socialLinks?.whatsapp,
+      pinterest: pinterest ?? settings.socialLinks?.pinterest,
+      
     };
 
     // FIX: Handle Logo Upload for "brandLogo" object

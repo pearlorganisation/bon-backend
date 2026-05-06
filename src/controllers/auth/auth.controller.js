@@ -1,6 +1,6 @@
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
-import { sendSubAdminCreatedEmail } from "../../utils/mail/mailer.js";
+
 import asyncHandler from "../../middleware/asyncHandler.js";
 import { OTP } from "../../models/otp/otp.model.js";
 import Auth from "../../models/auth/auth.model.js";
@@ -8,7 +8,12 @@ import Customer from "../../models/Customer/customer.model.js";
 import Partner from "../../models/Partner/partner.model.js";
 import Sub_Admin from "../../models/Sub_Admin/sub_admin.model.js";
 import { generateOTP } from "../../utils/otpUtils.js";
-import { sendOtpEmail } from "../../utils/mail/mailer.js";
+import {
+  sendOtpEmail,
+  sendSubAdminCreatedEmail,
+  sendPasswordResetConfirmation,
+  sendWelcomeEmail,
+} from "../../utils/mail/EmailTemplates/emailTemplate.js";
 import jwt from "jsonwebtoken";
 import dayjs from "dayjs";
 import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.model.js";
@@ -249,6 +254,8 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
   await user.save();
   await OTP.deleteOne({ email, type: "REGISTER" });
 
+  sendWelcomeEmail(user.name,user.email,user.role).then(console.log("mail sent successfully")).catch(err=>console.log(err));
+
   setAuthCookies(res, accessToken, refreshToken);
 
   return successResponse(res, 200, "Email verified successfully!", {
@@ -284,7 +291,9 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
     { upsert: true, new: true }
   );
 
-  await sendOtpEmail(user.name, email, otp, type);
+   sendOtpEmail(user.name, email, otp, type)
+     .then(console.log("mail sent successfully"))
+     .catch((err) => console.log(err));
 
   return successResponse(res, 200, "OTP resent successfully");
 });
@@ -385,6 +394,10 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
 
   user.password = newPassword;
   await user.save();
+
+  sendPasswordResetConfirmation(user.name, user.email)
+    .then(console.log("mail sent successfully"))
+    .catch((err) => console.log(err));
 
   return successResponse(res, 200, "Password reset Successfully");
 });

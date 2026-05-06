@@ -552,7 +552,7 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
 export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   const user = req.user;
   const { propertyId } = req.params;
-
+  
   let query = { _id: propertyId };
 
   // Role-based ownership check
@@ -561,6 +561,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   } else if (user.role === "SUB_ADMIN") {
     query.subAdminId = user._id;
     query.partnerId = null;
+  }else if (user.role === "ADMIN") {
   } else {
     return next(
       new CustomError("You are not authorized to access this property", 403)
@@ -568,7 +569,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   }
 
   // Find property
-  const property = await Property.findOne(query);
+  const property = await Property.findOne(query).lean();
 
   if (!property) {
     return next(new CustomError("Property not found or access denied", 404));
@@ -872,7 +873,7 @@ async function getPlaceGeometry(placeId) {
       error: "placeId is required",
     };
   }
-
+ 
   try {
     const response = await axios.get(
       "https://maps.googleapis.com/maps/api/place/details/json",
@@ -923,7 +924,7 @@ async function getPlaceGeometry(placeId) {
   }
 }
 export const searchProperties = asyncHandler(async (req, res, next) => {
-  const {
+  let {
     placeId,
     checkIn,
     checkOut,
@@ -989,6 +990,8 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     throw new CustomError("Invalid guest Experience format", 400);
   }
   let response = {};
+   if (placeId == "null")placeId = null;
+   
   if (placeId) {
     response = await getPlaceGeometry(placeId);
     console.log("api", response);
