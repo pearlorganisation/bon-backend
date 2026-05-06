@@ -69,6 +69,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     PartnerEmail,
     policies,
     childrenCharge,
+    guestExperience,
   } = req.body;
 
   // ✅ Required fields
@@ -82,6 +83,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   // ✅ Parse JSON fields
   if (amenities) amenities = JSON.parse(amenities);
   if (policies) policies = JSON.parse(policies);
+  if (guestExperience) guestExperience = JSON.parse(guestExperience);
   // ✅ Upload images & videos
   let Images = [];
   let Videos = [];
@@ -182,6 +184,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
     Images,
     Videos,
     policies,
+    guestExperience,
   };
 
   if (role === "PARTNER") {
@@ -270,6 +273,9 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   }
   if (req.body?.amenities) {
     property.amenities = JSON.parse(req.body.amenities); // { type: "Point", coordinates: [lng, lat] }
+  }
+  if (req.body?.guestExperience) {
+    property.guestExperience = JSON.parse(req.body.guestExperience); // { type: "Point", coordinates: [lng, lat] }
   }
 
   if (req.body?.policies) {
@@ -525,6 +531,19 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Unauthorized access", 403));
   }
 
+  if (req.query.verified) {
+    const statusMap = {
+      'Accepted': 'approved',
+      'Rejected': 'rejected'
+    };
+    if (statusMap[req.query.verified]) {
+      query.verified = statusMap[req.query.verified];
+    }
+  }
+  if (req.query.propertyType && req.query.propertyType.toLowerCase() !== 'all') {
+    query.propertyType = req.query.propertyType.toLowerCase();
+  }
+
   const a = Property.find(query)
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -546,7 +565,7 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
 export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   const user = req.user;
   const { propertyId } = req.params;
-
+  
   let query = { _id: propertyId };
 
   // Role-based ownership check
@@ -555,6 +574,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   } else if (user.role === "SUB_ADMIN") {
     query.subAdminId = user._id;
     query.partnerId = null;
+  }else if (user.role === "ADMIN") {
   } else {
     return next(
       new CustomError("You are not authorized to access this property", 403)
@@ -562,7 +582,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   }
 
   // Find property
-  const property = await Property.findOne(query);
+  const property = await Property.findOne(query).lean();
 
   if (!property) {
     return next(new CustomError("Property not found or access denied", 404));
@@ -866,7 +886,7 @@ async function getPlaceGeometry(placeId) {
       error: "placeId is required",
     };
   }
-
+ 
   try {
     const response = await axios.get(
       "https://maps.googleapis.com/maps/api/place/details/json",
@@ -917,7 +937,7 @@ async function getPlaceGeometry(placeId) {
   }
 }
 export const searchProperties = asyncHandler(async (req, res, next) => {
-  const {
+  let {
     placeId,
     checkIn,
     checkOut,
@@ -926,6 +946,16 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     propertyId,
     adults = 1,
     childrens,
+    min,
+    max,
+    roomType,
+    amenities,
+    mealPlans,
+    policies, // ["free-cancellation","instant-booking","pay-at-hotel","pet-friendly"]
+    guestExperience, //["family", "group", "workation", "digital_nomad", "solo","couple"]
+    distance, // "0-1","1-3","3-5","5+"
+    lat,
+    lng,
   } = req.query;
 
   if (!checkIn || !checkOut) {
@@ -939,7 +969,42 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
   const dates = getDatesBetween(checkInDate, checkOutDate);
   console.log("dates", dates);
+  let parsedGuestExperince = [];
+  let parsedPolicies = [];
+  let policiesObj = {};
+
+  try {
+     parsedPolicies = policies ? JSON.parse(policies) : [];
+
+    if (parsedPolicies.includes("free-cancellation")) {
+      policiesObj["policies.cancellationPolicy"] = {
+        $elemMatch: { refundPercentage: { $gt: 0 } },
+      };
+    }
+
+    if (parsedPolicies.includes("pet-friendly")) {
+      policiesObj["policies.petPolicy"] = { $exists: true, $ne: "" };
+    }
+
+    if (parsedPolicies.includes("instant-booking")) {
+      policiesObj["paymentModes.PAY_NOW"] = true;
+    }
+
+    if (parsedPolicies.includes("pay-at-hotel")) {
+      policiesObj["paymentModes.PAY_ON_ARRIVAL"] = true;
+    }
+  } catch (err) {
+    throw new CustomError("Invalid policies format", 400);
+  }
+
+  try {
+    parsedGuestExperince = guestExperience ? JSON.parse(guestExperience) : [];
+  } catch (error) {
+    throw new CustomError("Invalid guest Experience format", 400);
+  }
   let response = {};
+   if (placeId == "null")placeId = null;
+   
   if (placeId) {
     response = await getPlaceGeometry(placeId);
     console.log("api", response);
@@ -953,23 +1018,59 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const northEast = response?.viewport ? response.viewport.northeast : 0;
   const southWest = response?.viewport ? response.viewport.southwest : 0;
   // 1️ Find properties
-  const propertyPipeline = [
+
+  // ✅ GEO stage (optional)
+  let geoStage = null;
+
+  if (lat && lng && distance) {
+    const distanceMap = {
+      "0-1": [0, 1000],
+      "1-3": [1000, 3000],
+      "3-5": [3000, 5000],
+      "5+": [5000, null],
+    };
+
+    const selected = distanceMap[distance];
+
+    if (selected) {
+      const [min, max] = selected;
+
+      geoStage = {
+        $geoNear: {
+          near: {
+            type: "Point",
+            coordinates: [Number(lng), Number(lat)],
+          },
+          distanceField: "distance",
+          spherical: true,
+          ...(min && { minDistance: min }),
+          ...(max && { maxDistance: max }),
+        },
+      };
+    }
+  }
+  const restPipeline = [
     {
       $match: {
         status: "active",
         verified: "approved",
         ...(propertyType && { propertyType }),
         ...(propertyId && { _id: new mongoose.Types.ObjectId(propertyId) }),
-        ...(placeId && {
-          geoLocation: {
-            $geoWithin: {
-              $box: [
-                [southWest.lng, southWest.lat], // bottom-left
-                [northEast.lng, northEast.lat], // top-right
-              ],
-            },
-          },
+        ...policiesObj,
+        ...(parsedGuestExperince?.length && {
+          guestExperience: { $in: parsedGuestExperince },
         }),
+        ...(placeId &&
+          !distance && {
+            geoLocation: {
+              $geoWithin: {
+                $box: [
+                  [southWest.lng, southWest.lat], // bottom-left
+                  [northEast.lng, northEast.lat], // top-right
+                ],
+              },
+            },
+          }),
       },
     },
     // 2 Join Partner
@@ -1021,6 +1122,10 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     },
   ];
 
+  const propertyPipeline = [
+    ...(geoStage ? [geoStage] : []), // only if exists
+    ...restPipeline,
+  ];
   const properties = await Property.aggregate(propertyPipeline);
   if (!properties.length) {
     return successResponse(res, 200, "No properties found", []);
@@ -1029,6 +1134,8 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const propertyIds = properties.map((p) => p._id);
 
   let parsedChildren = [];
+  let parsedAmenities = [];
+  let parsedMealPlans = [];
 
   try {
     parsedChildren = childrens ? JSON.parse(childrens) : [];
@@ -1036,17 +1143,29 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     throw new CustomError("Invalid childrens format", 400);
   }
 
-  const totalChildren = parsedChildren.length;
-
   const childConfigMap = {}; // propertyId → config
 
   properties.forEach((p) => {
     childConfigMap[p._id] = p.childrenCharge;
   });
 
+  try {
+    parsedAmenities = amenities ? JSON.parse(amenities) : [];
+  } catch (err) {
+    throw new CustomError("Invalid amenities format", 400);
+  }
+  try {
+    parsedMealPlans = mealPlans ? JSON.parse(mealPlans) : [];
+  } catch (err) {
+    throw new CustomError("Invalid meael Plans format", 400);
+  }
+
   // 2️ Get rooms
   const roomsList = await Room.find({
     propertyId: { $in: propertyIds },
+    ...(roomType && { typeOfRoom: roomType }),
+    ...(parsedAmenities?.length && { amenities: { $all: parsedAmenities } }),
+    ...(parsedMealPlans?.length && { mealPlans: { $all: parsedMealPlans } }),
   }).lean();
 
   if (!roomsList.length) {
@@ -1065,27 +1184,19 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   const inventoryMap = {};
   for (const inv of inventories) {
     const roomKey = inv.roomId.toString();
-    if (!inventoryMap[roomKey]) inventoryMap[roomKey] = {};
-    inventoryMap[roomKey][inv.date.toISOString()] = inv.bookedRooms;
+    if (!inventoryMap[roomKey]) {
+      inventoryMap[roomKey] = {};
+    }
+   inventoryMap[roomKey][inv.date.toISOString()] = {
+     booked: inv.bookedRooms,
+     total: inv.totalRooms,
+   };
   }
 
   // 5️ Filter rooms
   const propertyRoomMap = {};
 
   for (const room of roomsList) {
-    let maxBooked = 0;
-
-    for (const date of dates) {
-      const booked =
-        inventoryMap[room._id.toString()]?.[date.toISOString()] || 0;
-      maxBooked = Math.max(maxBooked, booked);
-      console.log(maxBooked, date.toISOString());
-    }
-
-    const availableRooms = room.numberOfRooms - maxBooked;
-    /// console.log(availableRooms);
-    if (availableRooms < rooms) continue;
-
     const propertyChildConfig = childConfigMap[room.propertyId];
 
     let ChildTreatAsAdultCount = 0;
@@ -1096,12 +1207,34 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
       ).length;
     }
 
-  
-    const effectiveAdults = Number(adults || 0) + ChildTreatAsAdultCount; 
+    const effectiveAdults = Number(adults || 0) + ChildTreatAsAdultCount;
     const totalCapacity = room.capacity * rooms;
+    const TOTAL_GUESTS =
+      effectiveAdults + (parsedChildren.length - ChildTreatAsAdultCount);
     // filter
-    if (effectiveAdults > totalCapacity) continue; //means total person is  more than rooms capacity
+    if (TOTAL_GUESTS > totalCapacity + 5) continue; //means total person is  more than rooms capacity + 5
 
+    if (min && Number(min) > room.pricePerNight) continue;
+    if (max && Number(max) < room.pricePerNight) continue;
+
+    // room capacity logic
+
+   let availableRooms = Infinity;
+
+   for (const date of dates) {
+     const inv = inventoryMap[room._id.toString()]?.[date.toISOString()] || {};
+
+     const booked = inv.booked || 0;
+     const total = Math.max(inv.total || 0, room.numberOfRooms);
+
+     const available = total - booked;
+
+     availableRooms = Math.min(availableRooms, available);
+   }
+    /// console.log(availableRooms);
+    if (availableRooms < rooms) continue;
+
+    //add room to its property
     if (!propertyRoomMap[room.propertyId]) {
       propertyRoomMap[room.propertyId] = [];
     }

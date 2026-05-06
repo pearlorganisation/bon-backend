@@ -4,8 +4,7 @@ import CustomError from "../../../utils/error/customError.js";
 import successResponse from "../../../utils/error/successResponse.js";
 import { sendEmail } from "../../../utils/mail/mailer.js";
 import SupportEmail from "./supportEmail.model.js";
-import { supportMailToAdmin } from "../../../utils/mail/mailer.js";
-
+import { supportMailToAdmin } from "../../../utils/mail/EmailTemplates/emailTemplate.js";
 
 export const sendSupportEmail = asyncHandler(async (req, res) => {
   const { email, message } = req.body;
@@ -38,14 +37,19 @@ export const sendSupportEmail = asyncHandler(async (req, res) => {
   );
 });
 
-
-  // Update email status
+// Update email status
 export const updateEmailStatus = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
   // 1️ Validate status
-  const validStatuses = ["PENDING", "IN_PROGRESS", "COMPLETED", "RESOLVED","FAILED"];
+  const validStatuses = [
+    "PENDING",
+    "IN_PROGRESS",
+    "COMPLETED",
+    "RESOLVED",
+    "FAILED",
+  ];
 
   if (!validStatuses.includes(status)) {
     throw new CustomError("Invalid email status", 400);
@@ -62,11 +66,9 @@ export const updateEmailStatus = asyncHandler(async (req, res) => {
   }
 
   // 4️⃣ Update DB
-  const updatedEmail = await SupportEmail.findByIdAndUpdate(
-    id,
-    updateData,
-    { new: true }
-  );
+  const updatedEmail = await SupportEmail.findByIdAndUpdate(id, updateData, {
+    new: true,
+  });
 
   if (!updatedEmail) {
     throw new CustomError("Support email not found", 404);
@@ -81,15 +83,19 @@ export const updateEmailStatus = asyncHandler(async (req, res) => {
   );
 });
 
-
 /**
  * Get all support emails
  */
 export const getAllEmails = asyncHandler(async (req, res, next) => {
   const emails = await SupportEmail.find()
-    .populate("userId", "name email")       // optional, include user info
-    .populate("handledBy", "name email")   // optional, include handler info
-    .sort({ createdAt: -1 });              // latest first
+    .populate("userId", "name email") // optional, include user info
+    .populate("handledBy", "name email") // optional, include handler info
+    .sort({ createdAt: -1 }); // latest first
 
-  return successResponse(res, 200, "Support emails fetched successfully", emails);
+  return successResponse(
+    res,
+    200,
+    "Support emails fetched successfully",
+    emails
+  );
 });
