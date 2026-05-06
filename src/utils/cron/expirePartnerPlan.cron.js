@@ -1,10 +1,10 @@
 import cron from "node-cron";
-import PartnerPlan from "../../models/Partner/PartnerPlan.model.js"
+import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 
- const startPartnerPlanCron = () => {
-    
+const startPartnerPlanCron = () => {
   cron.schedule(
     "5 0 * * *",
+    //"* * * * *",
     async () => {
       try {
         const now = new Date();

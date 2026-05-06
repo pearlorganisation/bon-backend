@@ -1,6 +1,6 @@
 import successResponse from "../../utils/error/successResponse.js";
 import CustomError from "../../utils/error/customError.js";
-import { sendSubAdminCreatedEmail } from "../../utils/mail/mailer.js";
+
 import asyncHandler from "../../middleware/asyncHandler.js";
 import { OTP } from "../../models/otp/otp.model.js";
 import Auth from "../../models/auth/auth.model.js";
@@ -8,12 +8,17 @@ import Customer from "../../models/Customer/customer.model.js";
 import Partner from "../../models/Partner/partner.model.js";
 import Sub_Admin from "../../models/Sub_Admin/sub_admin.model.js";
 import { generateOTP } from "../../utils/otpUtils.js";
-import { sendOtpEmail } from "../../utils/mail/mailer.js";
+import {
+  sendOtpEmail,
+  sendSubAdminCreatedEmail,
+  sendPasswordResetConfirmation,
+  sendWelcomeEmail,
+} from "../../utils/mail/EmailTemplates/emailTemplate.js";
 import jwt from "jsonwebtoken";
 import dayjs from "dayjs";
 import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.model.js";
 import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
-export const register = asyncHandler(async (req, res, next) => {
+export const register = asyncHandler(async (req, res, next) => {         
   const { email, name, phoneNumber, password, role } = req?.body;
 
   const Roles = ["CUSTOMER", "PARTNER"];
@@ -69,11 +74,11 @@ export const register = asyncHandler(async (req, res, next) => {
   let newUser = null;
   try {
     // A. Create OTP Record first
-     await OTP.findOneAndReplace(
-       { email, type: "REGISTER" },
-       { otp, email, type: "REGISTER" },
-       { upsert: true, new: true }
-     );
+    await OTP.findOneAndReplace(
+      { email, type: "REGISTER" },
+      { otp, email, type: "REGISTER" },
+      { upsert: true, new: true }
+    );
 
     // B. Create User (Force isVerified: false)
     newUser = await Auth.create({
@@ -81,18 +86,20 @@ export const register = asyncHandler(async (req, res, next) => {
       isVerified: false,
     });
 
-    if (role === "CUSTOMER") {
-      await Customer.create({
-        userId: newUser._id,
-      });
-    } else {
-      await Partner.create({
-        userId: newUser._id,
-      });
-    }
+    // if (role === "CUSTOMER") {
+    //   await Customer.create({
+    //     userId: newUser._id,
+    //   });
+    // } else {
+    //   await Partner.create({
+    //     userId: newUser._id,
+    //   });
+    // }
 
     // C. Send OTP via email
-    await sendOtpEmail(name, email, otp, "REGISTER");
+  sendOtpEmail(name, email, otp, "REGISTER").catch((err) =>
+    console.error("Email failed:", err)
+  );
 
     return successResponse(
       res,
@@ -131,7 +138,7 @@ export const login = asyncHandler(async (req, res, next) => {
 
   const isPasswordValid = await user.isPasswordCorrect(password);
   if (!isPasswordValid) {
-    throw new CustomError("Invalid credentials", 401);
+    throw new CustomError("Invalid credentials", 404);
   }
 
   const accessToken = user.generateAccessToken();
@@ -229,6 +236,16 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
     await OTP.deleteOne({ email, type: "REGISTER" });
     return next(new CustomError("User already verified", 400));
   }
+ console.log(user);
+  if (user.role === "CUSTOMER") {
+    await Customer.create({
+      userId: user._id,
+    });
+  } else {
+    await Partner.create({
+      userId: user._id,
+    });
+  }
 
   user.isVerified = true;
   const accessToken = user.generateAccessToken();
@@ -236,6 +253,8 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
   user.refresh_token = refreshToken;
   await user.save();
   await OTP.deleteOne({ email, type: "REGISTER" });
+
+  sendWelcomeEmail(user.name,user.email,user.role).then(console.log("mail sent successfully")).catch(err=>console.log(err));
 
   setAuthCookies(res, accessToken, refreshToken);
 
@@ -271,7 +290,9 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
     { upsert: true, new: true }
   );
 
-  await sendOtpEmail(user.name, email, otp, type);
+   sendOtpEmail(user.name, email, otp, type)
+     .then(console.log("mail sent successfully"))
+     .catch((err) => console.log(err));
 
   return successResponse(res, 200, "OTP resent successfully");
 });
@@ -371,6 +392,10 @@ export const resetPassword = asyncHandler(async (req, res, next) => {
 
   user.password = newPassword;
   await user.save();
+
+  sendPasswordResetConfirmation(user.name, user.email)
+    .then(console.log("mail sent successfully"))
+    .catch((err) => console.log(err));
 
   return successResponse(res, 200, "Password reset Successfully");
 });

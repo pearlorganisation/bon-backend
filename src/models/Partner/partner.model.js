@@ -25,16 +25,15 @@ const partnerSchema = new mongoose.Schema(
       },
     ],
 
-    razorpay: {
-      contactId: String,
-      fundAccountId: String,
-    },
+    // razorpay: {
+    //   contactId: String,
+    //   fundAccountId: String,
+    // },
     bankDetails: {
       accountHolderName: String,
       accountNumber: String,
       ifscCode: String,
       bankName: String,
-      verifiedAt: Date,
     },
     isPanVerified:{ type: Boolean, default: false},  //for pan verification 
     isVerified: { type: Boolean, default: false }, //for  complete partner pan verification and  fund account

@@ -22,10 +22,20 @@ const AdminSchema = new mongoose.Schema(
       },
     ],
 
-    // gst which admin pay to govt for services like on admin booking commssion  and on subscription plan 
+    // gst which admin pay to govt for services like on admin booking commssion  and on subscription plan
     gstOnServices: {
       type: Number,
       default: 18,
+    },
+
+    GSTIN: {
+      type: String,
+      default: "N/A",
+    },
+    RAZORPAY_CONFIG: {
+      RAZORPAY_KEY_ID: String,
+      RAZORPAY_KEY_SECRET : String,
+      RAZORPAY_WEBHOOK_SECRET: String,
     },
   },
   { timestamps: true }
