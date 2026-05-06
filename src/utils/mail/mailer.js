@@ -26,7 +26,7 @@ export const sendSupportMail = async ({
   subject,
   html,
   replyTo,
-  cc, 
+  cc,
 }) => {
   try {
     const info = await transporter.sendMail({
@@ -35,7 +35,7 @@ export const sendSupportMail = async ({
       subject,
       html,
       replyTo, // ✅ allows admin to reply to customer
-      cc
+      cc,
     });
 
     console.log("📧 Support mail sent:", info.messageId);
@@ -100,7 +100,7 @@ export const supportMailToAdmin = async ({ customerEmail, message }) => {
   `;
 
   return sendSupportMail({
-    from:`"Support System" <${process.env.NODEMAILER_EMAIL_USER}>`, // ADMIN sender
+    from: `"Support System" <${process.env.NODEMAILER_EMAIL_USER}>`, // ADMIN sender
     to: process.env.NODEMAILER_EMAIL_USER, // ADMIN receives
     replyTo: customerEmail, // ✅ reply goes to customer
     subject,
@@ -157,15 +157,10 @@ export const sendOtpEmail = async (name, email, otp, type = "REGISTER") => {
   return sendEmail(email, subject, html);
 };
 
-
 /* -------------------------------------------------------------------------- */
 /*                 SUB ADMIN ACCOUNT CREATED (WITH PASSWORD)                   */
 /* -------------------------------------------------------------------------- */
-export const sendSubAdminCreatedEmail = async (
-  name,
-  email,
-  Password
-) => {
+export const sendSubAdminCreatedEmail = async (name, email, Password) => {
   const subject = "Your Bonfire Sub-Admin Account Details";
 
   const html = `

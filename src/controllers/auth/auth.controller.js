@@ -13,7 +13,7 @@ import jwt from "jsonwebtoken";
 import dayjs from "dayjs";
 import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.model.js";
 import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
-export const register = asyncHandler(async (req, res, next) => {         
+export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password, role } = req?.body;
 
   const Roles = ["CUSTOMER", "PARTNER"];
@@ -92,9 +92,9 @@ export const register = asyncHandler(async (req, res, next) => {
     // }
 
     // C. Send OTP via email
-  sendOtpEmail(name, email, otp, "REGISTER").catch((err) =>
-    console.error("Email failed:", err)
-  );
+    sendOtpEmail(name, email, otp, "REGISTER").catch((err) =>
+      console.error("Email failed:", err)
+    );
 
     return successResponse(
       res,
@@ -231,7 +231,7 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
     await OTP.deleteOne({ email, type: "REGISTER" });
     return next(new CustomError("User already verified", 400));
   }
- console.log(user);
+  console.log(user);
   if (user.role === "CUSTOMER") {
     await Customer.create({
       userId: user._id,
@@ -265,6 +265,7 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
 });
 
 export const resendOtp = asyncHandler(async (req, res, next) => {
+
   const { email, type } = req.body;
 
   if (!email || !type) {
@@ -287,6 +288,7 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
 
   return successResponse(res, 200, "OTP resent successfully");
 });
+
 
 export const logout = asyncHandler(async (req, res, next) => {
   const userId = req.user._id;
@@ -350,7 +352,6 @@ export const refreshToken = asyncHandler(async (req, res, next) => {
 });
 
 export const forgotPassword = asyncHandler(async (req, res, next) => {
-  
   const { email } = req.body;
 
   if (!email) return next(new CustomError("Email is required", 400));

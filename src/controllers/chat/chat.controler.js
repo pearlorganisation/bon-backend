@@ -414,6 +414,7 @@ export const sendMessageWithFiles = async (req, res, next) => {
 
     // Emit socket event
     const socketId = onlineUsers.get(userId);
+    console.log("data for recievnerer ", data);
     io.to(socketId).emit("receive_message", data);
 
     const receiverId =

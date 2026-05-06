@@ -74,7 +74,6 @@ route.get(
   getPropertyDetailsById
 );
 
-
 // plan and subscription
 route.get(
   "/get-patform-plans",
@@ -94,17 +93,17 @@ route.post(
 route.put(
   "/update-subscription-plan/:planId",
   authorizeRoles("ADMIN"),
- updateSubscriptionPlan
+  updateSubscriptionPlan
 );
 
-route.post("/upsert-gst-config",authorizeRoles("ADMIN"),upsertGSTConfig);
+route.post("/upsert-gst-config", authorizeRoles("ADMIN"), upsertGSTConfig);
 route.post(
   "/upsert-razorpay-config",
-  authorizeRoles("ADMIN", upsertRazorpayConfig)
+  authorizeRoles("ADMIN"),
+  upsertRazorpayConfig
 );
 
-
-//payout apis 
+//payout apis
 
 // route.post(
 //   "/release-partner-payout",
@@ -113,7 +112,7 @@ route.post(
 // );
 
 route.post(
-  "/confirm-partner-payout",  //admin ne partner ko pasie pay kardiya h
+  "/confirm-partner-payout", //admin ne partner ko pasie pay kardiya h
   authorizeRoles("ADMIN"),
   confirmPartnerMonthlyPayout
 );
@@ -123,8 +122,6 @@ route.post(
   authorizeRoles("ADMIN"),
   confirmAdminMonthlyPayout
 );
-
-
 
 // admin  Payment & Finance dashborad  api
 route.get(
@@ -184,7 +181,5 @@ route.get(
   authorizeRoles("ADMIN"),
   getMonthlyBookingsData
 );
-
-
 
 export default route;

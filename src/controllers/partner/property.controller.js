@@ -960,7 +960,7 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
   let policiesObj = {};
 
   try {
-     parsedPolicies = policies ? JSON.parse(policies) : [];
+    parsedPolicies = policies ? JSON.parse(policies) : [];
 
     if (parsedPolicies.includes("free-cancellation")) {
       policiesObj["policies.cancellationPolicy"] = {
@@ -1171,10 +1171,10 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     if (!inventoryMap[roomKey]) {
       inventoryMap[roomKey] = {};
     }
-   inventoryMap[roomKey][inv.date.toISOString()] = {
-     booked: inv.bookedRooms,
-     total: inv.totalRooms,
-   };
+    inventoryMap[roomKey][inv.date.toISOString()] = {
+      booked: inv.bookedRooms,
+      total: inv.totalRooms,
+    };
   }
 
   // 5️ Filter rooms
@@ -1203,18 +1203,18 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
     // room capacity logic
 
-   let availableRooms = Infinity;
+    let availableRooms = Infinity;
 
-   for (const date of dates) {
-     const inv = inventoryMap[room._id.toString()]?.[date.toISOString()] || {};
+    for (const date of dates) {
+      const inv = inventoryMap[room._id.toString()]?.[date.toISOString()] || {};
 
-     const booked = inv.booked || 0;
-     const total = Math.max(inv.total || 0, room.numberOfRooms);
+      const booked = inv.booked || 0;
+      const total = Math.max(inv.total || 0, room.numberOfRooms);
 
-     const available = total - booked;
+      const available = total - booked;
 
-     availableRooms = Math.min(availableRooms, available);
-   }
+      availableRooms = Math.min(availableRooms, available);
+    }
     /// console.log(availableRooms);
     if (availableRooms < rooms) continue;
 

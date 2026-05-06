@@ -26,15 +26,16 @@ const registerChatHandlers = (io, socket) => {
    * Send message logic
    */
   socket.on("send_message", async (data) => {
+    console.log("send mesage call ", data);
     try {
-      const { conversationId, text ,attachments=[] } = data;
+      const { conversationId, text, attachments = [] } = data;
+
+      console.log("send message call ", text);
 
       if (!conversationId) return;
 
-
       const conversation = await Conversation.findById(conversationId);
       if (!conversation) return;
-
 
       // Authorization
       const userId = socket.user.id.toString();
@@ -67,7 +68,6 @@ const registerChatHandlers = (io, socket) => {
 
       // Last message preview
       let lastMessagePreview = text;
-    
 
       conversation.lastMessage = lastMessagePreview;
       conversation.lastMessageAt = new Date();
@@ -82,7 +82,6 @@ const registerChatHandlers = (io, socket) => {
         const receiver = await User.findById(receiverId);
 
         let notificationBody = text?.substring(0, 40);
-
 
         // await sendFirebaseNotification({
         //   token: receiver.fcmToken,

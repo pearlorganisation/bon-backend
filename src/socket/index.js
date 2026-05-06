@@ -6,7 +6,7 @@ import ConversationModel from "../models/Chat/Conversation.model.js";
 
 let io;
 
-const initSocket = (server,app) => {
+const initSocket = (server, app) => {
   io = new Server(server, {
     cors: {
       origin: "*", // restrict in production

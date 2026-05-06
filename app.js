@@ -54,6 +54,6 @@ app.use(errorHandler);
 
 const server = http.createServer(app);
 
-initSocket(server,app);
+initSocket(server, app);
 
 export { app, server };

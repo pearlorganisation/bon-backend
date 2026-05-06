@@ -35,6 +35,6 @@ router.use("/blog", BlogRouter);
 router.use("/", UserRouter);
 router.use("/chat", chatRoute);
 router.use("/platform-setting", PlatformSettingRouter);
-router.use("/tours",tourRouter);
+router.use("/tours", tourRouter);
 
 export default router;
