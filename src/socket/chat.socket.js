@@ -10,7 +10,7 @@ const registerChatHandlers = (io, socket) => {
   const authenticatedUserId = socket.user.id.toString();
   socket.join(authenticatedUserId);
   console.log(
-    `User ${authenticatedUserId} joined their private notification room`
+    `User ${authenticatedUserId} joined their private notification room`,
   );
 
   /**
@@ -73,7 +73,7 @@ const registerChatHandlers = (io, socket) => {
         conversation.unreadCountCustomer += 1;
       }
 
-      socket.to(conversationId).emit("receive_message", newMessage);
+      io.to(conversationId).emit("receive_message", newMessage);
 
       await conversation.save();
 
@@ -84,7 +84,8 @@ const registerChatHandlers = (io, socket) => {
           attachments[0].type === "image" ? "📷 Image" : "📎 File";
       }
 
-      conversation.lastMessage = lastMessagePreview;
+      conversation.lastMessage =
+        text || (attachments.length > 0 ? "Attachment" : "");
       conversation.lastMessageAt = new Date();
 
       // 🔔 Firebase notification (receiver offline)
@@ -100,7 +101,7 @@ const registerChatHandlers = (io, socket) => {
 
         if (!text && attachments.length) {
           const imageCount = attachments.filter(
-            (a) => a.type === "image"
+            (a) => a.type === "image",
           ).length;
           const fileCount = attachments.filter((a) => a.type === "file").length;
 
@@ -140,7 +141,7 @@ const registerChatHandlers = (io, socket) => {
           senderId: { $ne: socket.user.id },
           seenBy: { $ne: socket.user.id },
         },
-        { $push: { seenBy: socket.user.id } }
+        { $push: { seenBy: socket.user.id } },
       );
 
       if (socket.user.role === "CUSTOMER") {

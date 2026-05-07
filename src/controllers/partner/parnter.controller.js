@@ -5,7 +5,7 @@ import Partner from "../../models/Partner/partner.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import successResponse from "../../utils/error/successResponse.js";
-import { razorpay,getRazorpayInstance } from "../../config/razorpayConfig.js";
+import { razorpay, getRazorpayInstance } from "../../config/razorpayConfig.js";
 import axios from "axios";
 import { configDotenv } from "dotenv";
 import Admin from "../../models/Admin/admin.model.js";
@@ -21,6 +21,7 @@ import ManualRoomBlock from "../../models/Listing/manualRoomBlock.model.js";
 import mongoose from "mongoose";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 import { createParterPlanInvoice } from "../../utils/invoive/createInvoice.js";
+import { sendAccountVerificationSuccess } from "../../utils/mail/EmailTemplates/emailTemplate.js";
 
 configDotenv();
 const round = (num) => Math.round(num * 100) / 100;
@@ -590,7 +591,7 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
   // 6. create razorpay order
   try {
-     const {razorpay} = await getRazorpayInstance();
+    const { razorpay } = await getRazorpayInstance();
     const order = await razorpay.orders.create({
       amount: Math.round(totalAmount * 100),
       currency: "INR",
@@ -629,24 +630,20 @@ export const buyNewSubscriptionPlan = asyncHandler(async (req, res, next) => {
       currency: "INR",
     });
   } catch (error) {
-    
-       if (error instanceof CustomError) {
-         return next(error);
-       }
+    if (error instanceof CustomError) {
+      return next(error);
+    }
 
-       if (error?.error) {
-       return next(
-         new CustomError(
-           err?.error?.description || "payment gateway error",
-           err.statusCode || 502
-         )
-       );
-       }
+    if (error?.error) {
+      return next(
+        new CustomError(
+          err?.error?.description || "payment gateway error",
+          err.statusCode || 502,
+        ),
+      );
+    }
 
-       throw new CustomError(
-         "internal server error ",
-         500
-       );
+    throw new CustomError("internal server error ", 500);
   }
 });
 
@@ -694,7 +691,7 @@ export const subscriptionWebhookController = asyncHandler(
 
 export const getMyPlans = asyncHandler(async (req, res, next) => {
   let partnerId = req.user._id;
-  if(req.user.role=="ADMIN"){
+  if (req.user.role == "ADMIN") {
     partnerId = req.query.partnerId;
   }
   console.log(partnerId);
@@ -703,7 +700,7 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
     planStatus: { $in: ["ACTIVE", "UPCOMING"] },
   })
     .sort({ createdAt: 1 })
-    .populate("subscriptionPlanId","name")
+    .populate("subscriptionPlanId", "name")
     .populate("invoiceId");
 
   successResponse(res, 200, "successfully fetched current plans", { plans });
@@ -1519,7 +1516,9 @@ export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
     partnerId,
     payoutMonth,
     payoutYear,
-  }).populate("partnerWallet.invoiceId").lean();
+  })
+    .populate("partnerWallet.invoiceId")
+    .lean();
 
   if (!payout) {
     return next(
