@@ -531,6 +531,19 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Unauthorized access", 403));
   }
 
+  if (req.query.verified) {
+    const statusMap = {
+      'Accepted': 'approved',
+      'Rejected': 'rejected'
+    };
+    if (statusMap[req.query.verified]) {
+      query.verified = statusMap[req.query.verified];
+    }
+  }
+  if (req.query.propertyType && req.query.propertyType.toLowerCase() !== 'all') {
+    query.propertyType = req.query.propertyType.toLowerCase();
+  }
+
   const a = Property.find(query)
     .sort({ createdAt: -1 })
     .skip(skip)
