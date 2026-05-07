@@ -1105,21 +1105,33 @@ export const getBookingById = asyncHandler(async (req, res, next) => {
   }
 
   const booking = await Booking.findById(bookingId)
-    .populate({ path: "propertyId", select: "name policies" })
-    .populate({ path: "userId", select: "name" })
-    .populate({ path: "rooms.roomId", select: "name typeOfRoom" })
-    .populate({ path: "invoiceId" });
+    .populate({ path: "propertyId", select: "name policies images address city state contactNumber email cancellationPolicy childrenCharge"  })
+    .populate({ path: "userId",select: "name email phone profilePicture"})
+    .populate({ path: "rooms.roomId",select: "name typeOfRoom images amenities description capacity" })
+    .populate({path: "invoiceId" })
+    .populate({  path: "cancellation.cancelledBy",select: "name role" });
 
   if (!booking) {
     return next(new CustomError("Booking not found", 404));
   }
   if (req.user.role === "CUSTOMER") {
-    if (booking.userId.toString() !== user._id.toString()) {
-      return next(new CustomError("not allowed ", 401));
+    if (booking.userId._id.toString() !== req.user._id.toString()) {
+      return next(new CustomError("Not authorized to view this booking", 401));
     }
   }
+  if (req.user.role === "PARTNER") {
+      if (booking.propertyId.partnerId?.toString() !== req.user._id.toString()) {
+          // Note: This requires 'partnerId' to be selected in propertyId population above
+          return next(new CustomError("Not authorized to view this property's bookings", 401));
+      }
+  }
 
-  successResponse(res, 200, "successfully fetch booking ", booking);
+  const review = await Review.findOne({ bookingId: booking._id });
+  
+  const bookingData = booking.toObject();
+  bookingData.review = review || null;
+
+  successResponse(res, 200, "Booking fetched successfully", bookingData);
 });
 
 export const cancelBooking = asyncHandler(async (req, res, next) => {
@@ -1136,7 +1148,8 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
     }
 
     const booking = await Booking.findById(bookingId)
-      .populate("propertyId", "cancellationPolicy")
+      .populate("propertyId", "partnerId  policies")
+      .populate("priceBreakdown.partnerPlanId")
       .session(session);
 
     if (!booking) {
@@ -1170,7 +1183,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         refundPercentage = 100;
       } else {
         refundPercentage = calculateRefundPercentage({
-          cancellationPolicy: booking.propertyId.cancellationPolicy,
+          cancellationPolicy: booking.propertyId?.policies?.cancellationPolicy,
           checkInDate: booking.checkInDate,
         });
         // refundPercentage = 100;
@@ -1184,7 +1197,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         await splitCancellationMoney(booking, retainedAmount);
       }
     }
-
+   
     // 2️ Release inventory (CRITICAL)
     await releaseInventory(booking);
 
@@ -1820,11 +1833,11 @@ export const splitMoney = async (booking, partnerId) => {
 };
 export const splitCancellationMoney = async (booking, retainedAmount) => {
   try {
-    if (!booking?.partnerPlan) {
-      throw new Error("Partner plan not found");
-    }
+  if (typeof booking?.priceBreakdown?.partnerPlanId !== "object") { 
+    throw new Error("Partner plan not found"); 
+}
 
-    const partnerPlan = booking.partnerPlan;
+    const partnerPlan = booking?.priceBreakdown?.partnerPlanId ;
 
     const totalPrice = booking.totalPrice;
     const totalGST = booking.priceBreakdown.gst_amount || 0;
@@ -1944,3 +1957,120 @@ export const releaseInventory = async (booking) => {
     throw error;
   }
 };
+
+
+
+export const customerDashboard = asyncHandler(async (req, res, next) => {
+  const userId = req.user._id;
+  
+  // Dashboard stats
+  const stats = await Booking.aggregate([
+    {
+      $match: {
+        userId: userId,
+      },
+    },
+
+    {
+      $group: {
+        _id: null,
+
+        // Total bookings
+        totalBookings: {
+          $sum: 1,
+        },
+
+        // Confirmed bookings
+        confirmedBookings: {
+          $sum: {
+            $cond: [
+              {
+                $in: [
+                  "$status",
+                  ["confirmed", "auto_settled", "no-show", "checkIn"],
+                ],
+              },
+              1,
+              0,
+            ],
+          },
+        },
+
+        // Pending bookings
+        pendingBookings: {
+          $sum: {
+            $cond: [{ $eq: ["$status", "pending"] }, 1, 0],
+          },
+        },
+        expiredBookings: {
+          $sum: {
+            $cond: [{ $eq: ["$status", "expired"] }, 1, 0],
+          },
+        },
+
+        // Cancelled bookings
+        cancelledBookings: {
+          $sum: {
+            $cond: [{ $eq: ["$status", "cancelled"] }, 1, 0],
+          },
+        },
+
+        // Refund pending
+        refundPendingBookings: {
+          $sum: {
+            $cond: [{ $eq: ["$paymentStatus", "refund_pending"] }, 1, 0],
+          },
+        },
+
+        // Refunded bookings
+        refundedBookings: {
+          $sum: {
+            $cond: [{ $eq: ["$paymentStatus", "refunded"] }, 1, 0],
+          },
+        },
+
+        // Total money spent
+        totalSpent: {
+          $sum: "$totalPrice",
+        },
+
+        // Total refund amount
+        totalRefundAmount: {
+          $sum: {
+            $cond: [
+              { $eq: ["$paymentStatus", "refunded"] },
+              "$cancellation.refundAmount",
+              0,
+            ],
+          },
+        },
+      },
+    },
+  ]);
+
+
+
+  // Recent bookings
+  const recentBookings = await Booking.find({
+    userId,
+  })
+    .populate("propertyId", "name city state Images")
+    .sort({ createdAt: -1 })
+    .limit(5);
+
+  return res.status(200).json({
+    success: true,
+
+    dashboard: stats[0] || {
+      totalBookings: 0,
+      confirmedBookings: 0,
+      pendingBookings: 0,
+      cancelledBookings: 0,
+      refundPendingBookings: 0,
+      refundedBookings: 0,
+      totalSpent: 0,
+      totalRefundAmount: 0,
+    },
+    recentBookings,
+  });
+});
