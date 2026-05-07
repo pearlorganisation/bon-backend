@@ -243,6 +243,34 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     "propertyType",
   ];
 
+  if (!property.documentVerification) {
+  property.documentVerification = {};
+}
+
+if (!property.documentVerification.bankDetails) {
+  property.documentVerification.bankDetails = {};
+}
+
+const bankFields = [
+  "accountHolderName",
+  "accrountNo",
+  "ifscCode",
+  "bankName",
+  "bankBranch",
+];
+ 
+ let bankData ;
+  if(req.body.bankDetails)bankData=JSON.parse(  req.body.bankDetails);
+
+bankFields.forEach((field) => {
+  if ( bankData  !== undefined) {
+    property.documentVerification.bankDetails[field] =
+      bankData[field];
+  }
+});
+
+property.markModified("documentVerification");
+
   updatableFields.forEach((field) => {
     if (req.body[field] !== undefined) {
       property[field] = req.body[field];

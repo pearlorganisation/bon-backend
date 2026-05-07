@@ -99,6 +99,15 @@ const propertySchema = new mongoose.Schema(
         },
       },
 
+     bankDetails: {
+      accountHolderName: String,
+      accrountNo: String,
+      ifscCode: String,
+      bankName: String,
+      bankBranch: String,
+    },
+
+    
       PropertyDocuments: [
         {
           document_name: { type: String, trim: true, lowercase: true },
