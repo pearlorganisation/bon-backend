@@ -1955,3 +1955,4 @@ export const releaseInventory = async (booking) => {
     throw error;
   }
 };
+

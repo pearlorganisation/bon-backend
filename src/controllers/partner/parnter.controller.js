@@ -21,6 +21,7 @@ import ManualRoomBlock from "../../models/Listing/manualRoomBlock.model.js";
 import mongoose from "mongoose";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 import { createParterPlanInvoice } from "../../utils/invoive/createInvoice.js";
+import { sendAccountVerificationSuccess } from "../../utils/mail/EmailTemplates/emailTemplate.js";
 
 configDotenv();
 const round = (num) => Math.round(num * 100) / 100;
