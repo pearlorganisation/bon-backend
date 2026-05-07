@@ -42,69 +42,67 @@ route.use(protect);
 route.get(
   "/get-subAdmin-sessions-history/:id",
   authorizeRoles("ADMIN", "SUB_ADMIN"),
-  getSubAdminSessionHistory
+  getSubAdminSessionHistory,
 );
 route.get(
   "/get-today-subadmins-session",
   authorizeRoles("ADMIN", "SUB_ADMIN"),
-  getTodaySubAdminSession
+  getTodaySubAdminSession,
 );
 
 route.get(
   "properties/approval-requests",
   authorizeRoles("ADMIN"),
-  getPropertyApprovalRequests
+  getPropertyApprovalRequests,
 );
 
 route.patch(
   "/properties/:propertyId/approve",
   authorizeRoles("ADMIN"),
-  approveRejectProperty
+  approveRejectProperty,
 );
 route.patch(
   "/assign-property/:propertyId",
   authorizeRoles("ADMIN"),
-  assignPropertyToPartner
+  assignPropertyToPartner,
 );
 
 route.get("/get-all-partners", authorizeRoles("ADMIN"), getAllPartners);
 route.get(
   "/get-property-by-id/:propertyId",
   authorizeRoles("ADMIN"),
-  getPropertyDetailsById
+  getPropertyDetailsById,
 );
-
 
 // plan and subscription
 route.get(
   "/get-patform-plans",
   authorizeRoles("ADMIN", "PARTNER"), //sdfsdf
-  getPlatformPlans
+  getPlatformPlans,
 );
 route.post(
   "/change-commission-range",
   authorizeRoles("ADMIN"),
-  upsertCommissionRange
+  upsertCommissionRange,
 );
 route.post(
   "/create-subscription-plan",
   authorizeRoles("ADMIN"),
-  createSubscriptionPlan
+  createSubscriptionPlan,
 );
 route.put(
   "/update-subscription-plan/:planId",
   authorizeRoles("ADMIN"),
- updateSubscriptionPlan
+  updateSubscriptionPlan,
 );
 
-route.post("/upsert-gst-config",authorizeRoles("ADMIN"),upsertGSTConfig); //rtretert
+route.post("/upsert-gst-config", authorizeRoles("ADMIN"), upsertGSTConfig); //rtretert
 route.post(
   "/upsert-razorpay-config",
-  authorizeRoles("ADMIN", upsertRazorpayConfig)
+  authorizeRoles("ADMIN", upsertRazorpayConfig),
 );
 
-
-//payout apis 
+//payout apis
 
 // route.post(
 //   "/release-partner-payout",
@@ -113,50 +111,48 @@ route.post(
 // );
 
 route.post(
-  "/confirm-partner-payout",  //admin ne partner ko pasie pay kardiya h
+  "/confirm-partner-payout", //admin ne partner ko pasie pay kardiya h
   authorizeRoles("ADMIN"),
-  confirmPartnerMonthlyPayout
+  confirmPartnerMonthlyPayout,
 );
 
 route.post(
   "/confirm-admin-payout", // admin ko paise mil gae h
   authorizeRoles("ADMIN"),
-  confirmAdminMonthlyPayout
+  confirmAdminMonthlyPayout,
 );
-
-
 
 // admin  Payment & Finance dashborad  api
 route.get(
   "/get-partner-monthly-payout",
   authorizeRoles("ADMIN"),
-  getPartnerMonthlyPayouts
+  getPartnerMonthlyPayouts,
 );
 route.get(
   "/get-admin-monthly-finance",
   authorizeRoles("ADMIN"),
-  getAdminMonthlyFinance
+  getAdminMonthlyFinance,
 );
 route.get(
   "/get-weekly-sales",
   authorizeRoles("ADMIN"),
-  getWeeklySalesFromBookings
+  getWeeklySalesFromBookings,
 );
 
 route.get(
   "/get-top-permormers",
   authorizeRoles("ADMIN"),
-  getTopPerformerHotels
+  getTopPerformerHotels,
 );
 route.get(
   "/get-monthly-refunds",
   authorizeRoles("ADMIN"),
-  getMonthlyRefundsData
+  getMonthlyRefundsData,
 );
 route.get(
   "/get-monthly-subscriptions-data",
   authorizeRoles("ADMIN"),
-  getMonthlySubscriptionsData
+  getMonthlySubscriptionsData,
 );
 
 //Analytics & Reports
@@ -164,27 +160,25 @@ route.get(
 route.get(
   "/get-yearly-revenue-tax",
   authorizeRoles("ADMIN"),
-  getYearly_Revenue_Tax_Data
+  getYearly_Revenue_Tax_Data,
 );
 
 route.get(
   "/get-monthly-hotels-data",
   authorizeRoles("ADMIN"),
-  getMonthlyHotelsData
+  getMonthlyHotelsData,
 );
 
 route.get(
   "/get-monthly-customer-data",
   authorizeRoles("ADMIN"),
-  getMonthlyCustomerData
+  getMonthlyCustomerData,
 );
 
 route.get(
   "/get-monthly-bookings-data",
   authorizeRoles("ADMIN"),
-  getMonthlyBookingsData
+  getMonthlyBookingsData,
 );
-
-
 
 export default route;

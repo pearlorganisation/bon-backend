@@ -55,7 +55,6 @@ const uploadFields = upload.fields([
   { name: "images", maxCount: 10 },
   { name: "videos", maxCount: 5 },
   { name: "propertyDocument", maxCount: 1 },
-   { name: "passbookImage", maxCount: 1 },
 ]);
 
 //---------- parnter routes ----------------
@@ -80,7 +79,7 @@ router.post(
   "/update--partner-bank-account",
   protect,
   authorizeRoles("PARTNER"),
-  updatePartnerBankAccount
+  updatePartnerBankAccount,
 );
 
 router.post(
@@ -105,7 +104,7 @@ router.get(
   "/get-plan/:planId",
   protect,
   authorizeRoles("PARTNER", "ADMIN"),
-  getPlanById
+  getPlanById,
 );
 
 //---------- property routes ----------------
