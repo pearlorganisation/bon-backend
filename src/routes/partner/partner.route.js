@@ -55,6 +55,7 @@ const uploadFields = upload.fields([
   { name: "images", maxCount: 10 },
   { name: "videos", maxCount: 5 },
   { name: "propertyDocument", maxCount: 1 },
+   { name: "passbookImage", maxCount: 1 },
 ]);
 
 //---------- parnter routes ----------------
