@@ -9,13 +9,14 @@ import CustomError from "../../utils/error/customError.js";
 import mongoose from "mongoose";
 import { check } from "express-validator";
 import successResponse from "../../utils/error/successResponse.js";
-import { razorpay,getRazorpayInstance } from "../../config/razorpayConfig.js";
+import { razorpay, getRazorpayInstance } from "../../config/razorpayConfig.js";
 import crypto from "crypto";
 import { isGeneratorFunction } from "util/types";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 import { createBookingInvoice } from "../../utils/invoive/createInvoice.js";
 import Review from "../../models/Listing/review.model.js";
 import Admin from "../../models/Admin/admin.model.js";
+import { sendBookingConfirmationEmail } from "../../utils/mail/emailTeamplates/sendBookingConfirmationEmail.js";
 
 const round = (num) => Math.round(num * 100) / 100;
 // utils/dateUtils.js
@@ -150,7 +151,7 @@ const calculateRefundPercentage = ({
 
 const getGST = async (amount) => {
   const admin = await Admin.findOne();
- console.log(admin);
+  console.log(admin);
   if (!admin || !admin.roomGSTSlabs) {
     throw new Error("no Room GST Slabs set by Admin");
   }
@@ -173,7 +174,6 @@ const getGST = async (amount) => {
 };
 
 //controllers
- 
 
 export const createBooking = asyncHandler(async (req, res, next) => {
   const session = await mongoose.startSession();
@@ -280,7 +280,6 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       //     400
       //   );
       // }
-    
 
       //  Date-wise availability
       const inventories = await RoomInventory.find({
@@ -298,15 +297,15 @@ export const createBooking = asyncHandler(async (req, res, next) => {
         const key = normalizeDate(date).toISOString();
         const inv = inventoryMap.get(key);
         const booked = inv?.bookedRooms || 0;
-       let total = inv?.totalRooms || 0;
-       total = Math.max(total, room.numberOfRooms);
+        let total = inv?.totalRooms || 0;
+        total = Math.max(total, room.numberOfRooms);
 
-       if (booked + item.quantity > total) {
-         throw new CustomError(
-           `Not enough availability for ${room.name} on ${key.slice(0, 10)}`,
-           400
-         );
-       }
+        if (booked + item.quantity > total) {
+          throw new CustomError(
+            `Not enough availability for ${room.name} on ${key.slice(0, 10)}`,
+            400
+          );
+        }
       }
 
       // 🔐 Reserve inventory
@@ -331,7 +330,7 @@ export const createBooking = asyncHandler(async (req, res, next) => {
           throw new CustomError(`Overbooking detected for ${room.name}`, 400);
         }
       }
-     
+
       //  Pricing
       totalCapacity += room.capacity * item.quantity;
       let roomPrice = 0;
@@ -478,15 +477,13 @@ export const createBooking = asyncHandler(async (req, res, next) => {
       { session }
     );
 
-       let BookingData = booking[0].toObject();
-       BookingData.rooms.forEach((room) => {
-         room.name = roomMap.get(String(room.roomId));
-       });
-      
-       
+    let BookingData = booking[0].toObject();
+    BookingData.rooms.forEach((room) => {
+      room.name = roomMap.get(String(room.roomId));
+    });
+
     await session.commitTransaction();
     session.endSession();
-  
 
     successResponse(res, 201, "Booking created successfully", BookingData);
   } catch (err) {
@@ -796,10 +793,10 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     booking.totalPrice = round(totalPrice);
 
     await booking.save({ session });
-       let BookingData = booking[0].toObject();
-       BookingData.rooms.forEach((room) => {
-         room.name = roomMap.get(String(room.roomId));
-       });
+    let BookingData = booking[0].toObject();
+    BookingData.rooms.forEach((room) => {
+      room.name = roomMap.get(String(room.roomId));
+    });
 
     await session.commitTransaction();
     session.endSession();
@@ -968,8 +965,8 @@ export const createRazorpayOrder = asyncHandler(async (req, res, next) => {
         bookingId: booking._id.toString(),
       },
     };
-     
-    const {razorpay} = await getRazorpayInstance();
+
+    const { razorpay } = await getRazorpayInstance();
 
     const order = await razorpay.orders.create(options);
 
@@ -1023,7 +1020,12 @@ export const bookingWebhookController = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Order ID missing in webhook", 400));
   }
 
-  const booking = await Booking.findOne({ "payment.razorpayOrderId": orderId });
+  const booking = await Booking.findOne({ "payment.razorpayOrderId": orderId })
+    .populate("userId", "email fullName")
+    .populate({
+      path: "propertyId",
+      select: "name ownerEmail",
+    });
 
   if (
     booking.paymentStatus === "paid" &&
@@ -1061,6 +1063,11 @@ export const bookingWebhookController = asyncHandler(async (req, res, next) => {
       if (!booking.invoiceId) {
         createBookingInvoice(booking._id).catch((error) =>
           console.log("Invoice generation failed", error)
+        );
+      }
+      if (booking.paymentStatus === "paid") {
+        sendBookingConfirmationEmail(booking).catch((err) =>
+          console.error("Failed to send confirmation email:", err)
         );
       }
 
@@ -1209,7 +1216,7 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
     // 5️ Initiate refund (OUTSIDE transaction)
     if (refundAmount > 0 && wasPaid) {
       try {
-         const {razorpay} = await getRazorpayInstance();
+        const { razorpay } = await getRazorpayInstance();
         const refund = await razorpay.payments.refund(
           booking.payment.razorpayPaymentId,
           {
@@ -1229,19 +1236,19 @@ export const cancelBooking = asyncHandler(async (req, res, next) => {
         booking.paymentStatus = "refund_failed";
         await booking.save();
 
-         if (error instanceof CustomError) {
-           return next(error);
-         }
+        if (error instanceof CustomError) {
+          return next(error);
+        }
 
-         if (error?.error) {
-           return next(
-             new CustomError(
-               error?.error?.description ||
-                 "Unable to initiate payment. Please try again.",
-               error.statusCode || 502
-             )
-           );
-         }
+        if (error?.error) {
+          return next(
+            new CustomError(
+              error?.error?.description ||
+                "Unable to initiate payment. Please try again.",
+              error.statusCode || 502
+            )
+          );
+        }
 
         throw new CustomError(
           "Cancellation successful but refund initiation failed. Support will contact you.",
@@ -1269,12 +1276,12 @@ export const razorpayRefundWebhook = asyncHandler(async (req, res) => {
     return res.status(200).json({ success: true });
   }
 
-    const { webhookSecret } = await getRazorpayInstance();
+  const { webhookSecret } = await getRazorpayInstance();
 
-    if (!webhookSecret) {
-      console.error("Webhook secret missing");
-      return res.status(200).json({ success: true });
-    }
+  if (!webhookSecret) {
+    console.error("Webhook secret missing");
+    return res.status(200).json({ success: true });
+  }
 
   const expectedSignature = crypto
     .createHmac("sha256", webhookSecret)

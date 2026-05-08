@@ -67,7 +67,7 @@ const auth_schema = new mongoose.Schema(
     },
     refresh_token: { type: String },
     fcmToken: {
-      type: String,
+      type: String, 
       required: false,
     },
   },
@@ -113,5 +113,5 @@ auth_schema.methods.generateRefreshToken = function () {
   });
 };
 
-const   Auth = mongoose.model("Auth", auth_schema);
+const Auth = mongoose.model("Auth", auth_schema);
 export default Auth;

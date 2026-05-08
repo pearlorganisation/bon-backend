@@ -5,7 +5,10 @@ import Auth from "../models/auth/auth.model.js";
 import Property from "../models/Listing/property.model.js";
 import Room from "../models/Listing/room.model.js";
 import RoomInventory from "../models/Listing/roomInventory.model.js";
-import {getDatesBetween,normalizeDate} from "../controllers/Booking/booking.controller.js"
+import {
+  getDatesBetween,
+  normalizeDate,
+} from "../controllers/Booking/booking.controller.js";
 
 import {
   deleteFileFromCloudinary,
@@ -47,7 +50,7 @@ export const updateUserProfile = asyncHandler(async (req, res, next) => {
     user.profileImageUrl = image[0];
   }
 
-   await user.save();
+  await user.save();
 
   successResponse(res, 200, "profile updated successfully");
 });
@@ -58,7 +61,9 @@ export const getUserProfile = asyncHandler(async (req, res, next) => {
 
   // 2. Fetch the user directly from the Auth collection
   // We exclude password and refresh_token for security
-  const user = await Auth.findById(authId).select("-password -refresh_token -__v");
+  const user = await Auth.findById(authId).select(
+    "-password -refresh_token -__v"
+  );
 
   if (!user) {
     return next(new CustomError("User not found", 404));
@@ -100,7 +105,6 @@ export const getUserProfileById = asyncHandler(async (req, res, next) => {
   successResponse(res, 200, "User profile fetched successfully", user);
 });
 
-
 // updating all user details for admin
 
 export const updateAllUsers = asyncHandler(async (req, res, next) => {
@@ -123,8 +127,8 @@ export const updateAllUsers = asyncHandler(async (req, res, next) => {
     "gender",
     "dateOfBirth",
     "phoneNumber",
-    "role", 
-    "isVerified", 
+    "role",
+    "isVerified",
   ];
 
   updatableFields.forEach((field) => {
@@ -167,6 +171,3 @@ export const deleteAllUsers = asyncHandler(async (req, res, next) => {
 
   successResponse(res, 200, "User deleted successfully");
 });
-
-
-

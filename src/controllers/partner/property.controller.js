@@ -531,6 +531,22 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Unauthorized access", 403));
   }
 
+  if (req.query.verified) {
+    const statusMap = {
+      Accepted: "approved",
+      Rejected: "rejected",
+    };
+    if (statusMap[req.query.verified]) {
+      query.verified = statusMap[req.query.verified];
+    }
+  }
+  if (
+    req.query.propertyType &&
+    req.query.propertyType.toLowerCase() !== "all"
+  ) {
+    query.propertyType = req.query.propertyType.toLowerCase();
+  }
+
   const a = Property.find(query)
     .sort({ createdAt: -1 })
     .skip(skip)
@@ -552,7 +568,7 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
 export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   const user = req.user;
   const { propertyId } = req.params;
-  
+
   let query = { _id: propertyId };
 
   // Role-based ownership check
@@ -561,7 +577,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   } else if (user.role === "SUB_ADMIN") {
     query.subAdminId = user._id;
     query.partnerId = null;
-  }else if (user.role === "ADMIN") {
+  } else if (user.role === "ADMIN") {
   } else {
     return next(
       new CustomError("You are not authorized to access this property", 403)
@@ -873,7 +889,7 @@ async function getPlaceGeometry(placeId) {
       error: "placeId is required",
     };
   }
- 
+
   try {
     const response = await axios.get(
       "https://maps.googleapis.com/maps/api/place/details/json",
@@ -990,8 +1006,8 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
     throw new CustomError("Invalid guest Experience format", 400);
   }
   let response = {};
-   if (placeId == "null")placeId = null;
-   
+  if (placeId == "null") placeId = null;
+
   if (placeId) {
     response = await getPlaceGeometry(placeId);
     console.log("api", response);

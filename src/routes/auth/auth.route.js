@@ -11,9 +11,12 @@ import {
   resetPassword,
   create_sub_admin,
   delete_user,
-  saveFcmToken
+  saveFcmToken,
 } from "../../controllers/auth/auth.controller.js";
-import { protect, authorizeRoles } from "../../middleware/auth/auth.middleware.js";
+import {
+  protect,
+  authorizeRoles,
+} from "../../middleware/auth/auth.middleware.js";
 
 const router = express.Router();
 
@@ -25,10 +28,15 @@ router.post("/logout", protect, logout);
 router.post("/refresh-token", refreshToken);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
-router.post("/save-fcm-token",protect,saveFcmToken)
-router.post("/create-sub-admin", protect,authorizeRoles("ADMIN"),create_sub_admin);
-router.post("/delete-user",protect,authorizeRoles("ADMIN"), delete_user);
-router.get("/test", protect,authorizeRoles("ADMIN"), (req, res) => {
+router.post("/save-fcm-token", protect, saveFcmToken);
+router.post(
+  "/create-sub-admin",
+  protect,
+  authorizeRoles("ADMIN"),
+  create_sub_admin
+);
+router.post("/delete-user", protect, authorizeRoles("ADMIN"), delete_user);
+router.get("/test", protect, authorizeRoles("ADMIN"), (req, res) => {
   res.status(200).json({ message: "Protected route accessed!" });
 });
 export default router;
