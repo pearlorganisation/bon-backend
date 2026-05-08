@@ -562,6 +562,9 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     const statusMap = {
       Accepted: "approved",
       Rejected: "rejected",
+      under_review: "under_review"
+
+      
     };
     if (statusMap[req.query.verified]) {
       query.verified = statusMap[req.query.verified];
@@ -612,7 +615,10 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   }
 
   // Find property
-  const property = await Property.findOne(query).lean();
+  const property = await Property.findOne(query)
+    .populate("partnerId", "name phoneNumber")
+    .populate("subAdminId", "name phoneNumber")
+    .lean();
 
   if (!property) {
     return next(new CustomError("Property not found or access denied", 404));
