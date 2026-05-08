@@ -62,14 +62,15 @@ const registerChatHandlers = (io, socket) => {
         conversation.unreadCountCustomer += 1;
       }
 
-      socket.to(conversationId).emit("receive_message", newMessage);
+      io.to(conversationId).emit("receive_message", newMessage);
 
       await conversation.save();
 
       // Last message preview
       let lastMessagePreview = text;
 
-      conversation.lastMessage = lastMessagePreview;
+      conversation.lastMessage =
+        text || (attachments.length > 0 ? "Attachment" : "");
       conversation.lastMessageAt = new Date();
 
       // 🔔 Firebase notification (receiver offline)
@@ -82,6 +83,25 @@ const registerChatHandlers = (io, socket) => {
         const receiver = await User.findById(receiverId);
 
         let notificationBody = text?.substring(0, 40);
+
+        if (!text && attachments.length) {
+          const imageCount = attachments.filter(
+            (a) => a.type === "image"
+          ).length;
+          const fileCount = attachments.filter((a) => a.type === "file").length;
+
+          if (imageCount && fileCount) {
+            notificationBody = `📎 ${attachments.length} attachments received`;
+          } else if (imageCount > 1) {
+            notificationBody = `📷 ${imageCount} images received`;
+          } else if (imageCount === 1) {
+            notificationBody = "📷 Image received";
+          } else if (fileCount > 1) {
+            notificationBody = `📄 ${fileCount} files received`;
+          } else if (fileCount === 1) {
+            notificationBody = "📄 File received";
+          }
+        }
 
         // await sendFirebaseNotification({
         //   token: receiver.fcmToken,

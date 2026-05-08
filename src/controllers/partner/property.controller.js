@@ -91,14 +91,14 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   if (req.files?.images) {
     Images = await uploadFileToCloudinary(
       req.files.images,
-      "properties/images"
+      "properties/images",
     );
   }
 
   if (req.files?.videos) {
     Videos = await uploadFileToCloudinary(
       req.files.videos,
-      "properties/videos"
+      "properties/videos",
     );
   }
 
@@ -162,7 +162,7 @@ export const createProperty = asyncHandler(async (req, res, next) => {
   if (childrenCharge) {
     if (childrenCharge.age < 2 && childrenCharge.age > 18) {
       return next(
-        new CustomError("please enter valid age for children charges")
+        new CustomError("please enter valid age for children charges"),
       );
     }
     if (!childrenCharge.charge)
@@ -242,6 +242,33 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     "checkOut",
     "propertyType",
   ];
+
+  if (!property.documentVerification) {
+    property.documentVerification = {};
+  }
+
+  if (!property.documentVerification.bankDetails) {
+    property.documentVerification.bankDetails = {};
+  }
+
+  const bankFields = [
+    "accountHolderName",
+    "accrountNo",
+    "ifscCode",
+    "bankName",
+    "bankBranch",
+  ];
+
+  let bankData;
+  if (req.body.bankDetails) bankData = JSON.parse(req.body.bankDetails);
+
+  bankFields.forEach((field) => {
+    if (bankData !== undefined) {
+      property.documentVerification.bankDetails[field] = bankData[field];
+    }
+  });
+
+  property.markModified("documentVerification");
 
   updatableFields.forEach((field) => {
     if (req.body[field] !== undefined) {
@@ -334,7 +361,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     if (childrenCharge) {
       if (childrenCharge.age < 2 && childrenCharge.age > 18) {
         return next(
-          new CustomError("please enter valid age for children charges")
+          new CustomError("please enter valid age for children charges"),
         );
       }
       if (!childrenCharge.charge)
@@ -356,7 +383,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // Remove images from property (once)
     property.Images = property.Images.filter(
-      (img) => !publicIdsToDelete.includes(img.public_id)
+      (img) => !publicIdsToDelete.includes(img.public_id),
     );
 
     // Delete from Cloudinary (sequential & safe)
@@ -378,7 +405,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // Remove videos from property (once)
     property.Videos = property.Videos.filter(
-      (video) => !publicIdsToDelete.includes(video.public_id)
+      (video) => !publicIdsToDelete.includes(video.public_id),
     );
 
     // Delete from Cloudinary (sequential & safe)
@@ -406,7 +433,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
     // Remove documents from property
     property.documentVerification.PropertyDocuments =
       property.documentVerification.PropertyDocuments.filter(
-        (doc) => !publicIdsToDelete.includes(doc.public_id)
+        (doc) => !publicIdsToDelete.includes(doc.public_id),
       );
 
     // Delete from Cloudinary (sequential & safe)
@@ -422,14 +449,14 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
   if (req.files?.images) {
     Images = await uploadFileToCloudinary(
       req.files.images,
-      "properties/images"
+      "properties/images",
     );
   }
 
   if (req.files?.videos) {
     Videos = await uploadFileToCloudinary(
       req.files.videos,
-      "properties/videos"
+      "properties/videos",
     );
   }
 
@@ -449,19 +476,19 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
     // 🔍 Check duplicate document name
     const duplicateName = property.documentVerification.PropertyDocuments.some(
-      (doc) => doc.document_name === normalizedName
+      (doc) => doc.document_name === normalizedName,
     );
 
     if (duplicateName) {
       return next(
-        new CustomError("Document with this name already exists", 400)
+        new CustomError("Document with this name already exists", 400),
       );
     }
 
     //  Upload to Cloudinary
     const uploadedDocs = await uploadFileToCloudinary(
       req.files.propertyDocument,
-      "properties/documents"
+      "properties/documents",
     );
 
     // 📎 Push document
@@ -580,7 +607,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   } else if (user.role === "ADMIN") {
   } else {
     return next(
-      new CustomError("You are not authorized to access this property", 403)
+      new CustomError("You are not authorized to access this property", 403),
     );
   }
 
@@ -593,7 +620,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
 
   if (!property) {
     return next(
-      new CustomError("Property not found or not owned by this partner", 404)
+      new CustomError("Property not found or not owned by this partner", 404),
     );
   }
 
@@ -601,7 +628,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
     res,
     200,
     "successfully fetch the partner property",
-    property
+    property,
   );
 });
 
@@ -645,7 +672,7 @@ export const getAllProperties = async (req, res) => {
       res,
       200,
       "Properties fetched successfully",
-      properties
+      properties,
     );
   } catch (error) {
     return res.status(500).json({
@@ -670,7 +697,7 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
 
   if (!["active", "inactive"].includes(status)) {
     return next(
-      new CustomError("Status must be either 'active' or 'inactive'", 400)
+      new CustomError("Status must be either 'active' or 'inactive'", 400),
     );
   }
 
@@ -686,7 +713,7 @@ export const changePropertyStatus = asyncHandler(async (req, res, next) => {
     res,
     200,
     `Property status updated to ${status} successfully`,
-    property
+    property,
   );
 });
 
@@ -815,7 +842,7 @@ export const getPropertyDetailsById = asyncHandler(async (req, res, next) => {
     res,
     200,
     "Property detail fetched successfully",
-    property[0]
+    property[0],
   );
 });
 
@@ -838,7 +865,7 @@ export const autoCompleteSuggestion = asyncHandler(async (req, res, next) => {
           key: process.env.GOOGLE_MAPS_API_KEY,
         },
         timeout: 10000,
-      }
+      },
     );
 
     const { status, predictions, error_message } = response.data;
@@ -846,7 +873,7 @@ export const autoCompleteSuggestion = asyncHandler(async (req, res, next) => {
     if (status !== "OK") {
       console.log(response);
       return next(
-        new CustomError(error_message || `Google API Error: ${status}`, 400)
+        new CustomError(error_message || `Google API Error: ${status}`, 400),
       );
     }
 
@@ -872,8 +899,8 @@ export const autoCompleteSuggestion = asyncHandler(async (req, res, next) => {
       return next(
         new CustomError(
           error.response.data?.error_message || "Google API request failed",
-          error.response.status || 500
-        )
+          error.response.status || 500,
+        ),
       );
     }
 
@@ -899,7 +926,7 @@ async function getPlaceGeometry(placeId) {
           key: process.env.GOOGLE_MAPS_API_KEY,
         },
         timeout: 10000, // 10 seconds timeout
-      }
+      },
     );
     console.log(response.data);
     const { status, result, error_message } = response.data;
@@ -1206,7 +1233,7 @@ export const searchProperties = asyncHandler(async (req, res, next) => {
 
     if (parsedChildren.length && propertyChildConfig) {
       ChildTreatAsAdultCount = parsedChildren.filter(
-        (c) => Number(c.age) > Number(propertyChildConfig.age)
+        (c) => Number(c.age) > Number(propertyChildConfig.age),
       ).length;
     }
 
@@ -1270,7 +1297,7 @@ export const getAllPropertyTypes = async (req, res) => {
       res,
       200,
       "Property types fetched successfully",
-      types
+      types,
     );
   } catch (error) {
     return res.status(500).json({
@@ -1346,7 +1373,7 @@ export const getPropertyTypeWithProperties = async (req, res) => {
       res,
       200,
       `Properties for type: ${type}`,
-      properties
+      properties,
     );
   } catch (error) {
     return res.status(500).json({
@@ -1376,7 +1403,7 @@ export const requestPropertyApproval = asyncHandler(async (req, res, next) => {
 
     if (!partner.isVerified) {
       return next(
-        new CustomError("Complete your KYC to verified you property", 404)
+        new CustomError("Complete your KYC to verified you property", 404),
       );
     }
 
@@ -1410,8 +1437,8 @@ export const getPropertyApprovalRequests = asyncHandler(
       return next(
         new CustomError(
           "Only admin can fetch all under_ reviewed properties",
-          403
-        )
+          403,
+        ),
       );
     }
 
@@ -1422,7 +1449,7 @@ export const getPropertyApprovalRequests = asyncHandler(
       .populate("subAdminId", "name email");
 
     successResponse(res, 200, "Property approval requests fetched", properties);
-  }
+  },
 );
 
 export const approveRejectProperty = asyncHandler(async (req, res, next) => {
@@ -1462,14 +1489,14 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `Only approved property can be assigned. Current status: ${property.verified}`,
-        400
-      )
+        400,
+      ),
     );
   }
 
   if (property.partnerId) {
     return next(
-      new CustomError("Property is already assigned to a partner", 409)
+      new CustomError("Property is already assigned to a partner", 409),
     );
   }
 
@@ -1484,7 +1511,10 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
 
   if (!partnerAuth.isVerified) {
     return next(
-      new CustomError(`Partner ${partnerAuth.name} has not verified email`, 400)
+      new CustomError(
+        `Partner ${partnerAuth.name} has not verified email`,
+        400,
+      ),
     );
   }
 
@@ -1495,7 +1525,7 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
 
   if (!partnerKyc) {
     return next(
-      new CustomError(`Partner ${partnerAuth.name} has not completed KYC`, 400)
+      new CustomError(`Partner ${partnerAuth.name} has not completed KYC`, 400),
     );
   }
 
@@ -1505,6 +1535,6 @@ export const assignPropertyToPartner = asyncHandler(async (req, res, next) => {
   return successResponse(
     res,
     200,
-    `Property (${property.name}) assigned to partner (${partnerAuth.name})`
+    `Property (${property.name}) assigned to partner (${partnerAuth.name})`,
   );
 });

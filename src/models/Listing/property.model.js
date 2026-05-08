@@ -99,6 +99,14 @@ const propertySchema = new mongoose.Schema(
         },
       },
 
+      bankDetails: {
+        accountHolderName: String,
+        accrountNo: String,
+        ifscCode: String,
+        bankName: String,
+        bankBranch: String,
+      },
+
       PropertyDocuments: [
         {
           document_name: { type: String, trim: true, lowercase: true },
@@ -141,7 +149,7 @@ const propertySchema = new mongoose.Schema(
     AdminNote: { type: String },
     //     commissionPercentage: { type: Number, default: 10 },
   },
-  { timestamps: true }
+  { timestamps: true },
 );
 
 // 2dsphere index for geospatial queries

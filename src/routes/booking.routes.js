@@ -8,6 +8,8 @@ import {
   getMyBooking,
   getBooking,
   updateGuestBookingStatus,
+  getBookingById,
+  customerDashboard
 } from "../controllers/Booking/booking.controller.js";
 
 // Middleware to check authentication and roles (Placeholder names)df
@@ -46,5 +48,10 @@ router.get("/my-bookings", protect, authorizeRoles("CUSTOMER"), getMyBooking);
 router.get("/", protect, authorizeRoles("ADMIN", "PARTNER"), getBooking);
 
 router.post("/update-booking-status", protect,authorizeRoles("PARTNER"), updateGuestBookingStatus);
+
+router.get("/customer-dashboard", protect, authorizeRoles("CUSTOMER"), customerDashboard);
+
+router.get("/:bookingId", protect, authorizeRoles("CUSTOMER", "PARTNER", "ADMIN"), getBookingById);
+
 
 export default router;

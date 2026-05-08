@@ -77,7 +77,7 @@ route.get(
 // plan and subscription
 route.get(
   "/get-patform-plans",
-  authorizeRoles("ADMIN", "PARTNER"),
+  authorizeRoles("ADMIN", "PARTNER"), //sdfsdf
   getPlatformPlans
 );
 route.post(
@@ -96,11 +96,10 @@ route.put(
   updateSubscriptionPlan
 );
 
-route.post("/upsert-gst-config", authorizeRoles("ADMIN"), upsertGSTConfig);
+route.post("/upsert-gst-config", authorizeRoles("ADMIN"), upsertGSTConfig); //rtretert
 route.post(
   "/upsert-razorpay-config",
-  authorizeRoles("ADMIN"),
-  upsertRazorpayConfig
+  authorizeRoles("ADMIN", upsertRazorpayConfig)
 );
 
 //payout apis

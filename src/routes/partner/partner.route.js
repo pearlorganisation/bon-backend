@@ -117,8 +117,6 @@ router.put(
   updateProperty
 );
 
-
-
 router.get("/get-partner-properties", protect, getPartnerProperties);
 
 router.get(
@@ -126,7 +124,6 @@ router.get(
   protect,
   getPartnerPropertyByID
 );
-
 
 router.get("/get-all-properties", getAllProperties);
 

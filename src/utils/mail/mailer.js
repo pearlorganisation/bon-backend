@@ -174,7 +174,7 @@ export const sendSupportMail = async ({
   } catch (error) {
     console.error(
       "❌ Support mail failed:",
-      error.response?.body || error.message
+      error.response?.body || error.message,
     );
     throw new Error(error.message);
   }
@@ -197,7 +197,7 @@ export const sendEmail = async (to, subject, html) => {
   } catch (error) {
     console.error(
       "❌ Email sending failed:",
-      error.response?.body || error.message
+      error.response?.body || error.message,
     );
     throw new Error(error.message);
   }
