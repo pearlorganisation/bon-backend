@@ -562,6 +562,9 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     const statusMap = {
       Accepted: "approved",
       Rejected: "rejected",
+      under_review: "under_review"
+
+      
     };
     if (statusMap[req.query.verified]) {
       query.verified = statusMap[req.query.verified];
