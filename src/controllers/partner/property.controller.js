@@ -601,7 +601,7 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
 
   let query = { _id: propertyId };
 
-  // Role-based ownership check
+  // Role-based ownership checks
   if (user.role === "PARTNER") {
     query.partnerId = user._id;
   } else if (user.role === "SUB_ADMIN") {
