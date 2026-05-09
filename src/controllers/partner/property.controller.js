@@ -213,7 +213,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
 
   if (role === "SUB_ADMIN") {
     ownershipFilter.subAdminId = userId;
-    // ownershipFilter.partnerId = null;
+    ownershipFilter.partnerId = null;
   }
 
   if (role === "PARTNER") {
@@ -225,7 +225,7 @@ export const updateProperty = asyncHandler(async (req, res, next) => {
    ------------------------------*/
   const property = await Property.findOne(ownershipFilter);
   if (!property) {
-    return next(new CustomError("Property not found or access denied", 404));
+    return next(new CustomError(" access denied", 404));
   }
 
   // 2️⃣ Update simple fields (name, description, address, city, state, country, pincode, checkIn, checkOut, amenities, status)
@@ -562,6 +562,9 @@ export const getPartnerProperties = asyncHandler(async (req, res, next) => {
     const statusMap = {
       Accepted: "approved",
       Rejected: "rejected",
+      under_review: "under_review"
+
+      
     };
     if (statusMap[req.query.verified]) {
       query.verified = statusMap[req.query.verified];
@@ -598,12 +601,12 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
 
   let query = { _id: propertyId };
 
-  // Role-based ownership check
+  // Role-based ownership checks
   if (user.role === "PARTNER") {
     query.partnerId = user._id;
   } else if (user.role === "SUB_ADMIN") {
     query.subAdminId = user._id;
-    query.partnerId = null;
+    // query.partnerId = null;
   } else if (user.role === "ADMIN") {
   } else {
     return next(
@@ -612,10 +615,13 @@ export const getPartnerPropertyByID = asyncHandler(async (req, res, next) => {
   }
 
   // Find property
-  const property = await Property.findOne(query).lean();
+  const property = await Property.findOne(query)
+    .populate("partnerId", "name phoneNumber")
+    .populate("subAdminId", "name phoneNumber")
+    .lean();
 
   if (!property) {
-    return next(new CustomError("Property not found or access denied", 404));
+    return next(new CustomError(" access denied", 404));
   }
 
   if (!property) {

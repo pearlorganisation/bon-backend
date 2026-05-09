@@ -5,7 +5,7 @@ import Partner from "../../models/Partner/partner.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
 import Auth from "../../models/auth/auth.model.js";
 import successResponse from "../../utils/error/successResponse.js";
-import { razorpay, getRazorpayInstance } from "../../config/razorpayConfig.js";
+import { getRazorpayInstance } from "../../config/razorpayConfig.js";
 import axios from "axios";
 import { configDotenv } from "dotenv";
 import Admin from "../../models/Admin/admin.model.js";

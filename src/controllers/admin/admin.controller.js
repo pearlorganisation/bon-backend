@@ -6,7 +6,6 @@ import successResponse from "../../utils/error/successResponse.js";
 import Admin from "../../models/Admin/admin.model.js";
 import AdminSubscriptionPlan from "../../models/Admin/admin.subscription.model.js";
 import { configDotenv } from "dotenv";
-import { razorpay } from "../../config/razorpayConfig.js";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
 import Booking from "../../models/Listing/booking.model.js";
 import PartnerPlan from "../../models/Partner/PartnerPlan.model.js";
@@ -538,6 +537,25 @@ export const confirmPartnerMonthlyPayout = asyncHandler(
     const payoutMonth = dateObj.getMonth() + 1;
     const payoutYear = dateObj.getFullYear();
 
+    /* ---------- ALLOW ONLY AFTER PAYOUT MONTH ---------- */
+
+    const today = new Date();
+
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+
+    const payoutValue = payoutYear * 12 + payoutMonth;
+    const currentValue = currentYear * 12 + currentMonth;
+
+    if (currentValue <= payoutValue) {
+      return next(
+        new CustomError(
+          "Changes can only be made after the payout month is completed",
+          400
+        )
+      );
+    }
+
     /* ---------- FIND PAYOUT ---------- */
     const payout = await PartnerMonthlyPayoutModel.findOne({
       partnerId,
@@ -612,6 +630,25 @@ export const confirmAdminMonthlyPayout = asyncHandler(
 
     const payoutMonth = dateObj.getMonth() + 1;
     const payoutYear = dateObj.getFullYear();
+
+    /* ---------- ALLOW ONLY AFTER PAYOUT MONTH ---------- */
+
+    const today = new Date();
+
+    const currentMonth = today.getMonth() + 1;
+    const currentYear = today.getFullYear();
+
+    const payoutValue = payoutYear * 12 + payoutMonth;
+    const currentValue = currentYear * 12 + currentMonth;
+
+    if (currentValue <= payoutValue) {
+      return next(
+        new CustomError(
+          "Changes can only be made after the payout month is completed",
+          400
+        )
+      );
+    }
 
     const monthlyPayout = await PartnerMonthlyPayoutModel.findOne({
       partnerId,

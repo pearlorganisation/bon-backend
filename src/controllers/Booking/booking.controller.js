@@ -9,7 +9,7 @@ import CustomError from "../../utils/error/customError.js";
 import mongoose from "mongoose";
 import { check } from "express-validator";
 import successResponse from "../../utils/error/successResponse.js";
-import { razorpay,getRazorpayInstance } from "../../config/razorpayConfig.js";
+import { getRazorpayInstance } from "../../config/razorpayConfig.js";
 import crypto from "crypto";
 import { isGeneratorFunction } from "util/types";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
