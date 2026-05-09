@@ -1120,7 +1120,9 @@ export const getBookingById = asyncHandler(async (req, res, next) => {
     .populate({ path: "userId",select: "name email phone profilePicture"})
     .populate({ path: "rooms.roomId",select: "name typeOfRoom images amenities description capacity" })
     .populate({path: "invoiceId" })
-    .populate({  path: "cancellation.cancelledBy",select: "name role" });
+    .populate({  path: "cancellation.cancelledBy",select: "name role" })
+    .populate("priceBreakdown.partnerPlanId");
+    
 
   if (!booking) {
     return next(new CustomError("Booking not found", 404));

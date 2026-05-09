@@ -1031,9 +1031,9 @@ export const getPartnerMonthlyFinance = asyncHandler(async (req, res, next) => {
     return next(new CustomError("Invalid partnerId", 400));
   }
 
-  // if (propertyId && !mongoose.Types.ObjectId.isValid(propertyId)) {
-  //   return next(new CustomError("Invalid propertyId", 400));
-  // }
+  if (propertyId && !mongoose.Types.ObjectId.isValid(propertyId)) {
+    return next(new CustomError("Invalid propertyId", 400));
+  }
 
   let dateObj = date ? new Date(date) : new Date();
 
@@ -1075,7 +1075,6 @@ export const getPartnerMonthlyFinance = asyncHandler(async (req, res, next) => {
         ...(propertyId && {
           "booking.propertyId": new mongoose.Types.ObjectId(propertyId),
         }),
-        "booking.paymentStatus": "paid",
       },
     },
 
@@ -1103,7 +1102,17 @@ export const getPartnerMonthlyFinance = asyncHandler(async (req, res, next) => {
           {
             $group: {
               _id: null,
-              totalRevenue: { $sum: "$booking.totalPrice" },
+
+              totalRevenue: {
+                $sum: {
+                  $add: [
+                    "$bookings.partnerAmount",
+                    "$bookings.partner_gst",
+                    "$bookings.adminAmount",
+                    "$bookings.admin_gst",
+                  ],
+                },
+              },
             },
           },
         ],
@@ -1203,13 +1212,13 @@ export const getPartnerYearlyAnalysis = asyncHandler(async (req, res, next) => {
 
   const partnerId = req.user._id;
   /* ---------- VALIDATION ---------- */
-  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
+  if ( !mongoose.Types.ObjectId.isValid(partnerId)) {
     return next(new CustomError("Invalid partnerId", 400));
   }
 
-  // if (!mongoose.Types.ObjectId.isValid(propertyId)) {
-  //   return next(new CustomError("Invalid propertyId", 400));
-  // }
+  if (propertyId && !mongoose.Types.ObjectId.isValid(propertyId)) {
+    return next(new CustomError("Invalid propertyId", 400));
+  }
 
   const selectedYear = year ? Number(year) : new Date().getFullYear();
 
@@ -1244,7 +1253,6 @@ export const getPartnerYearlyAnalysis = asyncHandler(async (req, res, next) => {
         ...(propertyId && {
           "booking.propertyId": new mongoose.Types.ObjectId(propertyId),
         }),
-        "booking.paymentStatus": "paid",
       },
     },
 
@@ -1349,7 +1357,10 @@ export const getRecentBookingByID = asyncHandler(async (req, res, next) => {
     .sort({ createdAt: -1 })
     .limit(Number(limit))
     .populate("userId", "fullName email phone")
-    .populate("rooms.roomId", "name typeOfRoom");
+    .populate("rooms.roomId", "name typeOfRoom")
+    .populate("propertyId", "name")
+    .populate("cancellation.cancelledBy", "name role email")
+    .populate("invoiceId");
 
   /* ---------- RESPONSE ---------- */
   return successResponse(
@@ -1416,7 +1427,6 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
           ...(propertyId && {
             "booking.propertyId": new mongoose.Types.ObjectId(propertyId),
           }),
-          "booking.paymentStatus": "paid",
         },
       },
 
@@ -1432,7 +1442,9 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
                 bookingId: "$booking._id",
                 totalPrice: "$booking.totalPrice",
                 paymentMode: "$booking.paymentMode",
+                paymentStatus: "$booking.paymentStatus",
                 status: "$booking.status",
+                cancellation: "$booking.cancellation",
                 checkInDate: "$booking.checkInDate",
                 checkOutDate: "$booking.checkOutDate",
                 createdAt: "$booking.createdAt",
@@ -1452,7 +1464,12 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
                 payNowTotal: {
                   $sum: {
                     $cond: [
-                      { $eq: ["$booking.paymentMode", "PAY_NOW"] },
+                      {
+                        $and: [
+                          { $eq: ["$booking.paymentMode", "PAY_NOW"] },
+                          { $eq: ["$booking.paymentStatus", "paid"] },
+                        ],
+                      },
                       "$booking.totalPrice",
                       0,
                     ],
@@ -1462,7 +1479,12 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
                 payOnArrivalTotal: {
                   $sum: {
                     $cond: [
-                      { $eq: ["$booking.paymentMode", "PAY_ON_ARRIVAL"] },
+                      {
+                        $and: [
+                          { $eq: ["$booking.paymentMode", "PAY_ON_ARRIVAL"] },
+                          { $eq: ["$booking.paymentStatus", "paid"] },
+                        ],
+                      },
                       "$booking.totalPrice",
                       0,
                     ],
@@ -1524,7 +1546,7 @@ export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
     return next(
       new CustomError(
         `No payout data found for ${payoutMonth}/${payoutYear}`,
-        404,
+        200,
       ),
     );
   }
@@ -1536,6 +1558,7 @@ export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
   const data = {
     totalBookings,
     /* Wallet Info */
+    bookings: payout.bookings,
     partnerWallet: payout.partnerWallet,
     adminWallet: payout.adminWallet,
   };
