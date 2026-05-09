@@ -797,7 +797,8 @@ export const updateBooking = asyncHandler(async (req, res, next) => {
     booking.totalPrice = round(totalPrice);
 
     await booking.save({ session });
-       let BookingData = booking[0].toObject();
+    console.log(booking, "updated booking");
+       let BookingData = booking.toObject();
        BookingData.rooms.forEach((room) => {
          room.name = roomMap.get(String(room.roomId));
        });
@@ -1116,9 +1117,9 @@ export const getBookingById = asyncHandler(async (req, res, next) => {
   }
 
   const booking = await Booking.findById(bookingId)
-    .populate({ path: "propertyId", select: "name policies images address city state contactNumber email cancellationPolicy childrenCharge"  })
+    .populate({ path: "propertyId", select: "name policies images address city state contactNumber email cancellationPolicy childrenCharge paymentModes"  })
     .populate({ path: "userId",select: "name email phone profilePicture"})
-    .populate({ path: "rooms.roomId",select: "name typeOfRoom images amenities description capacity" })
+    .populate({ path: "rooms.roomId",select: "name typeOfRoom images amenities description capacity servicesAndExtras" })
     .populate({path: "invoiceId" })
     .populate({  path: "cancellation.cancelledBy",select: "name role" })
     .populate("priceBreakdown.partnerPlanId");
