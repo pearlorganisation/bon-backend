@@ -1117,7 +1117,7 @@ export const getBookingById = asyncHandler(async (req, res, next) => {
   }
 
   const booking = await Booking.findById(bookingId)
-    .populate({ path: "propertyId", select: "name policies images address city state contactNumber email cancellationPolicy childrenCharge paymentModes"  })
+    .populate({ path: "propertyId", select: " partnerId name policies images address city state contactNumber email cancellationPolicy childrenCharge paymentModes"  })
     .populate({ path: "userId",select: "name email phone profilePicture"})
     .populate({ path: "rooms.roomId",select: "name typeOfRoom images amenities description capacity servicesAndExtras" })
     .populate({path: "invoiceId" })
