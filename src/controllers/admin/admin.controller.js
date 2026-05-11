@@ -1003,7 +1003,7 @@ export const getAdminMonthlyFinance = asyncHandler(async (req, res, next) => {
     /* Admin */
     totalGrossAmount: round(adminProfit.totalGrossAmount) || 0,
     totalNetProfit: round(adminProfit.totalProfit) || 0,
-    currentAdminGST: round(adminProfit.currentGST) || 0,
+    currentAdminGST: round(adminProfit.totalCurrentGST) || 0,
   };
 
   return successResponse(res, 200, `Finance report for ${month}/${year}`, data);

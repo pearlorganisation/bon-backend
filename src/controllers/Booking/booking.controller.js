@@ -1121,8 +1121,8 @@ export const getBookingById = asyncHandler(async (req, res, next) => {
     .populate({ path: "userId",select: "name email phone profilePicture"})
     .populate({ path: "rooms.roomId",select: "name typeOfRoom images amenities description capacity servicesAndExtras" })
     .populate({path: "invoiceId" })
-    .populate({  path: "cancellation.cancelledBy",select: "name role" })
-    .populate("priceBreakdown.partnerPlanId");
+    .populate({  path: "cancellation.cancelledBy",select: "name role" });
+    // .populate("priceBreakdown.partnerPlanId");
     
 
   if (!booking) {
