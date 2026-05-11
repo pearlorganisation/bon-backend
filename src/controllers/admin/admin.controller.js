@@ -1281,9 +1281,9 @@ export const getMonthlyRefundsData = asyncHandler(async (req, res, next) => {
     res,
     200,
     "Monthly refund data fetched",
-    result[0] || {
-      bookings: [],
-      totalRefundAmount: 0,
+     {
+      bookings: result[0]?.bookings || [],
+      totalRefundAmount: round( result[0]?.totalRefundAmount) || 0,
     }
   );
 });
