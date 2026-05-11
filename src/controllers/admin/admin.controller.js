@@ -101,7 +101,7 @@ export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
   if (roomGSTSlabs) {
     if (!Array.isArray(roomGSTSlabs) || roomGSTSlabs.length === 0) {
       return next(
-        new CustomError("Room GST slabs must be a non-empty array", 400)
+        new CustomError("Room GST slabs must be a non-empty array", 400),
       );
     }
 
@@ -124,7 +124,7 @@ export const upsertGSTConfig = asyncHandler(async (req, res, next) => {
       // ensure increasing order
       if (i > 0 && slab.upto <= roomGSTSlabs[i - 1].upto) {
         return next(
-          new CustomError("Slabs must be in strictly increasing order", 400)
+          new CustomError("Slabs must be in strictly increasing order", 400),
         );
       }
     }
@@ -207,7 +207,7 @@ export const upsertCommissionRange = asyncHandler(async (req, res, next) => {
     {
       commission: { min, max },
     },
-    { new: true, upsert: true }
+    { new: true, upsert: true },
   );
 
   successResponse(res, 200, "Commission range updated successfully");
@@ -222,7 +222,7 @@ export const createSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
   if (!name || !price || !durationDays) {
     return next(
-      new CustomError("name, price and durationDays are required", 400)
+      new CustomError("name, price and durationDays are required", 400),
     );
   }
 
@@ -231,7 +231,7 @@ export const createSubscriptionPlan = asyncHandler(async (req, res, next) => {
   const isExist = await AdminSubscriptionPlan.findOne({ name });
   if (isExist) {
     return next(
-      new CustomError("Subscription with this name already exists", 400)
+      new CustomError("Subscription with this name already exists", 400),
     );
   }
 
@@ -267,7 +267,7 @@ export const updateSubscriptionPlan = asyncHandler(async (req, res, next) => {
 
     if (isExist) {
       return next(
-        new CustomError("Subscription with this name already exists", 400)
+        new CustomError("Subscription with this name already exists", 400),
       );
     }
 
@@ -322,7 +322,7 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
 
   if (req.user.role === "PARTNER") {
     platformPlans.subscriptions = result[0].subscriptions.filter(
-      (sub) => sub.isActive === true
+      (sub) => sub.isActive === true,
     );
   } else {
     platformPlans.subscriptions = result[0].subscriptions;
@@ -551,8 +551,8 @@ export const confirmPartnerMonthlyPayout = asyncHandler(
       return next(
         new CustomError(
           "Changes can only be made after the payout month is completed",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -565,7 +565,10 @@ export const confirmPartnerMonthlyPayout = asyncHandler(
 
     if (!payout) {
       return next(
-        new CustomError(`No payout found for ${payoutMonth}/${payoutYear}`, 404)
+        new CustomError(
+          `No payout found for ${payoutMonth}/${payoutYear}`,
+          404,
+        ),
       );
     }
 
@@ -578,8 +581,8 @@ export const confirmPartnerMonthlyPayout = asyncHandler(
       return next(
         new CustomError(
           `No payable amount for ${payoutMonth}/${payoutYear}`,
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -587,8 +590,8 @@ export const confirmPartnerMonthlyPayout = asyncHandler(
       return next(
         new CustomError(
           `Payout already marked as paid for ${payoutMonth}/${payoutYear}`,
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -611,7 +614,7 @@ export const confirmPartnerMonthlyPayout = asyncHandler(
       payableAmount: payout.partnerWallet.payableAmount,
       status: payout.partnerWallet.status,
     });
-  }
+  },
 );
 
 export const confirmAdminMonthlyPayout = asyncHandler(
@@ -645,8 +648,8 @@ export const confirmAdminMonthlyPayout = asyncHandler(
       return next(
         new CustomError(
           "Changes can only be made after the payout month is completed",
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -660,8 +663,8 @@ export const confirmAdminMonthlyPayout = asyncHandler(
       return next(
         new CustomError(
           `No record found for ${payoutMonth}, ${payoutYear}`,
-          404
-        )
+          404,
+        ),
       );
     }
 
@@ -673,8 +676,8 @@ export const confirmAdminMonthlyPayout = asyncHandler(
       return next(
         new CustomError(
           `For ${payoutMonth}/${payoutYear}, receivable amount is ${monthlyPayout.adminWallet.receivableAmount}`,
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -682,8 +685,8 @@ export const confirmAdminMonthlyPayout = asyncHandler(
       return next(
         new CustomError(
           `For ${payoutMonth}/${payoutYear}, amount already received`,
-          400
-        )
+          400,
+        ),
       );
     }
 
@@ -693,9 +696,9 @@ export const confirmAdminMonthlyPayout = asyncHandler(
     return successResponse(
       res,
       200,
-      "Admin wallet status updated successfully"
+      "Admin wallet status updated successfully",
     );
-  }
+  },
 );
 
 // admin  Payment & Finance dashborad  controllers
@@ -767,30 +770,30 @@ export const getPartnerMonthlyPayouts = asyncHandler(async (req, res, next) => {
         preserveNullAndEmptyArrays: true,
       },
     },
-  {
-  $lookup: {
-    from: "invoices",
-    let: {
-      invoiceId: "$partnerMonthlyPayout.partnerWallet.invoiceId",
-    },
-    pipeline: [
-      {
-        $match: {
-          $expr: {
-            $eq: ["$_id", "$$invoiceId"],
-          },
+    {
+      $lookup: {
+        from: "invoices",
+        let: {
+          invoiceId: "$partnerMonthlyPayout.partnerWallet.invoiceId",
         },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $eq: ["$_id", "$$invoiceId"],
+              },
+            },
+          },
+        ],
+        as: "invoice",
       },
-    ],
-    as: "invoice",
-  },
-},
-{
-  $unwind: {
-    path: "$invoice",
-    preserveNullAndEmptyArrays: true,
-  },
-},
+    },
+    {
+      $unwind: {
+        path: "$invoice",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
     {
       $project: {
         password: 0,
@@ -805,7 +808,7 @@ export const getPartnerMonthlyPayouts = asyncHandler(async (req, res, next) => {
     res,
     200,
     `Successfully fetched partner payouts for ${month}/${year}`,
-    partnersMonthlyPayouts
+    partnersMonthlyPayouts,
   );
 });
 
@@ -1084,9 +1087,9 @@ export const getWeeklySalesFromBookings = asyncHandler(
       res,
       200,
       `Weekly sales (GMV) for ${month}/${year}`,
-      formatted
+      formatted,
     );
-  }
+  },
 );
 
 export const getTopPerformerHotels = asyncHandler(async (req, res, next) => {
@@ -1151,7 +1154,7 @@ export const getTopPerformerHotels = asyncHandler(async (req, res, next) => {
     res,
     200,
     `Top performing hotels for ${month}/${year}`,
-    result
+    result,
   );
 });
 
@@ -1277,15 +1280,10 @@ export const getMonthlyRefundsData = asyncHandler(async (req, res, next) => {
     },
   ]);
 
-  return successResponse(
-    res,
-    200,
-    "Monthly refund data fetched",
-     {
-      bookings: result[0]?.bookings || [],
-      totalRefundAmount: round( result[0]?.totalRefundAmount) || 0,
-    }
-  );
+  return successResponse(res, 200, "Monthly refund data fetched", {
+    bookings: result[0]?.bookings || [],
+    totalRefundAmount: round(result[0]?.totalRefundAmount) || 0,
+  });
 });
 
 export const getMonthlySubscriptionsData = asyncHandler(
@@ -1410,7 +1408,7 @@ export const getMonthlySubscriptionsData = asyncHandler(
       totalSubscriptionGST: totalGST,
       partners: partnerDetails,
     });
-  }
+  },
 );
 
 //Analytics & Reports
@@ -1544,9 +1542,9 @@ export const getYearly_Revenue_Tax_Data = asyncHandler(
       res,
       200,
       `Yearly revenue & GST report for ${year}`,
-      fullYearData
+      fullYearData,
     );
-  }
+  },
 );
 
 export const getMonthlyHotelsData = asyncHandler(async (req, res, next) => {

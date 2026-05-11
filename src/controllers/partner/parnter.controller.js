@@ -1212,7 +1212,7 @@ export const getPartnerYearlyAnalysis = asyncHandler(async (req, res, next) => {
 
   const partnerId = req.user._id;
   /* ---------- VALIDATION ---------- */
-  if ( !mongoose.Types.ObjectId.isValid(partnerId)) {
+  if (!mongoose.Types.ObjectId.isValid(partnerId)) {
     return next(new CustomError("Invalid partnerId", 400));
   }
 
@@ -1440,6 +1440,7 @@ export const getPartnerMonthlyBookingsData = asyncHandler(
             {
               $project: {
                 bookingId: "$booking._id",
+                propertyId: "$booking.propertyId",
                 totalPrice: "$booking.totalPrice",
                 paymentMode: "$booking.paymentMode",
                 paymentStatus: "$booking.paymentStatus",
@@ -1540,6 +1541,10 @@ export const getMyMonthlyPayout = asyncHandler(async (req, res, next) => {
     payoutYear,
   })
     .populate("partnerWallet.invoiceId")
+    .populate({
+      path: "bookings.bookingId",
+      select: "propertyId",
+    })
     .lean();
 
   if (!payout) {
