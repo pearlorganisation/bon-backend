@@ -99,7 +99,8 @@ route.put(
 route.post("/upsert-gst-config", authorizeRoles("ADMIN"), upsertGSTConfig); //rtretert
 route.post(
   "/upsert-razorpay-config",
-  authorizeRoles("ADMIN", upsertRazorpayConfig),
+  authorizeRoles("ADMIN"),
+  upsertRazorpayConfig,
 );
 
 //payout apis
