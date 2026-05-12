@@ -18,7 +18,7 @@ import jwt from "jsonwebtoken";
 import dayjs from "dayjs";
 import { Sub_Admin_Session } from "../../models/Sub_Admin/sub_admin_sessions.model.js";
 import { deleteFileFromCloudinary } from "../../utils/cloudinary.js";
-export const register = asyncHandler(async (req, res, next) => {         
+export const register = asyncHandler(async (req, res, next) => {
   const { email, name, phoneNumber, password, role } = req?.body;
 
   const Roles = ["CUSTOMER", "PARTNER"];
@@ -97,9 +97,9 @@ export const register = asyncHandler(async (req, res, next) => {
     // }
 
     // C. Send OTP via email
-  sendOtpEmail(name, email, otp, "REGISTER").catch((err) =>
-    console.error("Email failed:", err)
-  );
+    sendOtpEmail(name, email, otp, "REGISTER").catch((err) =>
+      console.error("Email failed:", err)
+    );
 
     return successResponse(
       res,
@@ -236,7 +236,7 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
     await OTP.deleteOne({ email, type: "REGISTER" });
     return next(new CustomError("User already verified", 400));
   }
- console.log(user);
+  console.log(user);
   if (user.role === "CUSTOMER") {
     await Customer.create({
       userId: user._id,
@@ -254,7 +254,9 @@ export const verifyOtp = asyncHandler(async (req, res, next) => {
   await user.save();
   await OTP.deleteOne({ email, type: "REGISTER" });
 
-  sendWelcomeEmail(user.name,user.email,user.role).then(console.log("mail sent successfully")).catch(err=>console.log(err));
+  sendWelcomeEmail(user.name, user.email, user.role)
+    .then(console.log("mail sent successfully"))
+    .catch((err) => console.log(err));
 
   setAuthCookies(res, accessToken, refreshToken);
 
@@ -290,9 +292,9 @@ export const resendOtp = asyncHandler(async (req, res, next) => {
     { upsert: true, new: true }
   );
 
-   sendOtpEmail(user.name, email, otp, type)
-     .then(console.log("mail sent successfully"))
-     .catch((err) => console.log(err));
+  sendOtpEmail(user.name, email, otp, type)
+    .then(console.log("mail sent successfully"))
+    .catch((err) => console.log(err));
 
   return successResponse(res, 200, "OTP resent successfully");
 });
@@ -419,35 +421,29 @@ export const create_sub_admin = asyncHandler(async (req, res, next) => {
     name = `SubAdmin-${Date.now()}`;
   }
 
-  const newSubAdmin = await Auth.create({
-    name,
-    email,
-    password,
-    role: "SUB_ADMIN",
-    isVerified: true,
-  });
+  // 📧 Send email to sub-admin
+  sendSubAdminCreatedEmail(name, email, password)
+    .then(async () => {
+      console.log("Sub-admin email sent");
+      const newSubAdmin = await Auth.create({
+        name,
+        email,
+        password,
+        role: "SUB_ADMIN",
+        isVerified: true,
+      });
 
-  if (newSubAdmin) {
-    await Sub_Admin.create({
-      userId: newSubAdmin._id,
+      if (newSubAdmin) {
+        await Sub_Admin.create({
+          userId: newSubAdmin._id,
+        });
+      }
+    })
+    .catch((err) => {
+      console.error("Failed to send sub-admin email:", err.message);
     });
 
-    // 📧 Send email to sub-admin
-    sendSubAdminCreatedEmail(name, email, password)
-      .then(() => {
-        console.log("Sub-admin email sent");
-      })
-      .catch((err) => {
-        console.error("Failed to send sub-admin email:", err.message);
-      });
-  }
-
-  return successResponse(
-    res,
-    201,
-    "Sub-admin created successfully",
-    newSubAdmin
-  );
+  return successResponse(res, 201, "Sub-admin created successfully", {});
 });
 
 export const delete_user = asyncHandler(async (req, res, next) => {

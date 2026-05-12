@@ -169,7 +169,7 @@ export const createParterMonthlyPayoutInvoice = async (payoutId) => {
           model: "Property",
         },
       })
-      .populate("partnerId").lean();
+      .populate("partnerId");
  
     if (!payout) {
       throw new Error("no payout found");
