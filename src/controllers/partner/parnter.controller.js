@@ -924,11 +924,12 @@ export const getPartnerRoomCalendar = asyncHandler(async (req, res) => {
     date: { $in: dates },
   });
 
-  const bookings = await Booking.find({
-    "rooms.roomId": { $in: roomIds },
-    checkInDate: { $lte: end },
-    checkOutDate: { $gte: start },
-  });
+const bookings = await Booking.find({
+  "rooms.roomId": { $in: roomIds },
+  status: { $nin: ["expired", "cancelled"] },
+  checkInDate: { $lte: end },
+  checkOutDate: { $gte: start },
+});
 
   const manualBlocks = await ManualRoomBlock.find({
     partnerId,

@@ -15,11 +15,11 @@ import Admin from "../../models/Admin/admin.model.js";
 import { generatePartnerPlanInvoicePDF } from "./generatePartnerPlanInvoicePDF.js";
 import { generatePartnerPayoutInvoicePDF } from "./generatePartnerPayoutInvoicePDF.js";
 import PartnerMonthlyPayoutModel from "../../models/Partner/PartnerMonthlyPayout.model.js";
+import platformSettingsModel from "../../models/PlatformSettings/platformSettings.model.js";
 import {
   sendCustomerBookingConfirmation,
   sendPartnerBookingNotification,
 } from "../mail/EmailTemplates/bookingEmailTemplate.js";
-import { errorMonitor } from "events";
 
 // const booking = {
 //   confirmationCode: "BNF-987654",
@@ -68,6 +68,42 @@ import { errorMonitor } from "events";
 //   },
 // };
 
+// const fetchPlatformSetting = async () => {
+//   try {
+//     const platform = await platformSettingsModel.findOne();
+
+//     return { success: true, data: platform };
+//   } catch (error) {
+//     console.log(error);
+//     return { success: false, error: error };
+//   }
+// };
+// ── get platform settings ─────────────────────────────────
+let platformSettingsCache = null;
+let lastFetched = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+export const getPlatformSettings = async () => {
+  try {
+    const now = Date.now();
+    if (
+      platformSettingsCache &&
+      lastFetched &&
+      now - lastFetched < CACHE_DURATION
+    ) {
+      return platformSettingsCache;
+    }
+
+    const settings = await platformSettingsModel.findOne();
+    platformSettingsCache = settings;
+    lastFetched = now;
+    return settings;
+  } catch (error) {
+    console.error("Error fetching platform settings:", error);
+    return null;
+  }
+};
+
 export const createBookingInvoice = async (bookingId) => {
   try {
     const invoiceNumber = await generateInvoiceNumber();
@@ -94,36 +130,36 @@ export const createBookingInvoice = async (bookingId) => {
     console.log("Customer PDF:", customerPdfUrl);
     console.log("Partner PDF:", partnerPdfUrl);
 
-    const invoice = await Invoice.create({
-      invoiceNumber,
-      invoiceType: "BOOKING_INVOICE",
-      pdfUrl: customerPdfUrl,
-      pdfUrl2: partnerPdfUrl,
-    });
+    // const invoice = await Invoice.create({
+    //   invoiceNumber,
+    //   invoiceType: "BOOKING_INVOICE",
+    //   pdfUrl: customerPdfUrl,
+    //   pdfUrl2: partnerPdfUrl,
+    // });
 
-    console.log("Invoice created:", invoice);
-    booking.invoiceId = invoice._id;
-    await booking.save();
+    // console.log("Invoice created:", invoice);
+    // booking.invoiceId = invoice._id;
+    // await booking.save();
 
-    // Send email to customer with invoice
-    sendCustomerBookingConfirmation(booking, customerPdfUrl)
-      .then(console.log("done customer"))
-      .catch((err) => console.log(err));
+    // // Send email to customer with invoice
+    // sendCustomerBookingConfirmation(booking, customerPdfUrl)
+    //   .then(console.log("done customer"))
+    //   .catch((err) => console.log(err));
 
-    // Send email to partner with invoice
-    sendPartnerBookingNotification(booking, partnerPdfUrl)
-      .then(console.log("done partner"))
-      .catch((err) => console.log(err));
+    // // Send email to partner with invoice
+    // sendPartnerBookingNotification(booking, partnerPdfUrl)
+    //   .then(console.log("done partner"))
+    //   .catch((err) => console.log(err));
 
-    return invoice;
+    // return invoice;
   } catch (error) {
     console.error("Invoice generation failed:", error);
     throw error;
   }
 };
 
-const id = "69f1fecb0cf86230391bffe0";
-// createBookingInvoice(id);
+const id = "6a0414c6186c01ba682d199d";
+//createBookingInvoice(id);
 
 export const createParterPlanInvoice = async (planId) => {
   try {
@@ -170,7 +206,7 @@ export const createParterMonthlyPayoutInvoice = async (payoutId) => {
         },
       })
       .populate("partnerId");
- 
+
     if (!payout) {
       throw new Error("no payout found");
     }
@@ -201,11 +237,10 @@ export const createParterMonthlyPayoutInvoice = async (payoutId) => {
 };
 
 // (async () => {
-
 //   // optional small delay if you still want it
 //   setTimeout(async () => {
 //     try {
-//       await createParterMonthlyPayoutInvoice("69d378252af7459f82373c40");
+//       await createParterMonthlyPayoutInvoice("6a01d0853e1d013032acb2bb");
 //     } catch (err) {
 //       console.error(err);
 //     }

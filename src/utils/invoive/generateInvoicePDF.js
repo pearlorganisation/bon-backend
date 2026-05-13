@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import fs from "fs";
 import path from "path";
 import { uploadFileToCloudinary } from "../cloudinary.js";
+import { getPlatformSettings } from "./createInvoice.js";
 
 // 🎨 UI COLORS (from your reference image)
 const COLORS = {
@@ -619,10 +620,585 @@ const getImageBuffer = async (url) => {
 //   });
 // };
 
+// export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
+//   return new Promise(async (resolve, reject) => {
+//     const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
+//     const buffers = [];
+
+//     doc.on("data", buffers.push.bind(buffers));
+//     doc.on("end", async () => {
+//       try {
+//         const pdfBuffer = Buffer.concat(buffers);
+//         const file = {
+//           buffer: pdfBuffer,
+//           mimetype: "application/pdf",
+//           originalname: `${invoiceNumber}.pdf`,
+//         };
+//         const [uploaded] = await uploadFileToCloudinary(file, "/Invoices");
+//         resolve(uploaded ? uploaded.secure_url : null);
+//       } catch (error) {
+//         reject(error);
+//       }
+//     });
+
+//     try {
+//       const isPaid = booking.paymentStatus === "paid";
+
+//       const normalizeDate = (date) => {
+//         const d = new Date(date);
+//         d.setUTCHours(0, 0, 0, 0);
+//         return d;
+//       };
+
+//       const nights = Math.ceil(
+//         (normalizeDate(booking.checkOutDate) -
+//           normalizeDate(booking.checkInDate)) /
+//           (1000 * 60 * 60 * 24)
+//       );
+
+//       // ================= HEADER (REDUCED HEIGHT) =================
+//       doc.rect(0, 0, 595, 110).fill(COLORS.primary);
+
+//       const logoPath = path.join(process.cwd(), "public", "bonfire_logo.png");
+//       if (fs.existsSync(logoPath)) {
+//         doc.image(logoPath, 50, 25, { width: 80 });
+//       }
+
+//       doc
+//         .fillColor("#ffffff")
+//         .fontSize(22)
+//         .font("Helvetica-Bold")
+//         .text("INVOICE", 400, 20, { align: "right" });
+
+//       const statusColor = isPaid ? COLORS.success : COLORS.danger;
+//       doc.rect(455, 50, 100, 20).fill(statusColor);
+
+//       doc
+//         .fillColor("#FFFFFF")
+//         .fontSize(10)
+//         .text(isPaid ? "PAID" : "PAYMENT DUE", 455, 55, {
+//           width: 100,
+//           align: "center",
+//         });
+
+//       doc.fillColor("#ffffff").font("Helvetica").fontSize(9);
+//       doc.text(`Invoice Number: ${invoiceNumber}`, 400, 78, {
+//         align: "right",
+//       });
+//       doc.text(
+//         `Booking Date: ${formatDate(booking.createdAt || new Date())}`,
+//         400,
+//         90,
+//         { align: "right" }
+//       );
+//       doc.text(`Confirmation Code: ${booking.confirmationCode}`, 400, 102, {
+//         align: "right",
+//       });
+
+//       // ================= DIVIDER =================
+//       doc.moveTo(40, 125).lineTo(555, 125).strokeColor(COLORS.border).stroke();
+
+//       // ================= PROPERTY (WITH ROUNDED CORNERS) =================
+//       const propX = 40;
+//       const propY = 140;
+
+//       // Rounded rectangle for property card
+//       doc
+//         .roundedRect(propX, propY, 250, 110, 6)
+//         .fill(COLORS.lightBg)
+//         .strokeColor(COLORS.border)
+//         .stroke();
+
+//       const propertyImgUrl = booking.propertyId?.Images?.[0]?.secure_url;
+//       if (propertyImgUrl) {
+//         const imgBuffer = await getImageBuffer(propertyImgUrl);
+//         if (imgBuffer) {
+//           doc
+//             .save()
+//             .roundedRect(propX + 10, propY + 10, 50, 50, 6)
+//             .clip();
+//           doc.image(imgBuffer, propX + 10, propY + 10, {
+//             width: 50,
+//             height: 50,
+//           });
+//           doc.restore();
+//         }
+//       }
+
+//       const propTextX = propertyImgUrl ? propX + 75 : propX + 10;
+
+//       doc
+//         .fillColor(COLORS.textDark)
+//         .font("Helvetica-Bold")
+//         .fontSize(11)
+//         .text(booking.propertyId.name, propTextX, propY + 12);
+
+//       doc.font("Helvetica").fontSize(8).fillColor(COLORS.textLight);
+
+//       doc.text(`${booking.propertyId.address},`, propTextX, doc.y + 2);
+//       doc.text(
+//         `${booking.propertyId.city}, ${booking.propertyId.state} - ${booking.propertyId.pincode}`,
+//         propTextX,
+//         doc.y + 2
+//       );
+//       doc.text(
+//         `GSTIN: ${
+//           booking.propertyId?.documentVerification?.GSTIN?.gstin || "N/A"
+//         }`,
+//         propTextX,
+//         doc.y + 2
+//       );
+
+//       doc
+//         .fillColor(COLORS.primaryDark)
+//         .text("Location: View on Google Maps", propTextX, doc.y + 2, {
+//           link: booking.propertyId.mapLink,
+//         });
+
+//       // ================= GUEST (WITH ROUNDED CORNERS) =================
+//       const guestX = 305;
+
+//       // Rounded rectangle for guest card
+//       doc
+//         .roundedRect(guestX, propY, 250, 110, 6)
+//         .fill(COLORS.lightBg)
+//         .strokeColor(COLORS.border)
+//         .stroke();
+
+//       doc
+//         .fillColor(COLORS.textDark)
+//         .font("Helvetica-Bold")
+//         .fontSize(10)
+//         .text("BILL TO", guestX + 10, propY + 12);
+
+//       doc.font("Helvetica").fontSize(9).fillColor(COLORS.textLight);
+
+//       doc.text(booking.primaryGuestDetails.fullName, guestX + 10, doc.y + 3);
+//       doc.text(booking.primaryGuestDetails.email, guestX + 10, doc.y + 2);
+//       doc.text(booking.primaryGuestDetails.phone, guestX + 10, doc.y + 2);
+
+//       if (booking.primaryGuestDetails.address) {
+//         doc.text(booking.primaryGuestDetails.address, guestX + 10, doc.y + 2);
+//       }
+
+//       // ================= SUMMARY =================
+//       const summaryY = 265;
+
+//       doc.roundedRect(40, summaryY, 515, 40, 6).fill(COLORS.lightBg);
+
+//       doc.fillColor(COLORS.primaryDark).fontSize(9).font("Helvetica-Bold");
+
+//       doc.text("CHECK-IN", 60, summaryY + 10);
+//       doc.text("CHECK-OUT", 180, summaryY + 10);
+//       doc.text("NIGHTS", 300, summaryY + 10);
+//       doc.text("GUESTS", 420, summaryY + 10);
+
+//       doc.font("Helvetica").fontSize(10).fillColor(COLORS.textDark);
+
+//       doc.text(formatDate(booking.checkInDate), 60, summaryY + 22);
+//       doc.text(formatDate(booking.checkOutDate), 180, summaryY + 22);
+//       doc.text(nights.toString(), 300, summaryY + 22);
+
+//       doc.text(
+//         `${booking.numberOfGuests.adults} Adults, ${
+//           booking.numberOfGuests.children?.length || 0
+//         } Kids`,
+//         420,
+//         summaryY + 22
+//       );
+
+//       // ================= TABLE =================
+//       const tableTop = 320;
+
+//       doc
+//         .fillColor(COLORS.textDark)
+//         .font("Helvetica-Bold")
+//         .fontSize(10)
+//         .text("BOOKING DETAILS", 40, tableTop);
+
+//       const headers = {
+//         desc: 40,
+//         type: 230,
+//         qty: 270,
+//         price: 290,
+//         disc: 380,
+//         total: 470,
+//       };
+
+//       doc.rect(40, tableTop + 15, 515, 20).fill(COLORS.primary);
+
+//       doc.fillColor("#FFFFFF").fontSize(8).font("Helvetica-Bold");
+
+//       doc.text("DESCRIPTION", headers.desc + 10, tableTop + 21);
+//       doc.text("TYPE", headers.type, tableTop + 21, {
+//         width: 40,
+//         align: "center",
+//       });
+//       doc.text("QTY", headers.qty, tableTop + 21, {
+//         width: 40,
+//         align: "center",
+//       });
+
+//       doc.text(
+//         booking.pricingType === "NIGHT" ? "UNIT PRICE" : "PACKAGE",
+//         headers.price,
+//         tableTop + 21,
+//         { width: 80, align: "right" }
+//       );
+
+//       doc.text("DISCOUNT", headers.disc, tableTop + 21, {
+//         width: 80,
+//         align: "right",
+//       });
+
+//       doc.text("TOTAL", headers.total, tableTop + 21, {
+//         width: 80,
+//         align: "right",
+//       });
+
+//       let rowY = tableTop + 45;
+
+//       if (!booking.rooms || booking.rooms.length === 0) {
+//         doc
+//           .fillColor(COLORS.textDark)
+//           .fontSize(9)
+//           .text("No booking details available.", 40, rowY);
+//       } else {
+//         booking.rooms.forEach((room) => {
+//           const discount = room.discount || 0;
+
+//           const unitPrice =
+//             booking.pricingType === "NIGHT"
+//               ? room.pricePerNight || 0
+//               : room.packagePrice || 0;
+
+//           let lineTotal = (unitPrice - discount) * (room.quantity || 1);
+//           if (booking.pricingType === "NIGHT") lineTotal *= nights;
+
+//           const descHeight = doc.heightOfString(room.roomId.name, {
+//             width: 200,
+//           });
+
+//           const rowHeight = Math.max(descHeight, 15);
+
+//           doc
+//             .fillColor(COLORS.textDark)
+//             .font("Helvetica-Bold")
+//             .fontSize(9)
+//             .text(room.roomId.name, headers.desc + 10, rowY, {
+//               width: 200,
+//               ellipsis: true,
+//             });
+//           doc
+//             .font("Helvetica")
+//             .text(
+//               (room.roomId?.typeOfRoom || "N/A").toString(),
+//               headers.type,
+//               rowY,
+//               {
+//                 width: 40,
+//                 align: "center",
+//               }
+//             );
+
+//           doc
+//             .font("Helvetica")
+//             .text((room.quantity || 1).toString(), headers.qty, rowY, {
+//               width: 40,
+//               align: "center",
+//             });
+
+//           doc.text(formatCurrency(unitPrice), headers.price, rowY, {
+//             width: 80,
+//             align: "right",
+//           });
+
+//           doc.text(formatCurrency(discount), headers.disc, rowY, {
+//             width: 80,
+//             align: "right",
+//           });
+
+//           doc.text(formatCurrency(lineTotal), headers.total, rowY, {
+//             width: 80,
+//             align: "right",
+//           });
+
+//           rowY += rowHeight;
+
+//           if (room.extraServices?.length) {
+//             room.extraServices.forEach((service) => {
+//               const serviceTotal = (service.fee || 0) * (room.quantity || 1);
+
+//               doc
+//                 .fillColor(COLORS.textLight)
+//                 .fontSize(8)
+//                 .text(`   + ${service.name}`, headers.desc + 20, rowY, {
+//                   width: 180,
+//                 });
+
+//               doc.text(formatCurrency(serviceTotal), headers.total, rowY, {
+//                 width: 80,
+//                 align: "right",
+//               });
+
+//               rowY += 12;
+//             });
+//           }
+
+//           rowY += 8;
+
+//           doc
+//             .moveTo(40, rowY)
+//             .lineTo(555, rowY)
+//             .strokeColor(COLORS.border)
+//             .stroke();
+
+//           rowY += 12;
+//         });
+//       }
+
+//       // ================= CALC =================
+//       if (rowY > 650) {
+//         doc.addPage();
+//         rowY = 50;
+//       }
+
+//       const calcX = 350;
+
+//       const drawCalcRow = (label, val, y, isBold = false, sign = "") => {
+//         doc
+//           .fillColor(isBold ? COLORS.textDark : COLORS.textLight)
+//           .font(isBold ? "Helvetica-Bold" : "Helvetica")
+//           .fontSize(9);
+
+//         doc.text(label, calcX, y);
+//         doc.text(formatCurrency(val, sign), calcX + 100, y, {
+//           align: "right",
+//         });
+//       };
+
+//       drawCalcRow("Base Subtotal", booking.priceBreakdown.basePrice, rowY);
+//       drawCalcRow(
+//         "Total Discounts",
+//         booking.priceBreakdown.discountAmount,
+//         rowY + 15
+//       );
+//       drawCalcRow(
+//         "Service Fees",
+//         booking.priceBreakdown.extraServicesFee,
+//         rowY + 30
+//       );
+
+//       if (booking.priceBreakdown.childrenCharge) {
+//         drawCalcRow(
+//           "Children Charges",
+//           booking.priceBreakdown.childrenCharge,
+//           rowY + 45
+//         );
+//         rowY += 15;
+//       }
+
+//       drawCalcRow("GST (Taxes)", booking.priceBreakdown.gst_amount, rowY + 45);
+
+//       rowY += 70;
+
+//       doc.roundedRect(calcX, rowY - 10, 210, 25, 6).fill(COLORS.primary);
+
+//       doc
+//         .fillColor("#fff")
+//         .font("Helvetica-Bold")
+//         .fontSize(11)
+//         .text("GRAND TOTAL", calcX + 10, rowY - 3);
+
+//       doc.text(formatCurrency(booking.totalPrice), calcX + 70, rowY - 3, {
+//         align: "right",
+//       });
+
+//       // ================= THREE COLUMN FOOTER (WITH ROUNDED CORNERS) =================
+//       const footerY = Math.max(rowY + 30, 700);
+
+//       // Payment Info Card (Left)
+//       const paymentX = 40;
+//       const paymentWidth = 165;
+//       doc
+//         .roundedRect(paymentX, footerY, paymentWidth, 85, 6)
+//         .fill(COLORS.lightBg)
+//         .strokeColor(COLORS.border)
+//         .stroke();
+
+//       doc
+//         .fillColor(COLORS.textDark)
+//         .fontSize(9)
+//         .text("PAYMENT INFO", paymentX + 8, footerY + 8);
+
+//       doc.fillColor(COLORS.textLight).fontSize(8);
+
+//       let paymentY = footerY + 25;
+//       doc.text(
+//         `Method: ${booking.paymentMode?.replace("_", " ")}`,
+//         paymentX + 8,
+//         paymentY
+//       );
+//       paymentY += 15;
+
+//       if (isPaid && booking.paymentMode === "PAY_NOW") {
+//         doc.text(
+//           `Txn ID: ${booking.payment?.razorpayPaymentId || "N/A"}`,
+//           paymentX + 8,
+//           paymentY
+//         );
+//         paymentY += 15;
+//         doc.text(
+//           `Amount: ${formatCurrency(
+//             booking.totalPrice
+//           )}`,
+//           paymentX + 8,
+//           paymentY
+//         );
+//       } else {
+//         doc
+//           .fontSize(7)
+//           .text(
+//             "Outstanding balance to be cleared at check-in.",
+//             paymentX + 8,
+//             paymentY
+//           );
+//       }
+
+//       // Cancellation Policy Card (Middle)
+//       const cancelX = 215;
+//       const cancelWidth = 165;
+//       const policies = booking.propertyId.policies?.cancellationPolicy || [];
+//       const cancelHeight = Math.max(85, 25 + policies.length * 12);
+
+//       doc
+//         .roundedRect(cancelX, footerY, cancelWidth, cancelHeight, 6)
+//         .fill(COLORS.lightBg)
+//         .strokeColor(COLORS.border)
+//         .stroke();
+
+//       doc
+//         .fillColor(COLORS.textDark)
+//         .fontSize(9)
+//         .text("CANCELLATION POLICY", cancelX + 8, footerY + 8);
+
+//       let cancelY = footerY + 25;
+//       if (policies.length === 0) {
+//         doc
+//           .fillColor(COLORS.textLight)
+//           .fontSize(7)
+//           .text("No cancellation policy available.", cancelX + 8, cancelY);
+//       } else {
+//         policies.forEach((p) => {
+//           doc
+//             .fillColor(COLORS.textLight)
+//             .fontSize(7)
+//             .text(
+//               `• ${p.daysBeforeCheckIn} days: ${p.refundPercentage}% refund`,
+//               cancelX + 8,
+//               cancelY
+//             );
+//           cancelY += 10;
+//         });
+//       }
+
+//       // Terms & Conditions Card (Right)
+//       const termsX = 390;
+//       const termsWidth = 165;
+//       doc
+//         .roundedRect(termsX, footerY, termsWidth, 85, 6)
+//         .fill(COLORS.lightBg)
+//         .strokeColor(COLORS.border)
+//         .stroke();
+
+//       doc
+//         .fillColor(COLORS.textDark)
+//         .fontSize(9)
+//         .text("TERMS & CONDITIONS", termsX + 8, footerY + 8);
+
+//       doc.fillColor(COLORS.textLight).fontSize(7);
+
+//       let termsY = footerY + 25;
+//       doc.text(
+//         `• Check-in: ${booking.propertyId.policies?.checkInTime || "2 PM"}`,
+//         termsX + 8,
+//         termsY
+//       );
+//       termsY += 12;
+//       doc.text(
+//         `• Check-out: ${booking.propertyId.policies?.checkOutTime || "12 PM"}`,
+//         termsX + 8,
+//         termsY
+//       );
+//       termsY += 12;
+//       doc.text("• Valid Photo ID required.", termsX + 8, termsY);
+
+//       // Bottom Footer Line
+//       const footerBottom = Math.max(footerY + cancelHeight, footerY + 85) + 15;
+
+//       doc
+//         .moveTo(40, footerBottom)
+//         .lineTo(555, footerBottom)
+//         .strokeColor(COLORS.primary)
+//         .stroke();
+
+//       doc
+//         .fontSize(8)
+//         .fillColor(COLORS.textLight)
+//         .text(
+//           "Bonfire Luxury Stays - Computer Generated Invoice",
+//           40,
+//           footerBottom + 8,
+//           {
+//             align: "center",
+//             width: 515,
+//           }
+//         );
+
+//       doc.end();
+//     } catch (err) {
+//       reject(err);
+//     }
+//   });
+// };
+
+// ============================================================
+//  generatePartnerInvoicePDF
+//  Sent to the hotel/property partner when a new booking is
+//  confirmed on Bonfire Escape.
+// ============================================================
+
 export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
   return new Promise(async (resolve, reject) => {
     const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
     const buffers = [];
+
+    // Track current Y position
+    let currentY = 40; // Starting Y position after margin
+
+    // Helper: Check if we have enough space on current page
+    const checkPageSpace = (requiredHeight) => {
+      const pageHeight = 842; // A4 height in points
+      const bottomMargin = 40;
+      const availableSpace = pageHeight - currentY - bottomMargin;
+
+      if (availableSpace < requiredHeight) {
+        doc.addPage();
+        currentY = 40; // Reset to top margin on new page
+        return false; // Indicates we moved to new page
+      }
+      return true; // Space available on current page
+    };
+
+    // Helper: Add spacing and check page space before rendering section
+    const prepareSection = (requiredHeight, additionalSpacing = 15) => {
+      currentY += additionalSpacing; // Add spacing before section
+      const hadSpace = checkPageSpace(requiredHeight);
+      if (!hadSpace) {
+        currentY += additionalSpacing; // Adjust Y after page break
+      }
+      return currentY;
+    };
 
     doc.on("data", buffers.push.bind(buffers));
     doc.on("end", async () => {
@@ -641,6 +1217,15 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
     });
 
     try {
+      // Get platform settings for footer
+      const platformSettings = await getPlatformSettings();
+      const supportEmail = platformSettings?.supportEmail || null;
+      const supportPhone = platformSettings?.supportPhone || null;
+      const copyrightText =
+        platformSettings?.copyrightText ||
+        `© ${new Date().getFullYear()} Bonfire Escape. All rights reserved.`;
+      const socialLinks = platformSettings?.socialLinks || {};
+
       const isPaid = booking.paymentStatus === "paid";
 
       const normalizeDate = (date) => {
@@ -655,8 +1240,23 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
           (1000 * 60 * 60 * 24)
       );
 
-      // ================= HEADER (REDUCED HEIGHT) =================
-      doc.rect(0, 0, 595, 110).fill(COLORS.primary);
+      // Format date with time
+      const formatDateTime = (dateStr) => {
+        if (!dateStr) return "N/A";
+        const date = new Date(dateStr);
+        return `${String(date.getDate()).padStart(2, "0")}/${String(
+          date.getMonth() + 1
+        ).padStart(2, "0")}/${date.getFullYear()} ${String(
+          date.getHours()
+        ).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+      };
+
+      
+
+      // ================= SECTION 1: HEADER =================
+      // Header is absolute at top of first page
+      const headerHeight = 110;
+      doc.rect(0, 0, 595, headerHeight).fill(COLORS.primary);
 
       const logoPath = path.join(process.cwd(), "public", "bonfire_logo.png");
       if (fs.existsSync(logoPath)) {
@@ -667,7 +1267,7 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         .fillColor("#ffffff")
         .fontSize(22)
         .font("Helvetica-Bold")
-        .text("INVOICE", 400, 20, { align: "right" });
+        .text("VOUCHER", 400, 20, { align: "right" });
 
       const statusColor = isPaid ? COLORS.success : COLORS.danger;
       doc.rect(455, 50, 100, 20).fill(statusColor);
@@ -680,30 +1280,45 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
           align: "center",
         });
 
-      doc.fillColor("#ffffff").font("Helvetica").fontSize(9);
-      doc.text(`Invoice Number: ${invoiceNumber}`, 400, 78, {
+      // Booking info section - no background, clean layout
+      doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(9);
+      doc.text(`Booking ID: ${booking._id}`, 350, 76, {
         align: "right",
       });
+
+      doc.fillColor("#ffffff").font("Helvetica").fontSize(9);
       doc.text(
-        `Booking Date: ${formatDate(booking.createdAt || new Date())}`,
+        `Booking Date: ${formatDateTime(
+          booking.updatedAt || booking.createdAt || new Date()
+        )}`,
         400,
         90,
         { align: "right" }
       );
+
+      doc.fillColor("#FFD700").font("Helvetica-Bold").fontSize(9);
       doc.text(`Confirmation Code: ${booking.confirmationCode}`, 400, 102, {
         align: "right",
       });
 
-      // ================= DIVIDER =================
-      doc.moveTo(40, 125).lineTo(555, 125).strokeColor(COLORS.border).stroke();
-
-      // ================= PROPERTY (WITH ROUNDED CORNERS) =================
-      const propX = 40;
-      const propY = 140;
-
-      // Rounded rectangle for property card
+      // ================= SECTION 2: DIVIDER =================
+      currentY = headerHeight + 15;
       doc
-        .roundedRect(propX, propY, 250, 110, 6)
+        .moveTo(40, currentY)
+        .lineTo(555, currentY)
+        .strokeColor(COLORS.border)
+        .stroke();
+      currentY += 15;
+
+      // ================= SECTION 3: PROPERTY & GUEST CARDS =================
+      const cardHeight = 110;
+      prepareSection(cardHeight, 0);
+
+      const propX = 40;
+      const propY = currentY;
+
+      doc
+        .roundedRect(propX, propY, 250, cardHeight, 6)
         .fill(COLORS.lightBg)
         .strokeColor(COLORS.border)
         .stroke();
@@ -754,12 +1369,11 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
           link: booking.propertyId.mapLink,
         });
 
-      // ================= GUEST (WITH ROUNDED CORNERS) =================
+      // Guest Card
       const guestX = 305;
 
-      // Rounded rectangle for guest card
       doc
-        .roundedRect(guestX, propY, 250, 110, 6)
+        .roundedRect(guestX, propY, 250, cardHeight, 6)
         .fill(COLORS.lightBg)
         .strokeColor(COLORS.border)
         .stroke();
@@ -768,7 +1382,7 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(10)
-        .text("BILL TO", guestX + 10, propY + 12);
+        .text("Guest Details", guestX + 10, propY + 12);
 
       doc.font("Helvetica").fontSize(9).fillColor(COLORS.textLight);
 
@@ -780,40 +1394,104 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         doc.text(booking.primaryGuestDetails.address, guestX + 10, doc.y + 2);
       }
 
-      // ================= SUMMARY =================
-      const summaryY = 265;
+      currentY = propY + cardHeight;
 
-      doc.roundedRect(40, summaryY, 515, 40, 6).fill(COLORS.lightBg);
+      // ================= SECTION 4: CONFIRMATION MESSAGE =================
+      currentY += 20;
+      const messageHeight = 50;
+      prepareSection(messageHeight, 5);
+
+      const messageX = 40;
+      const messageY = currentY;
+
+      doc
+        .roundedRect(messageX, messageY, 515, messageHeight, 6)
+        .fill("#f0f7ff")
+        .strokeColor(COLORS.primary)
+        .lineWidth(1.5)
+        .stroke();
+
+      // Add accent line on left
+      doc.rect(messageX, messageY, 6, messageHeight).fill(COLORS.primary);
+
+      doc
+        .fillColor(COLORS.primaryDark)
+        .font("Helvetica-Oblique")
+        .fontSize(11)
+        .text(
+          "Your Booking Is Confirmed ",
+          messageX + 20,
+          messageY + 12,
+          { align: "center", width: 475 }
+        );
+
+      doc
+        .fillColor(COLORS.textDark)
+        .font("Helvetica")
+        .fontSize(9)
+        .text(
+          `Thank you for using Bonfire Escapes to book your ${booking?.propertyId?.propertyType} accomodation . We are looking forward to your stay.`,
+          messageX + 20,
+          messageY + 28,
+          { align: "center", width: 475 }
+        );
+
+      currentY = messageY + messageHeight;
+
+      // ================= SECTION 5: SUMMARY SECTION =================
+      currentY += 15;
+      const summaryHeight = 40;
+      prepareSection(summaryHeight, 0);
+
+      doc.roundedRect(40, currentY, 515, summaryHeight, 6).fill(COLORS.lightBg);
 
       doc.fillColor(COLORS.primaryDark).fontSize(9).font("Helvetica-Bold");
 
-      doc.text("CHECK-IN", 60, summaryY + 10);
-      doc.text("CHECK-OUT", 180, summaryY + 10);
-      doc.text("NIGHTS", 300, summaryY + 10);
-      doc.text("GUESTS", 420, summaryY + 10);
+      doc.text("CHECK-IN", 60, currentY + 10);
+      doc.text("CHECK-OUT", 180, currentY + 10);
+      doc.text("NIGHTS", 300, currentY + 10);
+      doc.text("GUESTS", 420, currentY + 10);
 
       doc.font("Helvetica").fontSize(10).fillColor(COLORS.textDark);
 
-      doc.text(formatDate(booking.checkInDate), 60, summaryY + 22);
-      doc.text(formatDate(booking.checkOutDate), 180, summaryY + 22);
-      doc.text(nights.toString(), 300, summaryY + 22);
+      doc.text(formatDate(booking.checkInDate), 60, currentY + 22);
+      doc.text(formatDate(booking.checkOutDate), 180, currentY + 22);
+      doc.text(nights.toString(), 300, currentY + 22);
 
       doc.text(
         `${booking.numberOfGuests.adults} Adults, ${
           booking.numberOfGuests.children?.length || 0
         } Kids`,
         420,
-        summaryY + 22
+        currentY + 22
       );
 
-      // ================= TABLE =================
-      const tableTop = 320;
+      currentY += summaryHeight;
+
+      // ================= SECTION 6: BOOKING DETAILS TABLE =================
+      currentY += 15;
+
+      // Calculate total table height dynamically based on rooms and services
+      let estimatedTableHeight = 50; // header + base
+      if (booking.rooms && booking.rooms.length > 0) {
+        booking.rooms.forEach((room) => {
+          estimatedTableHeight += 15; // main row
+          if (room.extraServices?.length) {
+            estimatedTableHeight += room.extraServices.length * 12;
+          }
+          estimatedTableHeight += 20; // spacing after each room
+        });
+      } else {
+        estimatedTableHeight += 30;
+      }
+
+      prepareSection(estimatedTableHeight, 0);
 
       doc
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(10)
-        .text("BOOKING DETAILS", 40, tableTop);
+        .text("BOOKING DETAILS", 40, currentY);
 
       const headers = {
         desc: 40,
@@ -824,16 +1502,17 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         total: 470,
       };
 
-      doc.rect(40, tableTop + 15, 515, 20).fill(COLORS.primary);
+      const headerY = currentY + 15;
+      doc.rect(40, headerY, 515, 20).fill(COLORS.primary);
 
       doc.fillColor("#FFFFFF").fontSize(8).font("Helvetica-Bold");
 
-      doc.text("DESCRIPTION", headers.desc + 10, tableTop + 21);
-      doc.text("TYPE", headers.type, tableTop + 21, {
+      doc.text("DESCRIPTION", headers.desc + 10, headerY + 6);
+      doc.text("TYPE", headers.type, headerY + 6, {
         width: 40,
         align: "center",
       });
-      doc.text("QTY", headers.qty, tableTop + 21, {
+      doc.text("QTY", headers.qty, headerY + 6, {
         width: 40,
         align: "center",
       });
@@ -841,31 +1520,31 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       doc.text(
         booking.pricingType === "NIGHT" ? "UNIT PRICE" : "PACKAGE",
         headers.price,
-        tableTop + 21,
+        headerY + 6,
         { width: 80, align: "right" }
       );
 
-      doc.text("DISCOUNT", headers.disc, tableTop + 21, {
+      doc.text("DISCOUNT", headers.disc, headerY + 6, {
         width: 80,
         align: "right",
       });
 
-      doc.text("TOTAL", headers.total, tableTop + 21, {
+      doc.text("TOTAL", headers.total, headerY + 6, {
         width: 80,
         align: "right",
       });
 
-      let rowY = tableTop + 45;
+      let rowY = headerY + 25;
 
       if (!booking.rooms || booking.rooms.length === 0) {
         doc
           .fillColor(COLORS.textDark)
           .fontSize(9)
           .text("No booking details available.", 40, rowY);
+        rowY += 30;
       } else {
-        booking.rooms.forEach((room) => {
+        booking.rooms.forEach((room, index) => {
           const discount = room.discount || 0;
-
           const unitPrice =
             booking.pricingType === "NIGHT"
               ? room.pricePerNight || 0
@@ -877,7 +1556,6 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
           const descHeight = doc.heightOfString(room.roomId.name, {
             width: 200,
           });
-
           const rowHeight = Math.max(descHeight, 15);
 
           doc
@@ -945,24 +1623,24 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
           }
 
           rowY += 8;
-
           doc
             .moveTo(40, rowY)
             .lineTo(555, rowY)
             .strokeColor(COLORS.border)
             .stroke();
-
           rowY += 12;
         });
       }
 
-      // ================= CALC =================
-      if (rowY > 650) {
-        doc.addPage();
-        rowY = 50;
-      }
+      currentY = rowY;
+
+      // ================= SECTION 7: CALCULATIONS =================
+      currentY += 15;
+      const calcHeight = 100;
+      prepareSection(calcHeight, 0);
 
       const calcX = 350;
+      let calcY = currentY;
 
       const drawCalcRow = (label, val, y, isBold = false, sign = "") => {
         doc
@@ -976,51 +1654,58 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         });
       };
 
-      drawCalcRow("Base Subtotal", booking.priceBreakdown.basePrice, rowY);
+      drawCalcRow("Base Subtotal", booking.priceBreakdown.basePrice, calcY);
       drawCalcRow(
         "Total Discounts",
         booking.priceBreakdown.discountAmount,
-        rowY + 15
+        calcY + 15
       );
       drawCalcRow(
         "Service Fees",
         booking.priceBreakdown.extraServicesFee,
-        rowY + 30
+        calcY + 30
       );
 
       if (booking.priceBreakdown.childrenCharge) {
         drawCalcRow(
           "Children Charges",
           booking.priceBreakdown.childrenCharge,
-          rowY + 45
+          calcY + 45
         );
-        rowY += 15;
+        calcY += 15;
       }
 
-      drawCalcRow("GST (Taxes)", booking.priceBreakdown.gst_amount, rowY + 45);
+      drawCalcRow("GST (Taxes)", booking.priceBreakdown.gst_amount, calcY + 45);
 
-      rowY += 70;
-
-      doc.roundedRect(calcX, rowY - 10, 210, 25, 6).fill(COLORS.primary);
+      const grandTotalY = calcY + 70;
+      doc.roundedRect(calcX, grandTotalY - 10, 210, 25, 6).fill(COLORS.primary);
 
       doc
         .fillColor("#fff")
         .font("Helvetica-Bold")
         .fontSize(11)
-        .text("GRAND TOTAL", calcX + 10, rowY - 3);
+        .text("GRAND TOTAL", calcX + 10, grandTotalY - 3);
 
-      doc.text(formatCurrency(booking.totalPrice), calcX + 70, rowY - 3, {
-        align: "right",
-      });
+      doc.text(
+        formatCurrency(booking.totalPrice),
+        calcX + 70,
+        grandTotalY - 3,
+        {
+          align: "right",
+        }
+      );
 
-      // ================= THREE COLUMN FOOTER (WITH ROUNDED CORNERS) =================
-      const footerY = Math.max(rowY + 30, 700);
+      currentY = grandTotalY + 20;
+
+      // ================= SECTION 8: THREE COLUMN FOOTER CARDS =================
+      const cardSectionHeight = 110;
+      prepareSection(cardSectionHeight, 10);
 
       // Payment Info Card (Left)
       const paymentX = 40;
       const paymentWidth = 165;
       doc
-        .roundedRect(paymentX, footerY, paymentWidth, 85, 6)
+        .roundedRect(paymentX, currentY, paymentWidth, 85, 6)
         .fill(COLORS.lightBg)
         .strokeColor(COLORS.border)
         .stroke();
@@ -1028,11 +1713,11 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       doc
         .fillColor(COLORS.textDark)
         .fontSize(9)
-        .text("PAYMENT INFO", paymentX + 8, footerY + 8);
+        .text("PAYMENT INFO", paymentX + 8, currentY + 8);
 
       doc.fillColor(COLORS.textLight).fontSize(8);
 
-      let paymentY = footerY + 25;
+      let paymentY = currentY + 25;
       doc.text(
         `Method: ${booking.paymentMode?.replace("_", " ")}`,
         paymentX + 8,
@@ -1048,9 +1733,7 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
         );
         paymentY += 15;
         doc.text(
-          `Amount: ${formatCurrency(
-            booking.totalPrice
-          )}`,
+          `Amount: ${formatCurrency(booking.totalPrice)}`,
           paymentX + 8,
           paymentY
         );
@@ -1071,7 +1754,7 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       const cancelHeight = Math.max(85, 25 + policies.length * 12);
 
       doc
-        .roundedRect(cancelX, footerY, cancelWidth, cancelHeight, 6)
+        .roundedRect(cancelX, currentY, cancelWidth, cancelHeight, 6)
         .fill(COLORS.lightBg)
         .strokeColor(COLORS.border)
         .stroke();
@@ -1079,9 +1762,9 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       doc
         .fillColor(COLORS.textDark)
         .fontSize(9)
-        .text("CANCELLATION POLICY", cancelX + 8, footerY + 8);
+        .text("CANCELLATION POLICY", cancelX + 8, currentY + 8);
 
-      let cancelY = footerY + 25;
+      let cancelY = currentY + 25;
       if (policies.length === 0) {
         doc
           .fillColor(COLORS.textLight)
@@ -1105,7 +1788,7 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       const termsX = 390;
       const termsWidth = 165;
       doc
-        .roundedRect(termsX, footerY, termsWidth, 85, 6)
+        .roundedRect(termsX, currentY, termsWidth, 85, 6)
         .fill(COLORS.lightBg)
         .strokeColor(COLORS.border)
         .stroke();
@@ -1113,11 +1796,11 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       doc
         .fillColor(COLORS.textDark)
         .fontSize(9)
-        .text("TERMS & CONDITIONS", termsX + 8, footerY + 8);
+        .text("TERMS & CONDITIONS", termsX + 8, currentY + 8);
 
       doc.fillColor(COLORS.textLight).fontSize(7);
 
-      let termsY = footerY + 25;
+      let termsY = currentY + 25;
       doc.text(
         `• Check-in: ${booking.propertyId.policies?.checkInTime || "2 PM"}`,
         termsX + 8,
@@ -1132,26 +1815,159 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
       termsY += 12;
       doc.text("• Valid Photo ID required.", termsX + 8, termsY);
 
-      // Bottom Footer Line
-      const footerBottom = Math.max(footerY + cancelHeight, footerY + 85) + 15;
+      currentY += Math.max(cancelHeight, 85) + 15;
+
+      // ================= SECTION 9: BOTTOM FOOTER (CONTACT/SOCIAL) =================
+      const bottomFooterHeight = 80;
+      prepareSection(bottomFooterHeight, 10);
 
       doc
-        .moveTo(40, footerBottom)
-        .lineTo(555, footerBottom)
+        .moveTo(40, currentY)
+        .lineTo(555, currentY)
         .strokeColor(COLORS.primary)
+        .lineWidth(1.5)
         .stroke();
 
+      const footerContentY = currentY + 15;
+
+      // Left Column - Contact
       doc
+        .fillColor(COLORS.textDark)
+        .font("Helvetica-Bold")
         .fontSize(8)
+        .text("CONTACT", 40, footerContentY);
+
+      if (supportEmail) {
+        doc
+          .fillColor(COLORS.primary)
+          .font("Helvetica")
+          .fontSize(7.5)
+          .text(`${supportEmail}`, 40, footerContentY + 14, {
+            link: `mailto:${supportEmail}`,
+          });
+      }
+
+      if (supportPhone) {
+        doc
+          .fillColor(COLORS.textLight)
+          .font("Helvetica")
+          .fontSize(7)
+          .text(`${supportPhone}`, 40, footerContentY + 26);
+      }
+
+      // Center Column - Website
+      doc
+        .fillColor(COLORS.textDark)
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .text("WEBSITE", 200, footerContentY);
+
+      doc
+        .fillColor(COLORS.primary)
+        .font("Helvetica")
+        .fontSize(7.5)
+        .text(`bonfireescapes.com`, 200, footerContentY + 14, {
+          link: `https://bonfireescapes.com`,
+        });
+
+      // Right Column - Social Media
+      doc
+        .fillColor(COLORS.textDark)
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .text("FOLLOW US", 420, footerContentY);
+
+      const drawCircleIcon = (x, y, color, letter, link) => {
+        const size = 14;
+        const radius = size / 2;
+
+        doc.save();
+        doc
+          .circle(x + radius, y + radius, radius)
+          .fillColor(color)
+          .fill();
+        doc
+          .fillColor("#ffffff")
+          .font("Helvetica-Bold")
+          .fontSize(8)
+          .text(letter, x + 3, y + 3);
+        doc
+          .rect(x, y, size, size)
+          .fillOpacity(0)
+          .fill()
+          .link(x, y, size, size, link);
+        doc.restore();
+        return size + 8;
+      };
+
+      let iconX = 420;
+      let iconY = footerContentY + 14;
+
+      if (socialLinks.instagram) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#E4405F",
+          "I",
+          socialLinks.instagram
+        );
+      }
+      if (socialLinks.facebook) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#1877F2",
+          "f",
+          socialLinks.facebook
+        );
+      }
+      if (socialLinks.twitter) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#1DA1F2",
+          "T",
+          socialLinks.twitter
+        );
+      }
+      if (socialLinks.linkedin) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#0A66C2",
+          "in",
+          socialLinks.linkedin
+        );
+      }
+      if (socialLinks.whatsapp) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#25D366",
+          "W",
+          socialLinks.whatsapp
+        );
+      }
+
+      currentY = footerContentY + 50;
+
+      // ================= SECTION 10: COPYRIGHT =================
+      const copyrightHeight = 30;
+      prepareSection(copyrightHeight, 5);
+
+      doc
+        .fontSize(7)
+        .fillColor(COLORS.textLight)
+        .text(copyrightText, 40, currentY, { align: "center", width: 515 });
+
+      doc
+        .fontSize(6)
         .fillColor(COLORS.textLight)
         .text(
-          "Bonfire Luxury Stays - Computer Generated Invoice",
+          "This is a computer-generated document and does not require a physical signature.",
           40,
-          footerBottom + 8,
-          {
-            align: "center",
-            width: 515,
-          }
+          currentY + 12,
+          { align: "center", width: 515 }
         );
 
       doc.end();
@@ -1160,12 +1976,6 @@ export const generateCustomerInvoicePDF = async (booking, invoiceNumber) => {
     }
   });
 };
-
-// ============================================================
-//  generatePartnerInvoicePDF
-//  Sent to the hotel/property partner when a new booking is
-//  confirmed on Bonfire Escape.
-// ============================================================
 
 export const generatePartnerInvoicePDF = async (booking, invoiceNumber) => {
   return new Promise(async (resolve, reject) => {

@@ -1,9 +1,9 @@
+
 // import PDFDocument from "pdfkit";
 // import path from "path";
 // import fs from "fs";
 // import { uploadFileToCloudinary } from "../cloudinary.js";
 // import Partner from "../../models/Partner/partner.model.js";
-
 
 // // ============================================================
 // //  generatePartnerPayoutInvoicePDF
@@ -124,6 +124,32 @@
 //       }`;
 //       const bookings = payout.bookings || [];
 
+//       // Calculate totals ONLY for PAY_NOW bookings
+//       const payNowBookings = bookings.filter((entry) => {
+//         const booking = entry.bookingId;
+//         return booking?.paymentMode === "PAY_NOW";
+//       });
+
+//       const totalPartnerAmt = payNowBookings.reduce(
+//         (s, b) => s + (b.partnerAmount || 0),
+//         0
+//       );
+
+//       const totalPartnerGST = payNowBookings.reduce(
+//         (s, b) => s + (b.partner_gst || 0),
+//         0
+//       );
+
+//       const totalAdminAmt = payNowBookings.reduce(
+//         (s, b) => s + (b.adminAmount || 0),
+//         0
+//       );
+
+//       const totalAdminGST = payNowBookings.reduce(
+//         (s, b) => s + (b.admin_gst || 0),
+//         0
+//       );
+
 //       // ════════════════════════════════════════════════════
 //       //  HEADER  — two-tone band (same as partner invoice)
 //       // ════════════════════════════════════════════════════
@@ -243,11 +269,10 @@
 //         .fontSize(7.5)
 //         .text("PARTNER DETAILS", 52, blockY + 8);
 
-//     const partnerData = await Partner.findById(payout.partnerId);
+//       const partnerData = await Partner.findOne({ userId: payout.partnerId});
 
 //       const pan = partnerData?.panDetails || {};
 //       const bank = partnerData?.bankDetails || {};
-//      // const gstin = partnerData?.gstinList?.[0]?.gstin || "N/A";
 
 //       doc
 //         .fillColor(COLORS.textDark)
@@ -259,7 +284,6 @@
 //       doc.text(`PAN: ${pan.panNumber || "N/A"}`, 52, blockY + 33, {
 //         width: 214,
 //       });
-//       // doc.text(`GSTIN: ${gstin}`, 52, blockY + 44, { width: 214 });
 //       doc.text(
 //         `Bank: ${bank.bankName || "N/A"}  |  A/C: ${
 //           bank.accountNumber || "N/A"
@@ -515,27 +539,13 @@
 
 //       rowY += 10;
 
-//       const totalPartnerAmt = bookings.reduce(
-//         (s, b) => s + (b.partnerAmount || 0),
-//         0
-//       );
-               
-//       const totalAdminAmt = bookings.reduce(
-//         (s, b) => s + (b.adminAmount || 0),
-//         0
-//       );
-//       const totalAdminGST = bookings.reduce(
-//         (s, b) => s + (b.admin_gst || 0),
-//         0
-//       );
-
 //       const sumX = 330;
 //       const sumLabelW = 130;
 //       const sumValueW = 100;
 //       const cardW = sumLabelW + sumValueW + 16;
 
 //       // Light card
-//       doc.rect(sumX - 8, rowY - 6, cardW, 106).fill(COLORS.grayLight);
+//       doc.rect(sumX - 8, rowY - 6, cardW, 120).fill(COLORS.grayLight);
 
 //       const drawSumRow = (label, value, y) => {
 //         doc
@@ -556,13 +566,14 @@
 //       };
 
 //       drawSumRow("Partner Amount (excl. GST)", totalPartnerAmt, rowY);
-//       drawSumRow("Admin Commission", totalAdminAmt, rowY + 14);
-//       drawSumRow("Admin GST", totalAdminGST, rowY + 28);
+//       drawSumRow("Partner GST", totalPartnerGST, rowY + 14);
 //       drawSumRow(
-//         "Total Booking Value",
-//         totalPartnerAmt  + totalAdminAmt + totalAdminGST,
-//         rowY + 56
+//         "Total Partner Payout",
+//         totalPartnerAmt + totalPartnerGST,
+//         rowY + 28
 //       );
+//       drawSumRow("Admin Commission", totalAdminAmt, rowY + 42);
+//       drawSumRow("Admin GST", totalAdminGST, rowY + 56);
 
 //       rowY += 74;
 
@@ -653,18 +664,16 @@
 //   });
 // };
 
-
 import PDFDocument from "pdfkit";
 import path from "path";
 import fs from "fs";
 import { uploadFileToCloudinary } from "../cloudinary.js";
 import Partner from "../../models/Partner/partner.model.js";
+import { getPlatformSettings } from "./createInvoice.js";
 
 // ============================================================
 //  generatePartnerPayoutInvoicePDF
 //  Generates a monthly payout statement invoice for a partner.
-//  Mirrors the layout / helper conventions from the existing
-//  generateCustomerInvoicePDF / generatePartnerInvoicePDF fns.
 // ============================================================
 
 // 🎨 UI COLORS  (same palette used across all invoices)
@@ -741,6 +750,10 @@ const paymentStatusColor = (status) => {
   }
 };
 
+
+
+
+
 // ============================================================
 export const generatePartnerPayoutInvoicePDF = async (
   payout,
@@ -771,13 +784,26 @@ export const generatePartnerPayoutInvoicePDF = async (
     });
 
     try {
-      const partner = payout.partnerId; // populated Auth doc
+      const partner = payout.partnerId;
       const walletStatus = payout.partnerWallet?.status || "pending";
       const payableAmount = payout.partnerWallet?.payableAmount || 0;
       const periodLabel = `${MONTH_NAMES[(payout.payoutMonth || 1) - 1]} ${
         payout.payoutYear
       }`;
       const bookings = payout.bookings || [];
+
+      // Get platform settings for footer
+      const platformSettings = await getPlatformSettings();
+      const websiteName = platformSettings?.websiteName || "Bonfire Escape";
+      const supportEmail = platformSettings?.supportEmail || null;
+      const supportPhone = platformSettings?.supportPhone || null;
+      const socialLinks = platformSettings?.socialLinks || {};
+      const copyrightText =
+        platformSettings?.copyrightText ||
+        `© ${new Date().getFullYear()} Bonfire Escape. All rights reserved.`;
+
+      // Static account email
+      const accountsEmail = "accounts@bonfireescapes.com";
 
       // Calculate totals ONLY for PAY_NOW bookings
       const payNowBookings = bookings.filter((entry) => {
@@ -806,22 +832,17 @@ export const generatePartnerPayoutInvoicePDF = async (
       );
 
       // ════════════════════════════════════════════════════
-      //  HEADER  — two-tone band (same as partner invoice)
+      //  HEADER
       // ════════════════════════════════════════════════════
 
-      // Top orange band
       doc.rect(0, 0, 595, 110).fill(COLORS.primary);
-
-      // Dark accent strip
       doc.rect(0, 110, 595, 38).fill(COLORS.primaryDark);
 
-      // Logo
       const logoPath = path.join(process.cwd(), "public", "bonfire_logo.png");
       if (fs.existsSync(logoPath)) {
         doc.image(logoPath, 44, 16, { width: 86 });
       }
 
-      // Title
       doc
         .fillColor("#ffffff")
         .font("Helvetica-Bold")
@@ -831,7 +852,6 @@ export const generatePartnerPayoutInvoicePDF = async (
           align: "right",
         });
 
-      // Meta
       doc.font("Helvetica").fontSize(7.8).fillColor("rgba(255,255,255,0.80)");
       doc.text(`Ref No: ${invoiceNumber}`, 44, 52, {
         width: 507,
@@ -844,7 +864,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         { width: 507, align: "right" }
       );
 
-      // Badge row — payout period pill (left) + wallet status pill (right)
       doc.roundedRect(44, 117, 172, 22, 11).fill(COLORS.primaryDark);
       doc
         .fillColor("#ffffff")
@@ -872,7 +891,6 @@ export const generatePartnerPayoutInvoicePDF = async (
       doc.rect(0, 148, 595, 62).fill(COLORS.lightBg);
       doc.rect(0, 148, 6, 62).fill(COLORS.primary);
 
-      // Faded decorative glyph
       doc
         .fillColor(COLORS.primary)
         .opacity(0.07)
@@ -901,7 +919,6 @@ export const generatePartnerPayoutInvoicePDF = async (
           { width: 520 }
         );
 
-      // ── Section divider ────────────────────────────────
       doc
         .moveTo(40, 214)
         .lineTo(555, 214)
@@ -910,11 +927,10 @@ export const generatePartnerPayoutInvoicePDF = async (
         .stroke();
 
       // ════════════════════════════════════════════════════
-      //  PARTNER INFO CARD (left)  +  ADMIN INFO CARD (right)
+      //  PARTNER INFO CARD + ADMIN INFO CARD
       // ════════════════════════════════════════════════════
       const blockY = 224;
 
-      // ── Partner card ─────────────────────────────────────
       doc.rect(40, blockY, 238, 90).fill(COLORS.grayLight);
       doc.rect(40, blockY, 4, 90).fill(COLORS.primary);
 
@@ -924,8 +940,7 @@ export const generatePartnerPayoutInvoicePDF = async (
         .fontSize(7.5)
         .text("PARTNER DETAILS", 52, blockY + 8);
 
-      const partnerData = await Partner.findOne({ userId: payout.partnerId});
-
+      const partnerData = await Partner.findOne({ userId: payout.partnerId });
       const pan = partnerData?.panDetails || {};
       const bank = partnerData?.bankDetails || {};
 
@@ -951,7 +966,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         width: 214,
       });
 
-      // ── Admin / Platform card ─────────────────────────
       doc.rect(292, blockY, 263, 90).fill(COLORS.grayLight);
       doc.rect(292, blockY, 4, 90).fill(COLORS.primaryDark);
 
@@ -980,7 +994,6 @@ export const generatePartnerPayoutInvoicePDF = async (
       doc.roundedRect(40, walletY, 515, 46, 6).fill(COLORS.lightBg);
       doc.rect(40, walletY, 4, 46).fill(COLORS.primary);
 
-      // Payable amount — large, left
       doc
         .fillColor(COLORS.primaryDark)
         .font("Helvetica-Bold")
@@ -993,7 +1006,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         .fontSize(16)
         .text(formatCurrency(payableAmount), 56, walletY + 20);
 
-      // Status badge — right
       const badgeColor = walletStatusColor(walletStatus);
       doc.roundedRect(420, walletY + 12, 120, 22, 5).fill(badgeColor);
       doc
@@ -1016,19 +1028,17 @@ export const generatePartnerPayoutInvoicePDF = async (
         .fontSize(9.5)
         .text("BOOKING BREAKDOWN", 40, tableTop);
 
-      // Column x-positions
       const col = {
-        code: 40, // Confirmation code
-        property: 120, // Property name
-        checkin: 240, // Check-in
-        checkout: 288, // Check-out
-        totalPrice: 335, // Booking total
-        payMode: 385, // Payment mode
-        payStatus: 435, // Payment status
-        partnerAmt: 480, // Partner amount
+        code: 40,
+        property: 120,
+        checkin: 240,
+        checkout: 288,
+        totalPrice: 335,
+        payMode: 385,
+        payStatus: 435,
+        partnerAmt: 480,
       };
 
-      // Header row
       doc.rect(40, tableTop + 14, 515, 20).fill(COLORS.primary);
       doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(6.8);
 
@@ -1070,9 +1080,8 @@ export const generatePartnerPayoutInvoicePDF = async (
         rowY += 20;
       } else {
         bookings.forEach((entry, idx) => {
-          const booking = entry.bookingId; // populated Booking doc
+          const booking = entry.bookingId;
 
-          // Alternating row bg
           doc
             .rect(40, rowY - 3, 515, 22)
             .fill(idx % 2 === 0 ? "#fff7ed" : "#ffffff");
@@ -1087,14 +1096,12 @@ export const generatePartnerPayoutInvoicePDF = async (
           const partnerAmount = entry.partnerAmount || 0;
           const partnerGST = entry.partner_gst || 0;
 
-          // Confirmation code
           doc
             .fillColor(COLORS.textDark)
             .font("Helvetica-Bold")
             .fontSize(7.2)
             .text(confirmCode, col.code + 4, rowY, { width: 74 });
 
-          // Property name (truncated)
           doc
             .font("Helvetica")
             .fontSize(7)
@@ -1104,14 +1111,12 @@ export const generatePartnerPayoutInvoicePDF = async (
               ellipsis: true,
             });
 
-          // Check-in / Check-out
           doc.text(checkIn, col.checkin, rowY, { width: 46, align: "center" });
           doc.text(checkOut, col.checkout, rowY, {
             width: 46,
             align: "center",
           });
 
-          // Total price
           doc
             .fillColor(COLORS.textDark)
             .text(formatCurrency(totalPrice), col.totalPrice, rowY, {
@@ -1119,14 +1124,12 @@ export const generatePartnerPayoutInvoicePDF = async (
               align: "right",
             });
 
-          // Payment mode (short)
           doc
             .fillColor(COLORS.textLight)
             .font("Helvetica")
             .fontSize(6.5)
             .text(payMode, col.payMode, rowY, { width: 46, align: "center" });
 
-          // Payment status — coloured text
           doc
             .fillColor(paymentStatusColor(payStatus))
             .font("Helvetica-Bold")
@@ -1136,7 +1139,6 @@ export const generatePartnerPayoutInvoicePDF = async (
               align: "center",
             });
 
-          // Partner amount
           doc
             .fillColor(COLORS.primaryDark)
             .font("Helvetica-Bold")
@@ -1148,7 +1150,6 @@ export const generatePartnerPayoutInvoicePDF = async (
 
           rowY += 20;
 
-          // Sub-row: GST / admin breakdown (lighter, indented)
           doc
             .fillColor(COLORS.textLight)
             .font("Helvetica")
@@ -1166,7 +1167,6 @@ export const generatePartnerPayoutInvoicePDF = async (
 
           rowY += 10;
 
-          // Divider
           doc
             .moveTo(40, rowY)
             .lineTo(555, rowY)
@@ -1176,7 +1176,6 @@ export const generatePartnerPayoutInvoicePDF = async (
 
           rowY += 8;
 
-          // Page overflow guard
           if (rowY > 760) {
             doc.addPage();
             rowY = 50;
@@ -1185,7 +1184,7 @@ export const generatePartnerPayoutInvoicePDF = async (
       }
 
       // ════════════════════════════════════════════════════
-      //  TOTALS SUMMARY (right-aligned card)
+      //  TOTALS SUMMARY
       // ════════════════════════════════════════════════════
       if (rowY > 650) {
         doc.addPage();
@@ -1199,7 +1198,6 @@ export const generatePartnerPayoutInvoicePDF = async (
       const sumValueW = 100;
       const cardW = sumLabelW + sumValueW + 16;
 
-      // Light card
       doc.rect(sumX - 8, rowY - 6, cardW, 120).fill(COLORS.grayLight);
 
       const drawSumRow = (label, value, y) => {
@@ -1232,7 +1230,6 @@ export const generatePartnerPayoutInvoicePDF = async (
 
       rowY += 74;
 
-      // Grand total pill
       doc.roundedRect(sumX - 8, rowY, cardW, 28, 5).fill(COLORS.primary);
 
       doc
@@ -1247,7 +1244,7 @@ export const generatePartnerPayoutInvoicePDF = async (
       });
 
       // ════════════════════════════════════════════════════
-      //  FOOTER
+      //  FOOTER - SIMPLE CIRCLE ICONS WITH LETTERS
       // ════════════════════════════════════════════════════
       const footerY = Math.max(rowY + 44, 700);
 
@@ -1258,7 +1255,7 @@ export const generatePartnerPayoutInvoicePDF = async (
         .lineWidth(1.5)
         .stroke();
 
-      // Left — payout status note
+      // Left Column - Payout Status
       doc
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
@@ -1276,39 +1273,161 @@ export const generatePartnerPayoutInvoicePDF = async (
           align: "center",
         });
 
-      // Centre — note
-      doc
-        .fillColor(COLORS.textLight)
-        .font("Helvetica")
-        .fontSize(7.2)
-        .text(
-          "This document is computer-generated and serves as an\nofficial payout statement from Bonfire Escape.",
-          200,
-          footerY + 10,
-          { width: 200, align: "center" }
-        );
-
-      // Right — admin GSTIN
+      // Center Column - Static Accounts Email + Dynamic Support Info
       doc
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(8)
-        .text("PLATFORM GSTIN", 420, footerY + 10);
+        .text("FINANCE & SUPPORT", 200, footerY + 10);
 
+      // Static accounts email
       doc
-        .fillColor(COLORS.textLight)
+        .fillColor(COLORS.primary)
         .font("Helvetica")
-        .fontSize(8)
-        .text(adminGSTIN, 420, footerY + 22);
+        .fontSize(7.5)
+        .text(`${accountsEmail}`, 200, footerY + 24, {
+          link: `mailto:${accountsEmail}`,
+        });
 
-      // Bottom tagline
+      let centerY = footerY + 36;
+
+      // Dynamic support email (if exists)
+      if (supportEmail) {
+        doc
+          .fillColor(COLORS.textLight)
+          .font("Helvetica")
+          .fontSize(7)
+          .text(`Support: ${supportEmail}`, 200, centerY, {
+            link: `mailto:${supportEmail}`,
+          });
+        centerY += 10;
+      }
+
+      // Dynamic support phone (if exists)
+      if (supportPhone) {
+        doc
+          .fillColor(COLORS.textLight)
+          .font("Helvetica")
+          .fontSize(7)
+          .text(`Phone: ${supportPhone}`, 200, centerY);
+      }
+
+      // Right Column - Simple Circle Icons with Letters
+      doc
+        .fillColor(COLORS.textDark)
+        .font("Helvetica-Bold")
+        .fontSize(8)
+        .text("FOLLOW US", 420, footerY + 10);
+
+      // Function to draw circle icon with letter
+      const drawCircleIcon = (x, y, color, letter, link) => {
+        const size = 16;
+        const radius = size / 2;
+
+        doc.save();
+        // Draw circle background
+        doc
+          .circle(x + radius, y + radius, radius)
+          .fillColor(color)
+          .fill();
+        // Draw letter
+        doc
+          .fillColor("#ffffff")
+          .font("Helvetica-Bold")
+          .fontSize(9)
+          .text(letter, x + 4, y + 4);
+        // Make it clickable
+        doc
+          .rect(x, y, size, size)
+          .fillOpacity(0)
+          .fill()
+          .link(x, y, size, size, link);
+        doc.restore();
+        return size + 8;
+      };
+
+      let iconX = 420;
+      let iconY = footerY + 24;
+
+      // Instagram - I
+      if (socialLinks.instagram) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#E4405F",
+          "I",
+          socialLinks.instagram
+        );
+      }
+
+      // Facebook - f
+      if (socialLinks.facebook) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#1877F2",
+          "f",
+          socialLinks.facebook
+        );
+      }
+
+      // Twitter - T
+      if (socialLinks.twitter) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#1DA1F2",
+          "T",
+          socialLinks.twitter
+        );
+      }
+
+      // LinkedIn - in
+      if (socialLinks.linkedin) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#0A66C2",
+          "in",
+          socialLinks.linkedin
+        );
+      }
+
+      // WhatsApp - W
+      if (socialLinks.whatsapp) {
+        iconX += drawCircleIcon(
+          iconX,
+          iconY,
+          "#25D366",
+          "W",
+          socialLinks.whatsapp
+        );
+      }
+
+      // Website Name (if exists)
+      if (websiteName) {
+        doc
+          .fillColor(COLORS.textLight)
+          .font("Helvetica")
+          .fontSize(6.5)
+          .text(`${websiteName.toLowerCase()}.com`, 420, iconY + 22);
+      }
+
+      // Bottom Footer with Copyright
+      const bottomY = Math.max(footerY + 80, 770);
+
       doc
         .fontSize(7)
         .fillColor(COLORS.textLight)
+        .text(copyrightText, 40, bottomY, { align: "center", width: 515 });
+
+      doc
+        .fontSize(6)
+        .fillColor(COLORS.textLight)
         .text(
-          "Bonfire Escape — Auto-generated partner payout statement. Do not reply to this document.",
+          "This is a computer-generated document and does not require a physical signature.",
           40,
-          782,
+          bottomY + 12,
           { align: "center", width: 515 }
         );
 
