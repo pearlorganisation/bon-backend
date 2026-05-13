@@ -699,7 +699,10 @@ export const getMyPlans = asyncHandler(async (req, res, next) => {
     partnerId,
     planStatus: { $in: ["ACTIVE", "UPCOMING"] },
   })
-    .sort({ createdAt: 1 })
+    .sort({
+      planStatus: 1, // ACTIVE will come before UPCOMING alphabetically
+      
+    })
     .populate("subscriptionPlanId", "name")
     .populate("invoiceId");
 

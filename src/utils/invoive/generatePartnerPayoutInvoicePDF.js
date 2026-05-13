@@ -750,10 +750,6 @@ const paymentStatusColor = (status) => {
   }
 };
 
-
-
-
-
 // ============================================================
 export const generatePartnerPayoutInvoicePDF = async (
   payout,
@@ -763,6 +759,33 @@ export const generatePartnerPayoutInvoicePDF = async (
   return new Promise(async (resolve, reject) => {
     const doc = new PDFDocument({ margin: 40, size: "A4", bufferPages: true });
     const buffers = [];
+
+    // Track current Y position
+    let currentY = 40;
+
+    // Helper: Check if we have enough space on current page
+    const checkPageSpace = (requiredHeight) => {
+      const pageHeight = 842; // A4 height in points
+      const bottomMargin = 40;
+      const availableSpace = pageHeight - currentY - bottomMargin;
+
+      if (availableSpace < requiredHeight) {
+        doc.addPage();
+        currentY = 40; // Reset to top margin on new page
+        return false;
+      }
+      return true;
+    };
+
+    // Helper: Add spacing and check page space before rendering section
+    const prepareSection = (requiredHeight, additionalSpacing = 15) => {
+      currentY += additionalSpacing;
+      const hadSpace = checkPageSpace(requiredHeight);
+      if (!hadSpace) {
+        currentY += additionalSpacing;
+      }
+      return currentY;
+    };
 
     doc.on("data", buffers.push.bind(buffers));
     doc.on("end", async () => {
@@ -831,9 +854,8 @@ export const generatePartnerPayoutInvoicePDF = async (
         0
       );
 
-      // ════════════════════════════════════════════════════
-      //  HEADER
-      // ════════════════════════════════════════════════════
+      // ================= SECTION 1: HEADER =================
+      const headerHeight = 148;
 
       doc.rect(0, 0, 595, 110).fill(COLORS.primary);
       doc.rect(0, 110, 595, 38).fill(COLORS.primaryDark);
@@ -885,18 +907,21 @@ export const generatePartnerPayoutInvoicePDF = async (
           align: "center",
         });
 
-      // ════════════════════════════════════════════════════
-      //  GREETING BAND
-      // ════════════════════════════════════════════════════
-      doc.rect(0, 148, 595, 62).fill(COLORS.lightBg);
-      doc.rect(0, 148, 6, 62).fill(COLORS.primary);
+      currentY = headerHeight;
+
+      // ================= SECTION 2: GREETING BAND =================
+      const greetingHeight = 66;
+      prepareSection(greetingHeight, 0);
+
+      doc.rect(0, currentY, 595, 62).fill(COLORS.lightBg);
+      doc.rect(0, currentY, 6, 62).fill(COLORS.primary);
 
       doc
         .fillColor(COLORS.primary)
         .opacity(0.07)
         .font("Helvetica-Bold")
         .fontSize(64)
-        .text("₹", 490, 143, { lineBreak: false });
+        .text("₹", 490, currentY - 5, { lineBreak: false });
       doc.opacity(1);
 
       const partnerName =
@@ -906,7 +931,7 @@ export const generatePartnerPayoutInvoicePDF = async (
         .fillColor(COLORS.primaryDark)
         .font("Helvetica-Bold")
         .fontSize(14)
-        .text(`Hello, ${partnerName}!`, 22, 158, { width: 480 });
+        .text(`Hello, ${partnerName}!`, 22, currentY + 10, { width: 480 });
 
       doc
         .fillColor(COLORS.textDark)
@@ -915,30 +940,35 @@ export const generatePartnerPayoutInvoicePDF = async (
         .text(
           `Here is your payout statement for ${periodLabel}. Please review the booking breakdown and payable amount below.`,
           22,
-          175,
+          currentY + 27,
           { width: 520 }
         );
 
+      currentY += 62;
+
+      // Divider
       doc
-        .moveTo(40, 214)
-        .lineTo(555, 214)
+        .moveTo(40, currentY)
+        .lineTo(555, currentY)
         .strokeColor(COLORS.border)
         .lineWidth(0.8)
         .stroke();
 
-      // ════════════════════════════════════════════════════
-      //  PARTNER INFO CARD + ADMIN INFO CARD
-      // ════════════════════════════════════════════════════
-      const blockY = 224;
+      currentY += 10;
 
-      doc.rect(40, blockY, 238, 90).fill(COLORS.grayLight);
-      doc.rect(40, blockY, 4, 90).fill(COLORS.primary);
+      // ================= SECTION 3: PARTNER & ADMIN CARDS =================
+      const cardsHeight = 90;
+      prepareSection(cardsHeight, 0);
+
+      // Partner card
+      doc.rect(40, currentY, 238, 90).fill(COLORS.grayLight);
+      doc.rect(40, currentY, 4, 90).fill(COLORS.primary);
 
       doc
         .fillColor(COLORS.primaryDark)
         .font("Helvetica-Bold")
         .fontSize(7.5)
-        .text("PARTNER DETAILS", 52, blockY + 8);
+        .text("PARTNER DETAILS", 52, currentY + 8);
 
       const partnerData = await Partner.findOne({ userId: payout.partnerId });
       const pan = partnerData?.panDetails || {};
@@ -948,10 +978,10 @@ export const generatePartnerPayoutInvoicePDF = async (
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(9)
-        .text(pan.fullName || partnerName, 52, blockY + 20, { width: 214 });
+        .text(pan.fullName || partnerName, 52, currentY + 20, { width: 214 });
 
       doc.font("Helvetica").fontSize(7.8).fillColor(COLORS.textLight);
-      doc.text(`PAN: ${pan.panNumber || "N/A"}`, 52, blockY + 33, {
+      doc.text(`PAN: ${pan.panNumber || "N/A"}`, 52, currentY + 33, {
         width: 214,
       });
       doc.text(
@@ -959,74 +989,88 @@ export const generatePartnerPayoutInvoicePDF = async (
           bank.accountNumber || "N/A"
         }`,
         52,
-        blockY + 55,
+        currentY + 55,
         { width: 214 }
       );
-      doc.text(`IFSC: ${bank.ifscCode || "N/A"}`, 52, blockY + 66, {
+      doc.text(`IFSC: ${bank.ifscCode || "N/A"}`, 52, currentY + 66, {
         width: 214,
       });
 
-      doc.rect(292, blockY, 263, 90).fill(COLORS.grayLight);
-      doc.rect(292, blockY, 4, 90).fill(COLORS.primaryDark);
+      // Admin card
+      doc.rect(292, currentY, 263, 90).fill(COLORS.grayLight);
+      doc.rect(292, currentY, 4, 90).fill(COLORS.primaryDark);
 
       doc
         .fillColor(COLORS.primaryDark)
         .font("Helvetica-Bold")
         .fontSize(7.5)
-        .text("PLATFORM (BONFIRE ESCAPE)", 304, blockY + 8);
+        .text("PLATFORM (BONFIRE ESCAPE)", 304, currentY + 8);
 
       doc
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(9)
-        .text("Bonfire Escape Pvt. Ltd.", 304, blockY + 20);
+        .text("Bonfire Escape Pvt. Ltd.", 304, currentY + 20);
 
       doc.font("Helvetica").fontSize(7.8).fillColor(COLORS.textLight);
-      doc.text(`GSTIN: ${adminGSTIN}`, 304, blockY + 33);
-      doc.text(`Invoice Ref: ${invoiceNumber}`, 304, blockY + 44);
-      doc.text(`Statement Period: ${periodLabel}`, 304, blockY + 55);
+      doc.text(`GSTIN: ${adminGSTIN}`, 304, currentY + 33);
+      doc.text(`Invoice Ref: ${invoiceNumber}`, 304, currentY + 44);
+      doc.text(`Statement Period: ${periodLabel}`, 304, currentY + 55);
 
-      // ════════════════════════════════════════════════════
-      //  WALLET SUMMARY STRIP
-      // ════════════════════════════════════════════════════
-      const walletY = blockY + 103;
+      currentY += 90;
 
-      doc.roundedRect(40, walletY, 515, 46, 6).fill(COLORS.lightBg);
-      doc.rect(40, walletY, 4, 46).fill(COLORS.primary);
+      // ================= SECTION 4: WALLET SUMMARY STRIP =================
+      const walletHeight = 46;
+      prepareSection(walletHeight, 13);
+
+      doc.roundedRect(40, currentY, 515, 46, 6).fill(COLORS.lightBg);
+      doc.rect(40, currentY, 4, 46).fill(COLORS.primary);
 
       doc
         .fillColor(COLORS.primaryDark)
         .font("Helvetica-Bold")
         .fontSize(8)
-        .text("TOTAL PAYABLE AMOUNT", 56, walletY + 8);
+        .text("TOTAL PAYABLE AMOUNT", 56, currentY + 8);
 
       doc
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(16)
-        .text(formatCurrency(payableAmount), 56, walletY + 20);
+        .text(formatCurrency(payableAmount), 56, currentY + 20);
 
       const badgeColor = walletStatusColor(walletStatus);
-      doc.roundedRect(420, walletY + 12, 120, 22, 5).fill(badgeColor);
+      doc.roundedRect(420, currentY + 12, 120, 22, 5).fill(badgeColor);
       doc
         .fillColor("#ffffff")
         .font("Helvetica-Bold")
         .fontSize(9)
-        .text(walletStatus.toUpperCase(), 420, walletY + 19, {
+        .text(walletStatus.toUpperCase(), 420, currentY + 19, {
           width: 120,
           align: "center",
         });
 
-      // ════════════════════════════════════════════════════
-      //  BOOKINGS TABLE
-      // ════════════════════════════════════════════════════
-      const tableTop = walletY + 62;
+      currentY += 46;
+
+      // ================= SECTION 5: BOOKINGS TABLE =================
+      currentY += 16;
+
+      // Calculate estimated table height
+      let estimatedTableHeight = 40; // header
+      if (bookings.length > 0) {
+        bookings.forEach(() => {
+          estimatedTableHeight += 38; // main row + GST row + spacing
+        });
+      } else {
+        estimatedTableHeight += 30;
+      }
+
+      prepareSection(estimatedTableHeight, 0);
 
       doc
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(9.5)
-        .text("BOOKING BREAKDOWN", 40, tableTop);
+        .text("BOOKING BREAKDOWN", 40, currentY);
 
       const col = {
         code: 40,
@@ -1039,37 +1083,38 @@ export const generatePartnerPayoutInvoicePDF = async (
         partnerAmt: 480,
       };
 
-      doc.rect(40, tableTop + 14, 515, 20).fill(COLORS.primary);
+      const headerY = currentY + 14;
+      doc.rect(40, headerY, 515, 20).fill(COLORS.primary);
       doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(6.8);
 
-      doc.text("CONF. CODE", col.code + 4, tableTop + 20);
-      doc.text("PROPERTY", col.property + 2, tableTop + 20, { width: 95 });
-      doc.text("CHECK-IN", col.checkin, tableTop + 20, {
+      doc.text("CONF. CODE", col.code + 4, headerY + 6);
+      doc.text("PROPERTY", col.property + 2, headerY + 6, { width: 95 });
+      doc.text("CHECK-IN", col.checkin, headerY + 6, {
         width: 46,
         align: "center",
       });
-      doc.text("CHECK-OUT", col.checkout, tableTop + 20, {
+      doc.text("CHECK-OUT", col.checkout, headerY + 6, {
         width: 46,
         align: "center",
       });
-      doc.text("TOTAL", col.totalPrice, tableTop + 20, {
+      doc.text("TOTAL", col.totalPrice, headerY + 6, {
         width: 46,
         align: "right",
       });
-      doc.text("MODE", col.payMode, tableTop + 20, {
+      doc.text("MODE", col.payMode, headerY + 6, {
         width: 46,
         align: "center",
       });
-      doc.text("PAY STATUS", col.payStatus, tableTop + 20, {
+      doc.text("PAY STATUS", col.payStatus, headerY + 6, {
         width: 46,
         align: "center",
       });
-      doc.text("PARTNER AMT", col.partnerAmt, tableTop + 20, {
+      doc.text("PARTNER AMT", col.partnerAmt, headerY + 6, {
         width: 70,
         align: "right",
       });
 
-      let rowY = tableTop + 44;
+      let rowY = headerY + 24;
 
       if (bookings.length === 0) {
         doc
@@ -1077,7 +1122,7 @@ export const generatePartnerPayoutInvoicePDF = async (
           .font("Helvetica")
           .fontSize(9)
           .text("No bookings found for this payout period.", 40, rowY);
-        rowY += 20;
+        rowY += 30;
       } else {
         bookings.forEach((entry, idx) => {
           const booking = entry.bookingId;
@@ -1175,30 +1220,22 @@ export const generatePartnerPayoutInvoicePDF = async (
             .stroke();
 
           rowY += 8;
-
-          if (rowY > 760) {
-            doc.addPage();
-            rowY = 50;
-          }
         });
       }
 
-      // ════════════════════════════════════════════════════
-      //  TOTALS SUMMARY
-      // ════════════════════════════════════════════════════
-      if (rowY > 650) {
-        doc.addPage();
-        rowY = 50;
-      }
+      currentY = rowY;
 
-      rowY += 10;
+      // ================= SECTION 6: TOTALS SUMMARY =================
+      currentY += 10;
+      const summaryHeight = 120;
+      prepareSection(summaryHeight, 0);
 
       const sumX = 330;
       const sumLabelW = 130;
       const sumValueW = 100;
       const cardW = sumLabelW + sumValueW + 16;
 
-      doc.rect(sumX - 8, rowY - 6, cardW, 120).fill(COLORS.grayLight);
+      doc.rect(sumX - 8, currentY - 6, cardW, 120).fill(COLORS.grayLight);
 
       const drawSumRow = (label, value, y) => {
         doc
@@ -1218,57 +1255,60 @@ export const generatePartnerPayoutInvoicePDF = async (
           .stroke();
       };
 
-      drawSumRow("Partner Amount (excl. GST)", totalPartnerAmt, rowY);
-      drawSumRow("Partner GST", totalPartnerGST, rowY + 14);
+      let sumY = currentY + 2;
+      drawSumRow("Partner Amount (excl. GST)", totalPartnerAmt, sumY);
+      drawSumRow("Partner GST", totalPartnerGST, sumY + 14);
       drawSumRow(
         "Total Partner Payout",
         totalPartnerAmt + totalPartnerGST,
-        rowY + 28
+        sumY + 28
       );
-      drawSumRow("Admin Commission", totalAdminAmt, rowY + 42);
-      drawSumRow("Admin GST", totalAdminGST, rowY + 56);
+      drawSumRow("Admin Commission", totalAdminAmt, sumY + 42);
+      drawSumRow("Admin GST", totalAdminGST, sumY + 56);
 
-      rowY += 74;
-
-      doc.roundedRect(sumX - 8, rowY, cardW, 28, 5).fill(COLORS.primary);
+      sumY += 68;
+      doc.roundedRect(sumX - 8, sumY, cardW, 28, 5).fill(COLORS.primary);
 
       doc
         .fillColor("#ffffff")
         .font("Helvetica-Bold")
         .fontSize(9.5)
-        .text("PAYABLE TO PARTNER", sumX, rowY + 9, { width: sumLabelW });
+        .text("PAYABLE TO PARTNER", sumX, sumY + 9, { width: sumLabelW });
 
-      doc.text(formatCurrency(payableAmount), sumX + sumLabelW, rowY + 9, {
+      doc.text(formatCurrency(payableAmount), sumX + sumLabelW, sumY + 9, {
         width: sumValueW,
         align: "right",
       });
 
-      // ════════════════════════════════════════════════════
-      //  FOOTER - SIMPLE CIRCLE ICONS WITH LETTERS
-      // ════════════════════════════════════════════════════
-      const footerY = Math.max(rowY + 44, 700);
+      currentY = sumY + 35;
+
+      // ================= SECTION 7: FOOTER =================
+      const footerHeight = 100;
+      prepareSection(footerHeight, 10);
 
       doc
-        .moveTo(40, footerY)
-        .lineTo(555, footerY)
+        .moveTo(40, currentY)
+        .lineTo(555, currentY)
         .strokeColor(COLORS.primary)
         .lineWidth(1.5)
         .stroke();
+
+      const footerContentY = currentY + 20;
 
       // Left Column - Payout Status
       doc
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(8)
-        .text("PAYOUT STATUS", 40, footerY + 10);
+        .text("PAYOUT STATUS", 40, footerContentY);
 
       const statusColor2 = walletStatusColor(walletStatus);
-      doc.roundedRect(40, footerY + 24, 90, 16, 4).fill(statusColor2);
+      doc.roundedRect(40, footerContentY + 14, 90, 16, 4).fill(statusColor2);
       doc
         .fillColor("#ffffff")
         .font("Helvetica-Bold")
         .fontSize(7.5)
-        .text(walletStatus.toUpperCase(), 40, footerY + 29, {
+        .text(walletStatus.toUpperCase(), 40, footerContentY + 19, {
           width: 90,
           align: "center",
         });
@@ -1278,20 +1318,18 @@ export const generatePartnerPayoutInvoicePDF = async (
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(8)
-        .text("FINANCE & SUPPORT", 200, footerY + 10);
+        .text("FINANCE & SUPPORT", 200, footerContentY);
 
-      // Static accounts email
       doc
         .fillColor(COLORS.primary)
         .font("Helvetica")
         .fontSize(7.5)
-        .text(`${accountsEmail}`, 200, footerY + 24, {
+        .text(`${accountsEmail}`, 200, footerContentY + 14, {
           link: `mailto:${accountsEmail}`,
         });
 
-      let centerY = footerY + 36;
+      let centerY = footerContentY + 26;
 
-      // Dynamic support email (if exists)
       if (supportEmail) {
         doc
           .fillColor(COLORS.textLight)
@@ -1303,7 +1341,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         centerY += 10;
       }
 
-      // Dynamic support phone (if exists)
       if (supportPhone) {
         doc
           .fillColor(COLORS.textLight)
@@ -1317,26 +1354,22 @@ export const generatePartnerPayoutInvoicePDF = async (
         .fillColor(COLORS.textDark)
         .font("Helvetica-Bold")
         .fontSize(8)
-        .text("FOLLOW US", 420, footerY + 10);
+        .text("FOLLOW US", 420, footerContentY);
 
-      // Function to draw circle icon with letter
       const drawCircleIcon = (x, y, color, letter, link) => {
         const size = 16;
         const radius = size / 2;
 
         doc.save();
-        // Draw circle background
         doc
           .circle(x + radius, y + radius, radius)
           .fillColor(color)
           .fill();
-        // Draw letter
         doc
           .fillColor("#ffffff")
           .font("Helvetica-Bold")
           .fontSize(9)
           .text(letter, x + 4, y + 4);
-        // Make it clickable
         doc
           .rect(x, y, size, size)
           .fillOpacity(0)
@@ -1347,9 +1380,8 @@ export const generatePartnerPayoutInvoicePDF = async (
       };
 
       let iconX = 420;
-      let iconY = footerY + 24;
+      let iconY = footerContentY + 14;
 
-      // Instagram - I
       if (socialLinks.instagram) {
         iconX += drawCircleIcon(
           iconX,
@@ -1360,7 +1392,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         );
       }
 
-      // Facebook - f
       if (socialLinks.facebook) {
         iconX += drawCircleIcon(
           iconX,
@@ -1371,7 +1402,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         );
       }
 
-      // Twitter - T
       if (socialLinks.twitter) {
         iconX += drawCircleIcon(
           iconX,
@@ -1382,7 +1412,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         );
       }
 
-      // LinkedIn - in
       if (socialLinks.linkedin) {
         iconX += drawCircleIcon(
           iconX,
@@ -1393,7 +1422,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         );
       }
 
-      // WhatsApp - W
       if (socialLinks.whatsapp) {
         iconX += drawCircleIcon(
           iconX,
@@ -1404,7 +1432,6 @@ export const generatePartnerPayoutInvoicePDF = async (
         );
       }
 
-      // Website Name (if exists)
       if (websiteName) {
         doc
           .fillColor(COLORS.textLight)
@@ -1413,13 +1440,16 @@ export const generatePartnerPayoutInvoicePDF = async (
           .text(`${websiteName.toLowerCase()}.com`, 420, iconY + 22);
       }
 
-      // Bottom Footer with Copyright
-      const bottomY = Math.max(footerY + 80, 770);
+      currentY = footerContentY + 60;
+
+      // ================= SECTION 8: COPYRIGHT =================
+      const copyrightHeight = 30;
+      prepareSection(copyrightHeight, 5);
 
       doc
         .fontSize(7)
         .fillColor(COLORS.textLight)
-        .text(copyrightText, 40, bottomY, { align: "center", width: 515 });
+        .text(copyrightText, 40, currentY, { align: "center", width: 515 });
 
       doc
         .fontSize(6)
@@ -1427,7 +1457,7 @@ export const generatePartnerPayoutInvoicePDF = async (
         .text(
           "This is a computer-generated document and does not require a physical signature.",
           40,
-          bottomY + 12,
+          currentY + 12,
           { align: "center", width: 515 }
         );
 

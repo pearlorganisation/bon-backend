@@ -130,28 +130,28 @@ export const createBookingInvoice = async (bookingId) => {
     console.log("Customer PDF:", customerPdfUrl);
     console.log("Partner PDF:", partnerPdfUrl);
 
-    // const invoice = await Invoice.create({
-    //   invoiceNumber,
-    //   invoiceType: "BOOKING_INVOICE",
-    //   pdfUrl: customerPdfUrl,
-    //   pdfUrl2: partnerPdfUrl,
-    // });
+    const invoice = await Invoice.create({
+      invoiceNumber,
+      invoiceType: "BOOKING_INVOICE",
+      pdfUrl: customerPdfUrl,
+      pdfUrl2: partnerPdfUrl,
+    });
 
-    // console.log("Invoice created:", invoice);
-    // booking.invoiceId = invoice._id;
-    // await booking.save();
+    console.log("Invoice created:", invoice);
+    booking.invoiceId = invoice._id;
+    await booking.save();
 
-    // // Send email to customer with invoice
-    // sendCustomerBookingConfirmation(booking, customerPdfUrl)
-    //   .then(console.log("done customer"))
-    //   .catch((err) => console.log(err));
+    // Send email to customer with invoice
+    sendCustomerBookingConfirmation(booking, customerPdfUrl)
+      .then(console.log("done customer"))
+      .catch((err) => console.log(err));
 
-    // // Send email to partner with invoice
-    // sendPartnerBookingNotification(booking, partnerPdfUrl)
-    //   .then(console.log("done partner"))
-    //   .catch((err) => console.log(err));
+    // Send email to partner with invoice
+    sendPartnerBookingNotification(booking, partnerPdfUrl)
+      .then(console.log("done partner"))
+      .catch((err) => console.log(err));
 
-    // return invoice;
+    return invoice;
   } catch (error) {
     console.error("Invoice generation failed:", error);
     throw error;
@@ -175,23 +175,23 @@ export const createParterPlanInvoice = async (planId) => {
 
     const url = await generatePartnerPlanInvoicePDF(plan, invoiceNumber);
     console.log(url);
-    const invoice = await Invoice.create({
-      invoiceNumber,
-      invoiceType: "PARTNER_PLAN_INVOICE",
-      pdfUrl: url,
-    });
-    console.log(invoice);
-    plan.invoiceId = invoice._id;
-    await plan.save();
+    // const invoice = await Invoice.create({
+    //   invoiceNumber,
+    //   invoiceType: "PARTNER_PLAN_INVOICE",
+    //   pdfUrl: url,
+    // });
+    // console.log(invoice);
+    // plan.invoiceId = invoice._id;
+    // await plan.save();
 
-    return invoice;
+    // return invoice;
   } catch (error) {
     console.error(" partner plan Invoice generation failed:", error);
     throw error;
   }
 };
-//createParterPlanInvoice("69e0bfb72a751495ee4706b8");
-// createParterPlanInvoice("69d35f0fecc687c0a6235796");
+// createParterPlanInvoice("6a01cf183e1d013032acafe7");
+//  createParterPlanInvoice("6a01cf293e1d013032acaffa");
 
 export const createParterMonthlyPayoutInvoice = async (payoutId) => {
   try {
