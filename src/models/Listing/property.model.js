@@ -146,8 +146,14 @@ const propertySchema = new mongoose.Schema(
       enum: ["pending", "under_review", "approved", "rejected"], //admin"approved" approved
       default: "pending",
     },
+    propertyAgreementDocument: {
+      secure_url: String,
+      access_date: Date,
+      view: {type: Boolean,default:false}
+    },
     AdminNote: { type: String },
-    //     commissionPercentage: { type: Number, default: 10 },
+  
+   
   },
   { timestamps: true },
 );

@@ -21,6 +21,7 @@ import {
   sendPartnerBookingNotification,
 } from "../mail/EmailTemplates/bookingEmailTemplate.js";
 
+
 // const booking = {
 //   confirmationCode: "BNF-987654",
 //   propertyId: { name: "Bonfire Luxury Villa" },
@@ -191,7 +192,7 @@ export const createParterPlanInvoice = async (planId) => {
   }
 };
 // createParterPlanInvoice("6a01cf183e1d013032acafe7");
-//  createParterPlanInvoice("6a01cf293e1d013032acaffa");
+// createParterPlanInvoice("6a01cf293e1d013032acaffa");
 
 export const createParterMonthlyPayoutInvoice = async (payoutId) => {
   try {
@@ -246,3 +247,4 @@ export const createParterMonthlyPayoutInvoice = async (payoutId) => {
 //     }
 //   }, 5000);
 // })();
+

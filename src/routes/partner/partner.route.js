@@ -9,6 +9,8 @@ import {
   requestPropertyApproval,
   getAllPropertyTypes,
   getPropertyTypeWithProperties,
+  requestForViewingPropertyAgreementDoc,
+  getPropertyAgreementDoc,
 } from "../../controllers/partner/property.controller.js";
 import {
   createRooms,
@@ -105,6 +107,20 @@ router.get(
   protect,
   authorizeRoles("PARTNER", "ADMIN"),
   getPlanById,
+);
+
+router.post(
+  "/request-viewing-property-agreement-doc",
+  protect,
+  authorizeRoles("PARTNER"),
+  requestForViewingPropertyAgreementDoc
+);
+
+router.get(
+  "/get-property-agreement-doc",
+  protect,
+  authorizeRoles("PARTNER"),
+  getPropertyAgreementDoc
 );
 
 //---------- property routes ----------------

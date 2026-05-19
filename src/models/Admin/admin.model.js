@@ -34,8 +34,18 @@ const AdminSchema = new mongoose.Schema(
     },
     RAZORPAY_CONFIG: {
       RAZORPAY_KEY_ID: String,
-      RAZORPAY_KEY_SECRET : String,
+      RAZORPAY_KEY_SECRET: String,
       RAZORPAY_WEBHOOK_SECRET: String,
+    },
+
+    PropertyListingTerm: {
+      type: String,
+    },
+    CommissionAndPaymentPolicy: {
+      type: String,
+    },
+    TermsOfUse: {
+      type: String,
     },
   },
   { timestamps: true }

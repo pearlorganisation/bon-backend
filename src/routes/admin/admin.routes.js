@@ -9,6 +9,8 @@ import {
   approveRejectProperty,
   assignPropertyToPartner,
   getPropertyDetailsById,
+  getAllPropertyAgreementRequests,
+  approvePropertyAgreementRequest,
 } from "../../controllers/partner/property.controller.js";
 import {
   protect,
@@ -35,9 +37,13 @@ import {
   confirmPartnerMonthlyPayout,
   upsertGSTConfig,
   upsertRazorpayConfig,
+  upsertPoliciesDocuments,
 } from "../../controllers/admin/admin.controller.js";
+import multer from "multer";
 
 route.use(protect);
+const storage = multer.memoryStorage();
+const upload = multer({ storage });
 
 route.get(
   "/get-subAdmin-sessions-history/:id",
@@ -101,6 +107,37 @@ route.post(
   "/upsert-razorpay-config",
   authorizeRoles("ADMIN"),
   upsertRazorpayConfig,
+);
+
+route.post(
+  "/upsert-policies",
+  authorizeRoles("ADMIN"),
+  upload.fields([
+    {
+      name: "PropertyListingTerm",
+      maxCount: 1,
+    },
+    {
+      name: "CommissionAndPaymentPolicy",
+      maxCount: 1,
+    },
+    {
+      name: "TermsOfUse",
+      maxCount: 1,
+    },
+  ]),
+  upsertPoliciesDocuments
+);
+
+route.get(
+  "/get-all-property-agreement-requests",
+  authorizeRoles("ADMIN"),
+  getAllPropertyAgreementRequests
+);
+route.post(
+  "/approve-property-agreement-request",
+  authorizeRoles("ADMIN"),
+  approvePropertyAgreementRequest
 );
 
 //payout apis
