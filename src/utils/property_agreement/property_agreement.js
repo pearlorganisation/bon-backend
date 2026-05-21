@@ -111,7 +111,7 @@ export const generatePropertyAgreementPDF = async (
       const ownerEmail  = auth.email             || "N/A";
       const ownerPhone  = auth.phoneNumber       || "N/A";
       const panNumber   = partner.panDetails?.panNumber || "N/A";
-      const gstin       = partner.gstinList?.[0]?.gstin  || "N/A";
+      const gstin       = property?.documentVerification?.GSTIN?.gstin  || "N/A";
  
       // ── Y tracker ─────────────────────────────────────────────────────────
       let y = MARGIN;
@@ -390,9 +390,9 @@ export const createPropertyAgreement = async (propertyId) => {
     }
 
     // Already generated
-    if (agreementDoc.HotelPartnerAgreement?.url) {
-      throw new Error("Hotel Partner Agreement already generated!");
-    }
+    // if (agreementDoc.HotelPartnerAgreement?.url) {
+    //   throw new Error("Hotel Partner Agreement already generated!");
+    // }
 
     // Generate agreement number
     const agreementNumber = `AGR-${Date.now()}`;
