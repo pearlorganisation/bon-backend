@@ -393,6 +393,9 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
         gstOnServices: 1,
         GSTIN: 1,
         RAZORPAY_CONFIG: 1,
+        TermsOfUse: 1,
+        CommissionAndPaymentPolicy: 1,
+        PropertyListingTerm:1,
       },
     },
   ]);
@@ -416,6 +419,11 @@ export const getPlatformPlans = asyncHandler(async (req, res, next) => {
     platformPlans.gstOnServices = result[0].gstOnServices;
     platformPlans.GSTIN = result[0].GSTIN;
     platformPlans.RAZORPAY_CONFIG = result[0].RAZORPAY_CONFIG;
+    platformPlans.polices = {
+       TermsOfUse: result[0]?.TermsOfUse|| null,
+        CommissionAndPaymentPolicy:result[0]?.CommissionAndPaymentPolicy ||null,
+        PropertyListingTerm: result[0]?.PropertyListingTerm|| null,
+    }
   }
 
   successResponse(res, 200, "Plans fetched successfully", platformPlans);
