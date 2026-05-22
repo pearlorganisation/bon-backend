@@ -1628,7 +1628,7 @@ export const getPropertyAgreementDoc = asyncHandler(async (req, res, next) => {
   });
 
   if (!agreementDoc) {
-    return next(new CustomError("Agreement document not found", 404));
+    return next(new CustomError("please verify this property first .", 404));
   }
 
   // Find admin policy docs
