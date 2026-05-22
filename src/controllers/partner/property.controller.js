@@ -1591,7 +1591,7 @@ export const requestForViewingPropertyAgreementDoc = asyncHandler(
     });
 
     if (!agreementDoc) {
-      return next(new CustomError("Agreement document not found", 404));
+      return next(new CustomError("please verify this property first .", 404));
     }
 
     // Current status
