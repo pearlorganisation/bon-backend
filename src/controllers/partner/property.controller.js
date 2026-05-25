@@ -1621,7 +1621,6 @@ export const getPropertyAgreementDoc = asyncHandler(async (req, res, next) => {
 
   const { propertyId } = req.body;
 
-  // Find agreement doc
   const agreementDoc = await propertyAgreementDoc.findOne({
     partnerId: userId,
     propertyId,
@@ -1631,14 +1630,12 @@ export const getPropertyAgreementDoc = asyncHandler(async (req, res, next) => {
     return next(new CustomError("please verify this property first .", 404));
   }
 
-  // Find admin policy docs
   const adminDoc = await Admin.findOne();
 
   if (!adminDoc) {
     return next(new CustomError("Hotel policies document not found", 404));
   }
 
-  // Final response object
   const allowedDocuments = {
     HotelPartnerAgreement: {},
     PropertyListingTerm: {},
@@ -1646,79 +1643,76 @@ export const getPropertyAgreementDoc = asyncHandler(async (req, res, next) => {
     TermsOfUse: {},
   };
 
-  // Current time
   const now = new Date();
+  const TEN_MINUTES_IN_SECONDS = 10 * 60; // 600 seconds
 
   for (const doc_name of Object.keys(allowedDocuments)) {
     const doc = agreementDoc[doc_name];
 
     // Default response
     allowedDocuments[doc_name] = {
-      status: doc?.isRequested ,
-
+      status: doc?.isRequested || "send-request",
       url: null,
+      remainingSeconds: 0
     };
 
-    // Skip if doc missing
     if (!doc) continue;
 
-    // APPROVED -> VIEW
+    // --- CASE 1: APPROVED -> VIEW (First time opening) ---
     if (doc.isRequested === "approved") {
       agreementDoc[doc_name].isRequested = "view";
-
+      
       agreementDoc[doc_name].viewTime = now;
 
       allowedDocuments[doc_name] = {
         status: "view",
-
-        url:
-          doc_name === "HotelPartnerAgreement"
+        url: doc_name === "HotelPartnerAgreement"
             ? agreementDoc[doc_name]?.url
             : adminDoc[doc_name],
+        remainingSeconds: TEN_MINUTES_IN_SECONDS, // Start with full 600 seconds
       };
     }
 
-    // ALREADY VIEW
+    // --- CASE 2: ALREADY VIEW (Checking existing timer) ---
     else if (doc.isRequested === "view") {
       const viewTime = agreementDoc[doc_name]?.viewTime;
+      
+      // Calculate how many seconds have passed
+      const elapsedSeconds = Math.floor((now - new Date(viewTime)) / 1000);
+      const remaining = TEN_MINUTES_IN_SECONDS - elapsedSeconds;
 
-      // Difference in minutes
-      const diffInMinutes = (now - viewTime) / (1000 * 60);
-
-      // Expired after 10 min
-      if (diffInMinutes > 10) {
+      if (remaining <= 0) {
+        // Time expired
         agreementDoc[doc_name].isRequested = "send-request";
         agreementDoc[doc_name].viewTime = null;
 
         allowedDocuments[doc_name] = {
           status: "send-request",
-
           url: null,
+          remainingSeconds: 0,
         };
       } else {
-        // Still accessible
+        // Still has time remaining
         allowedDocuments[doc_name] = {
           status: "view",
-
-          url:
-            doc_name === "HotelPartnerAgreement"
+          url: doc_name === "HotelPartnerAgreement"
               ? agreementDoc[doc_name]?.url
               : adminDoc[doc_name],
+          remainingSeconds: remaining, // This variable is now defined!
         };
       }
     }
 
-    // requested / send-request
+    // --- CASE 3: Requested or Send-Request ---
     else {
       allowedDocuments[doc_name] = {
         status: doc.isRequested,
-
         url: null,
+        remainingSeconds: 0
       };
     }
   }
 
-  // Save status updates
   await agreementDoc.save();
 
   successResponse(
