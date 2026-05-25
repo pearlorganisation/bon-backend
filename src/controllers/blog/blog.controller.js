@@ -3,7 +3,7 @@ import path from "path";
 import blogModel from "../../models/blog/blog.model.js";
 import mongoose from "mongoose";
 import { uploadBlogImage } from "../../utils/blog/blog.uploads.js";
-
+import { v2 as cloudinary } from "cloudinary";
 export const createBlog = async (req, res) => {
   try {
     const { title, content, category, tags, seoTitle, seoDescription } =
@@ -92,19 +92,36 @@ export const getBlogByIdAndSlug = async (req, res) => {
 export const updateBlog = async (req, res) => {
   try {
     const { id } = req.params;
+
     const blog = await blogModel.findById(id);
-    if (!blog)
-      return res
-        .status(404)
-        .json({ success: false, message: "Blog not found" });
 
-    const { title, content, category, tags, seoTitle, seoDescription, status } =
-      req.body;
+    if (!blog) {
+      return res.status(404).json({
+        success: false,
+        message: "Blog not found",
+      });
+    }
 
+    let {
+      title,
+      content,
+      category,
+      tags,
+      seoTitle,
+      seoDescription,
+      status,
+      deleteImageUrls, // array of image urls
+    } = req.body;
+
+    // Update fields
     if (title) {
       blog.title = title;
-      blog.slug = slugify(title, { lower: true, strict: true });
+      blog.slug = slugify(title, {
+        lower: true,
+        strict: true,
+      });
     }
+
     if (content) blog.content = content;
     if (category) blog.category = category;
     if (seoTitle) blog.seoTitle = seoTitle;
@@ -116,27 +133,76 @@ export const updateBlog = async (req, res) => {
         typeof tags === "string" ? tags.split(",").map((t) => t.trim()) : tags;
     }
 
-    // --- FIX 2: Handle file updates correctly ---
-    if (req.files?.coverImage?.[0]) {
-      const uploadedUrl = await uploadBlogImage(req.files.coverImage[0].path);
-      if (uploadedUrl) blog.coverImage = uploadedUrl;
+    // =========================
+    // DELETE BLOG IMAGES
+    // =========================
+
+    const imagesToDelete = [];
+     deleteImageUrls =JSON.parse(deleteImageUrls);
+     console.log(deleteImageUrls,typeof deleteImageUrls);
+    if (deleteImageUrls && Array.isArray(deleteImageUrls)) {
+      imagesToDelete.push(...deleteImageUrls);
     }
 
+    for (const imageUrl of imagesToDelete) {
+      // remove from blog.images array
+      blog.images = blog.images.filter((img) => img !== imageUrl);
+
+      // extract public id from cloudinary url
+      const publicId = imageUrl.split("/").slice(-1)[0].split(".")[0];
+
+      // delete from cloudinary
+      await cloudinary.uploader.destroy(`blogs/${publicId}`);
+    }
+
+    // =========================
+    // UPDATE COVER IMAGE
+    // =========================
+
+    if (req.files?.coverImage?.[0]) {
+      const uploadedUrl = await uploadBlogImage(req.files.coverImage[0].path);
+
+      if (uploadedUrl) {
+        // delete old cover image from cloudinary
+        if (blog.coverImage) {
+          const oldPublicId = blog.coverImage
+            .split("/")
+            .slice(-1)[0]
+            .split(".")[0];
+
+          await cloudinary.uploader.destroy(`blogs/${oldPublicId}`);
+        }
+
+        blog.coverImage = uploadedUrl;
+      }
+    }
+
+    // =========================
+    // ADD NEW IMAGES
+    // =========================
+
     if (req.files?.images) {
-      // If you want to replace old images, clear them; otherwise, push to existing
-      // blog.images = [];
       for (const file of req.files.images) {
         const imageUrl = await uploadBlogImage(file.path);
-        if (imageUrl) blog.images.push(imageUrl);
+
+        if (imageUrl) {
+          blog.images.push(imageUrl);
+        }
       }
     }
 
     await blog.save();
-    res
-      .status(200)
-      .json({ success: true, message: "Blog updated", data: blog });
+
+    return res.status(200).json({
+      success: true,
+      message: "Blog updated successfully",
+      data: blog,
+    });
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 

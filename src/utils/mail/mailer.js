@@ -146,7 +146,7 @@ import sgMail from "@sendgrid/mail";
 // set API key
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
-const SENDGRID_FROM_EMAIL = "rohit-singh@pearlorganisation.com";
+const SENDGRID_FROM_EMAIL = "bonfireescapes@gmail.com";
 
 // Support Mail
 export const sendSupportMail = async ({

@@ -13,7 +13,6 @@ const OtpSchema = new mongoose.Schema({
   email: {
     type: String,
     trim: true,
-    unique:true
   },
   
   createdAt: {
@@ -24,6 +23,8 @@ const OtpSchema = new mongoose.Schema({
 
 // ⏱️ Automatically delete OTP after 5 minutes
 OtpSchema.index({ createdAt: 1 }, { expireAfterSeconds: 300 });
+// 🔍 Compound index to optimize queries using both email and type
+OtpSchema.index({ email: 1, type: 1 });
 
 // ✅ Fix typo here: was 'emailOtpSchem' → should be 'emailOtpSchema'
 export const OTP = mongoose.model("OTP", OtpSchema);
