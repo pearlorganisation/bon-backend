@@ -116,7 +116,7 @@ router.post(
   requestForViewingPropertyAgreementDoc
 );
 
-router.get(
+router.post(
   "/get-property-agreement-doc",
   protect,
   authorizeRoles("PARTNER"),

@@ -1612,7 +1612,7 @@ export const requestForViewingPropertyAgreementDoc = asyncHandler(
 
     await agreementDoc.save();
 
-    successResponse(res, 200, "Request sent successfully", agreementDoc);
+    successResponse(res, 200, "Request sent successfully", {});
   }
 );
 
@@ -1654,7 +1654,7 @@ export const getPropertyAgreementDoc = asyncHandler(async (req, res, next) => {
 
     // Default response
     allowedDocuments[doc_name] = {
-      status: doc?.isRequested || "send-request",
+      status: doc?.isRequested ,
 
       url: null,
     };
@@ -1744,7 +1744,7 @@ export const getAllPropertyAgreementRequests = asyncHandler(
 
       .populate("partnerId", "name email phone")
 
-      .populate("propertyId", "propertyName")
+      .populate("propertyId", "name")
 
       .lean();
 
@@ -1785,7 +1785,7 @@ export const getAllPropertyAgreementRequests = asyncHandler(
             property: {
               _id: agreement.propertyId?._id,
 
-              propertyName: agreement.propertyId?.propertyName,
+              name: agreement.propertyId?.name,
             },
           });
         }
