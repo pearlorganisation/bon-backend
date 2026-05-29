@@ -176,16 +176,16 @@ export const createParterPlanInvoice = async (planId) => {
 
     const url = await generatePartnerPlanInvoicePDF(plan, invoiceNumber);
     console.log(url);
-    // const invoice = await Invoice.create({
-    //   invoiceNumber,
-    //   invoiceType: "PARTNER_PLAN_INVOICE",
-    //   pdfUrl: url,
-    // });
-    // console.log(invoice);
-    // plan.invoiceId = invoice._id;
-    // await plan.save();
+    const invoice = await Invoice.create({
+      invoiceNumber,
+      invoiceType: "PARTNER_PLAN_INVOICE",
+      pdfUrl: url,
+    });
+    console.log(invoice);
+    plan.invoiceId = invoice._id;
+    await plan.save();
 
-    // return invoice;
+    return invoice;
   } catch (error) {
     console.error(" partner plan Invoice generation failed:", error);
     throw error;

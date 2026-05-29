@@ -849,6 +849,33 @@ export const subscriptionWebhookController = asyncHandler(
   }
 );
 
+export const deleteUpcomingPlan = asyncHandler(async (req, res, next) => {
+  const partnerId = req.user._id;
+  const { planId } = req.params;
+
+  // validate id
+  if (!mongoose.Types.ObjectId.isValid(planId)) {
+    return next(new CustomError("Invalid plan id", 400));
+  }
+
+  // find upcoming plan
+  const upcomingPlan = await PartnerPlan.findOne({
+    partnerId,
+    _id: planId,
+    planStatus: "UPCOMING",
+  });
+
+  if (!upcomingPlan) {
+    return next(
+      new CustomError("Upcoming plan not found or cannot be deleted", 404)
+    );
+  }
+
+  await upcomingPlan.deleteOne();
+
+  successResponse(res, 200, "Plan deleted successfully");
+});
+
 export const getMyPlans = asyncHandler(async (req, res, next) => {
   let partnerId = req.user._id;
   if (req.user.role == "ADMIN") {

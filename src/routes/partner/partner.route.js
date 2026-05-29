@@ -40,6 +40,7 @@ import {
   getRecentBookingByID,
   getPlanById,
   updatePartnerBankAccount,
+  deleteUpcomingPlan,
 } from "../../controllers/partner/parnter.controller.js";
 import {
   authorizeRoles,
@@ -95,6 +96,13 @@ router.post(
   protect,
   authorizeRoles("PARTNER"),
   buyNewSubscriptionPlan,
+);
+
+router.delete(
+  "/delete-upcoming-plan/:planId",
+  protect,
+  authorizeRoles("PARTNER"),
+  deleteUpcomingPlan
 );
 router.get(
   "/my-plans",
