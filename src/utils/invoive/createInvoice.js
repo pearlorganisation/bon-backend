@@ -162,7 +162,7 @@ export const createBookingInvoice = async (bookingId) => {
 const id = "6a0414c6186c01ba682d199d";
 //createBookingInvoice(id);
 
-export const createParterPlanInvoice = async (planId) => {
+export const  createParterPlanInvoice = async (planId) => {
   try {
     const invoiceNumber = await generateInvoiceNumber();
 

@@ -136,7 +136,7 @@ export const updateBlog = async (req, res) => {
     // =========================
     // DELETE BLOG IMAGES
     // =========================
-
+   if(deleteImageUrls){
     const imagesToDelete = [];
      deleteImageUrls =JSON.parse(deleteImageUrls);
      console.log(deleteImageUrls,typeof deleteImageUrls);
@@ -153,6 +153,7 @@ export const updateBlog = async (req, res) => {
 
       // delete from cloudinary
       await cloudinary.uploader.destroy(`blogs/${publicId}`);
+    }
     }
 
     // =========================
