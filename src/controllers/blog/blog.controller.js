@@ -28,12 +28,19 @@ export const createBlog = async (req, res) => {
       if (uploadedUrl) coverImage = uploadedUrl; // Use local variable
     }
 
-    if (req.files?.images) {
-      for (const file of req.files.images) {
-        const imageUrl = await uploadBlogImage(file.path);
-        if (imageUrl) images.push(imageUrl); // Now images is defined
+  if (req.files?.images?.length) {
+    const uploadResults = await Promise.allSettled(
+      req.files.images.map((file) => uploadBlogImage(file.path))
+    );
+
+    uploadResults.forEach((result) => {
+      if (result.status === "fulfilled" && result.value) {
+        images.push(result.value);
+      } else {
+        console.error("Image upload failed:", result.reason);
       }
-    }
+    });
+  }
 
     const blog = await blogModel.create({
       title,
@@ -182,15 +189,19 @@ export const updateBlog = async (req, res) => {
     // ADD NEW IMAGES
     // =========================
 
-    if (req.files?.images) {
-      for (const file of req.files.images) {
-        const imageUrl = await uploadBlogImage(file.path);
+  if (req.files?.images?.length) {
+  const uploadResults = await Promise.allSettled(
+    req.files.images.map((file) => uploadBlogImage(file.path))
+  );
 
-        if (imageUrl) {
-          blog.images.push(imageUrl);
-        }
-      }
+  uploadResults.forEach((result) => {
+    if (result.status === "fulfilled" && result.value) {
+      blog.images.push(result.value);
+    } else {
+      console.error("Image upload failed:", result.reason);
     }
+  });
+}
 
     await blog.save();
 

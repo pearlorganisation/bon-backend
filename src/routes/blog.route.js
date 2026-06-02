@@ -19,7 +19,7 @@ router.post(
   authorizeRoles("ADMIN", "SUBADMIN"),
   upload.fields([
     { name: "coverImage", maxCount: 1 },
-    { name: "images", maxCount: 10 },
+    { name: "images", maxCount: 15 },
   ]),
   createBlog,
 );
@@ -33,7 +33,7 @@ router.patch(
   authorizeRoles("ADMIN", "SUBADMIN"),
   upload.fields([
     { name: "coverImage", maxCount: 1 },
-    { name: "images", maxCount: 10 },
+    { name: "images", maxCount: 15 },
   ]),
   updateBlog,
 );
