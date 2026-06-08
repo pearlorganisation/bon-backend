@@ -505,3 +505,74 @@ export const sendSubAdminCreatedEmail = async (name, email, password) => {
 // )
 //   .then((res) => console.log("done"))
 //   .catch((error) => console.log(error));
+
+
+
+/* -------------------------------------------------------------------------- */
+/*                          Trip Enquiry Templates                            */
+/* -------------------------------------------------------------------------- */
+
+export const sendTripEnquiryEmail = async ({ 
+  adminEmail, 
+  customerData, 
+  tripData, 
+  batchData 
+}) => {
+  const subject = `New Trip Enquiry: ${tripData.title}`;
+
+  // Email content for the ADMIN
+  const adminContent = `
+    <div>
+      <h2 style="color: ${COLORS.textDark}; font-size: 20px; border-bottom: 2px solid ${COLORS.primary}; padding-bottom: 8px;">
+        New Enquiry Received
+      </h2>
+
+      <div style="margin: 20px 0; background: ${COLORS.grayBg}; padding: 15px; border-radius: 8px;">
+        <h3 style="color: ${COLORS.primaryDark}; font-size: 16px; margin-top: 0;">👤 Customer Details</h3>
+        <p style="margin: 5px 0;"><strong>Name:</strong> ${customerData.name}</p>
+        <p style="margin: 5px 0;"><strong>Email:</strong> ${customerData.email}</p>
+        <p style="margin: 5px 0;"><strong>Phone:</strong> ${customerData.phone}</p>
+        <p style="margin: 5px 0;"><strong>Guests:</strong> ${customerData.guests}</p>
+        <p style="margin: 5px 0;"><strong>Message:</strong> ${customerData.message || "No message provided"}</p>
+      </div>
+
+      <div style="margin: 20px 0; background: ${COLORS.primaryLight}; padding: 15px; border-radius: 8px;">
+        <h3 style="color: ${COLORS.primaryDark}; font-size: 16px; margin-top: 0;">🏔️ Trip Details</h3>
+        <p style="margin: 5px 0;"><strong>Trip Title:</strong> ${tripData.title}</p>
+        <p style="margin: 5px 0;"><strong>Batch:</strong> ${new Date(batchData.startDate).toDateString()} - ${new Date(batchData.endDate).toDateString()}</p>
+        <p style="margin: 5px 0;"><strong>Price/Person:</strong> ₹${batchData.pricePerPerson}</p>
+      </div>
+    </div>
+  `;
+
+  // Email content for the CUSTOMER
+  const customerContent = `
+    <div>
+      <h2 style="color: ${COLORS.textDark};">Hi ${customerData.name},</h2>
+      <p style="color: ${COLORS.textLight}; font-size: 15px; line-height: 1.6;">
+        Thank you for your interest in the <strong>${tripData.title}</strong>! We have received your enquiry and our travel experts will get back to you shortly.
+      </p>
+      <div style="background: ${COLORS.grayBg}; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p style="margin:0;"><strong>Selected Batch:</strong> ${new Date(batchData.startDate).toDateString()}</p>
+        <p style="margin:0;"><strong>Number of Guests:</strong> ${customerData.guests}</p>
+      </div>
+      <p style="color: ${COLORS.textLight}; font-size: 14px;">
+        If you have urgent questions, feel free to reply to this email.
+      </p>
+    </div>
+  `;
+
+  const adminHtml = await createEmailWrapper(adminContent, "New Trip Enquiry");
+  const customerHtml = await createEmailWrapper(customerContent, "Enquiry Received");
+
+  // 1. Send to Admin
+  await sendSupportMail({
+    to: adminEmail,
+    replyTo: customerData.email,
+    subject: subject,
+    html: adminHtml
+  });
+
+  // 2. Send Confirmation to Customer
+  await sendEmail(customerData.email, `Enquiry Received: ${tripData.title}`, customerHtml);
+};

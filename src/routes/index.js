@@ -16,7 +16,7 @@ import ContactRouter from "../routes/contactus.routes.js";
 import BlogRouter from "../routes/blog.route.js";
 import chatRoute from "../routes/chat/chat.route.js";
 import PlatformSettingRouter from "../routes/platformSetting.route.js";
-import tourRouter from "../modules/TourPackage/tour.routes.js";
+ import tourRouter from "../modules/TourPackage/tour.route.js";
 const router = express.Router();
 
 router.use("/auth", AuthRouter);
